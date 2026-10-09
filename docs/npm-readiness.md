@@ -75,6 +75,31 @@ Expand the existing `files` allowlist to:
 
 The example glob selects only top-level public YAML models. Keep the documentation generator as source-checkout tooling; it is not needed at runtime.
 
+## Clean tarball install (2026-10-09)
+
+Node.js 24.21.0 / npm 11.19.0. After `npm run build`, `npm pack` produced `chen-er-0.1.0.tgz`: 111 files, 1.1 MB packed (1,096,527 bytes), 2.1 MB unpacked. Nothing from `examples/private/`, `test/` or `src/` is in the tarball; shipped examples are the three top-level `examples/*.er.yaml`, plus `docs/` (images, model reference, lint example, this file), `assets`, `schema`, `skills`, `bin`, `dist`.
+
+The tarball was installed with `npm install <tgz>` into a fresh directory outside the repository (`npm init -y` first, temporary npm cache). Results with `npx chen`:
+
+| Check | Result |
+| --- | --- |
+| `--help`, `schema`, `rules` | pass |
+| `init demo.er.yaml`, `lint demo.er.yaml` | pass (exit 0) |
+| `render demo.er.yaml --png` | pass; SVG (3,477 bytes) and PNG (39,111 bytes) written |
+| `render node_modules/chen-er/examples/library.er.yaml -o lib.svg` | pass (10,934 bytes) |
+| `serve demo.er.yaml --port 5791` | pass; page `/` 200, `/api/state` 200 (JSON), `/api/export.svg` 200 |
+| MCP over stdio (`initialize`, `tools/list`) | pass; tools `get_schema`, `lint_er`, `render_er` |
+
+Findings: the README documented the MCP server only for a source checkout (`npx tsx src/mcp/server.ts`); the package had no installed entry point for it. `dist/mcp/server.js` starts only when it is the main module, so it cannot be used through a bin symlink. `bin/chen-mcp.js` was added; it calls `startServer()` directly and works from `node_modules/chen-er/bin/chen-mcp.js`. The README now documents install and MCP for the installed package. `bin/chen-mcp.js` was added after the tarball above was packed (the `bin` directory is in `files`, so it will ship); it was verified by copying it into the installed package, not through a bin entry.
+
+Optional maintainer change (package.json), to expose the server as a command (`npx -p chen-er chen-er-mcp`):
+
+```json
+{"bin": {"chen": "./bin/chen.js", "chen-er-mcp": "./bin/chen-mcp.js"}}
+```
+
+Not tested: installation from the registry, Node 22, Windows, `chen serve --open`, browser-side viewer interaction (pin dragging, export buttons) and the MCP `lint_er`/`render_er` calls from the installed package.
+
 ## Before a release
 
-Build, run the required typecheck/tests, regenerate documentation and review the final pack listing. `prepublishOnly` runs for publication; `npm pack` itself still needs an explicit build. Confirm the README images, model reference and examples ship after applying the allowlist. Test the actual tarball installation and `chen serve` on a clean environment before publication. The current built checkout was checked; a clean tarball installation remains a release task.
+Build, run the required typecheck/tests, regenerate documentation and review the final pack listing. `prepublishOnly` runs for publication; `npm pack` itself still needs an explicit build. Confirm the README images, model reference and examples ship after applying the allowlist. The clean tarball installation is recorded above; repeat it for the final release candidate.

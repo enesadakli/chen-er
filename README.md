@@ -63,7 +63,15 @@ Start the stdio MCP server from the checkout:
 npx tsx src/mcp/server.ts
 ```
 
-For a client configuration, replace the checkout path and launch the client from an environment where `tsx` resolves:
+From an installed package (`npm install chen-er`), run the server with Node:
+
+```sh
+node node_modules/chen-er/bin/chen-mcp.js
+```
+
+and configure the client with `"command": "node"` and `"args": ["/absolute/path/to/project/node_modules/chen-er/bin/chen-mcp.js"]`.
+
+For a checkout client configuration, replace the checkout path and launch the client from an environment where `tsx` resolves:
 
 ```json
 {
@@ -96,7 +104,16 @@ Open the printed URL. Saves to the YAML or sibling layout file refresh the diagr
 
 ## Install and quick start
 
-Use Node.js 24. Install the checkout's dependencies with `npm ci`, then the one-command render above runs without a build. This README documents source and built-checkout usage; npm publication is pending the [packaging checklist](docs/npm-readiness.md).
+Use Node.js 24. To use the packed package in another project (verified with a clean install of the tarball; the registry release is pending):
+
+```sh
+npm install chen-er        # or: npm install ./chen-er-0.1.0.tgz
+npx chen init model.er.yaml
+npx chen lint model.er.yaml
+npx chen render model.er.yaml --png
+```
+
+From a checkout, install the checkout's dependencies with `npm ci`, then the one-command render above runs without a build. This README documents source and built-checkout usage; npm publication is pending the [packaging checklist](docs/npm-readiness.md).
 
 To use the built CLI:
 
