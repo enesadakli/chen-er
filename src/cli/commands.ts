@@ -110,3 +110,14 @@ export function rulesCommand(): CommandResult {
     stderr: "",
   };
 }
+
+export interface ServeCommandOptions {
+  port?: number;
+  open?: boolean;
+  engine?: LayoutOptions["engine"];
+}
+
+export async function serveCommand(modelPath: string, options: ServeCommandOptions = {}) {
+  const { serve } = await import("../app/serve.js");
+  return serve(modelPath, options);
+}

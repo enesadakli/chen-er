@@ -43,6 +43,23 @@ program.command("init").description("write a commented starter model")
 program.command("rules").description("list lint rules")
   .action(() => print(rulesCommand()));
 
+program.command("serve").description("open a live local diagram viewer")
+  .argument("<model>", "path to a .er.yaml model")
+  .option("--port <number>", "local HTTP port", Number, 5178)
+  .option("--open", "open the viewer in your browser")
+  .addOption(new Option("--engine <name>", "layout engine").choices(["layered", "stress", "simple"]))
+  .action(async (model: string, options: import("./commands.js").ServeCommandOptions) => {
+    const { serveCommand } = await import("./commands.js");
+    const viewer = await serveCommand(model, options);
+    console.log(viewer.url);
+    const stop = () => { void viewer.close().catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }); };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+
 program.parseAsync().catch((error: unknown) => {
   if (error instanceof CommanderError) {
     process.exitCode = error.exitCode === 0 ? 0 : 2;

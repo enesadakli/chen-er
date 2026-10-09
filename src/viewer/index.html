@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>chen-er notebook</title></head>
+<body>
+  <header class="header">
+    <h1 id="title">chen-er</h1><span id="path" class="path"></span>
+    <label class="engine">Engine <select id="engine"><option>simple</option><option>layered</option><option>stress</option></select></label>
+    <span id="quality" class="quality">Quality pending</span>
+    <span id="status" role="status" aria-live="polite">connecting</span>
+    <button id="fit" title="Fit (F)">Fit</button>
+    <details class="actions"><summary>Export</summary><div class="menu">
+      <a href="/api/export.svg" download>Export SVG</a><a href="/api/export.png?scale=2" download>Export PNG</a>
+      <button id="reset-mobile" class="mobile-only">Reset pins</button><button id="theme">Dark desk</button>
+    </div></details><button id="reset" class="desktop-only">Reset pins</button>
+  </header>
+  <main class="workspace">
+    <section id="canvas" class="canvas" tabindex="0" aria-label="Diagram. F fits, plus and minus zoom, 0 resets zoom. Arrow keys pan. Select a node and use arrow keys to move it; Alt disables snap. Delete unpins.">
+      <div id="sheet" class="sheet"><div id="figure" class="figure"></div><svg id="overlay" class="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="Findings and pin marks"></svg></div>
+      <p id="placeholder">Loading the model…</p>
+      <div class="zoom-controls"><button id="minus" aria-label="Zoom out">−</button><output id="zoom">100%</output><button id="plus" aria-label="Zoom in">+</button><button id="actual" title="100% (0)">100%</button></div>
+    </section>
+    <aside id="notes" class="notes" aria-label="Model findings">
+      <button id="drawer" class="drawer" aria-label="Resize notes drawer. Arrow keys change its height.">Findings</button>
+      <div id="findings" class="findings"><p>Waiting for findings…</p></div>
+    </aside>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body></html>
