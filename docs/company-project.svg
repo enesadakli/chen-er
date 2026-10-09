@@ -1,54 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1092" height="1608" viewBox="0 0 1092 1608" font-family="Inter, Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1092" height="878" viewBox="0 0 1092 878" font-family="Inter, Helvetica, Arial, sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
 <g fill="none" stroke="#1f2328" stroke-width="1.5" stroke-linejoin="round">
-<g data-id="edge:SPONSORS#0" class="er-edge"><polyline points="860,440 860,195"/></g>
-<g data-id="edge:SPONSORS#1" class="er-edge"><polyline points="860,504 860,749"/></g>
-<g data-id="edge:CONTAINS#0" class="er-edge"><polyline points="860,1040 860,795"/></g>
-<g data-id="edge:CONTAINS#1" class="er-edge"><polyline points="858,1104 858,1349"/><polyline points="862,1104 862,1349"/></g>
-<g data-id="edge:CONTRIBUTES#0" class="er-edge"><polyline points="458,772 326,772"/></g>
-<g data-id="edge:CONTRIBUTES#1" class="er-edge"><polyline points="662,772 800.5,772"/></g>
-<g data-id="edge:MENTORS#mentor" class="er-edge"><polyline points="286.5,513.3 286.5,631.2 310,631.2 310,749"/></g>
-<g data-id="edge:MENTORS#mentee" class="er-edge"><polyline points="233.5,513.3 233.5,631.2 203,631.2 203,749"/></g>
-<g data-id="edge:A:COMPANY.CompanyId" class="er-edge"><polyline points="879,149 879,114"/></g>
-<g data-id="edge:A:COMPANY.Name" class="er-edge"><polyline points="925,149 956.9,147.2"/></g>
-<g data-id="edge:A:PROJECT.ProjectId" class="er-edge"><polyline points="919.5,772 956,772"/></g>
-<g data-id="edge:A:PROJECT.Title" class="er-edge"><polyline points="919.5,749 936.8,733"/></g>
-<g data-id="edge:A:EMPLOYEE.EmployeeId" class="er-edge"><polyline points="194,772 158,772"/></g>
-<g data-id="edge:A:EMPLOYEE.Name" class="er-edge"><polyline points="194,795 179.4,811.1"/></g>
-<g data-id="edge:A:TASK.TaskNo" class="er-edge"><polyline points="879,1395 879,1430"/></g>
-<g data-id="edge:A:TASK.Summary" class="er-edge"><polyline points="915,1395 942.9,1396"/></g>
-<g data-id="edge:A:CONTRIBUTES.HoursPerWeek" class="er-edge"><polyline points="532.3,795.3 504.5,818.6"/></g>
+<g data-id="edge:SPONSORS#0" class="er-edge"><polyline points="860,255 860,190"/></g>
+<g data-id="edge:SPONSORS#1" class="er-edge"><polyline points="860,319 860,384"/></g>
+<g data-id="edge:CONTAINS#0" class="er-edge"><polyline points="860,495 860,430"/></g>
+<g data-id="edge:CONTAINS#1" class="er-edge"><polyline points="858,559 858,624"/><polyline points="862,559 862,624"/></g>
+<g data-id="edge:CONTRIBUTES#0" class="er-edge"><polyline points="458,407 326,407"/></g>
+<g data-id="edge:CONTRIBUTES#1" class="er-edge"><polyline points="662,407 800.5,407"/></g>
+<g data-id="edge:MENTORS#mentor" class="er-edge"><polyline points="310,218.9 310,384"/></g>
+<g data-id="edge:MENTORS#mentee" class="er-edge"><polyline points="210,218.9 210,384"/></g>
+<g data-id="edge:A:COMPANY.CompanyId" class="er-edge"><polyline points="904,144 904,114"/></g>
+<g data-id="edge:A:COMPANY.Name" class="er-edge"><polyline points="925,147 958.5,147"/></g>
+<g data-id="edge:A:PROJECT.ProjectId" class="er-edge"><polyline points="919.5,407 956,407"/></g>
+<g data-id="edge:A:PROJECT.Title" class="er-edge"><polyline points="919.5,384 936.8,368"/></g>
+<g data-id="edge:A:EMPLOYEE.EmployeeId" class="er-edge"><polyline points="194,407 158,407"/></g>
+<g data-id="edge:A:EMPLOYEE.Name" class="er-edge"><polyline points="194,430 179.4,446.1"/></g>
+<g data-id="edge:A:TASK.TaskNo" class="er-edge"><polyline points="904,670 904,700"/></g>
+<g data-id="edge:A:TASK.Summary" class="er-edge"><polyline points="915,667 945.5,667"/></g>
+<g data-id="edge:A:CONTRIBUTES.HoursPerWeek" class="er-edge"><polyline points="532.3,430.3 504.5,453.6"/></g>
 </g>
-<g data-id="E:COMPANY" class="er-entity"><rect x="795" y="149" width="130" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="172" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">COMPANY</text></g>
-<g data-id="E:PROJECT" class="er-entity"><rect x="800.5" y="749" width="119" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="772" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PROJECT</text></g>
-<g data-id="E:EMPLOYEE" class="er-entity"><rect x="194" y="749" width="132" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="260" y="772" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">EMPLOYEE</text></g>
-<g data-id="E:TASK" class="er-entity"><rect x="805" y="1349" width="110" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><rect x="810" y="1354" width="100" height="36" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="1372" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">TASK</text></g>
-<g data-id="R:SPONSORS" class="er-relationship"><polygon points="860,440 945,472 860,504 775,472" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="472" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">SPONSORS</text></g>
-<g data-id="R:CONTAINS" class="er-relationship"><polygon points="860,1040 943,1072 860,1104 777,1072" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><polygon points="860,1047 924.8,1072 860,1097 795.2,1072" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="1072" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CONTAINS</text></g>
-<g data-id="R:CONTRIBUTES" class="er-relationship"><polygon points="560,740 662,772 560,804 458,772" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="560" y="772" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CONTRIBUTES</text></g>
-<g data-id="R:MENTORS" class="er-relationship"><polygon points="260,460 339.5,492 260,524 180.5,492" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="260" y="492" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">MENTORS</text></g>
-<g data-id="A:COMPANY.CompanyId" class="er-attribute"><ellipse cx="879" cy="97" rx="62" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="879" y="97" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CompanyId</text><line x1="841.1" y1="105.7" x2="916.9" y2="105.7" stroke="#1f2328" stroke-width="1.2"/></g>
-<g data-id="A:COMPANY.Name" class="er-attribute"><ellipse cx="997" cy="145" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="997" y="145" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
-<g data-id="A:PROJECT.ProjectId" class="er-attribute"><ellipse cx="1008" cy="772" rx="52" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1008" y="772" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">ProjectId</text><line x1="978.5" y1="780.7" x2="1037.5" y2="780.7" stroke="#1f2328" stroke-width="1.2"/></g>
-<g data-id="A:PROJECT.Title" class="er-attribute"><ellipse cx="953" cy="718" rx="34.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="953" y="718" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Title</text></g>
-<g data-id="A:EMPLOYEE.EmployeeId" class="er-attribute"><ellipse cx="95" cy="772" rx="63" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="95" y="772" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">EmployeeId</text><line x1="56.2" y1="780.7" x2="133.8" y2="780.7" stroke="#1f2328" stroke-width="1.2"/></g>
-<g data-id="A:EMPLOYEE.Name" class="er-attribute"><ellipse cx="165" cy="827" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="165" y="827" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
-<g data-id="A:TASK.TaskNo" class="er-attribute"><ellipse cx="879" cy="1447" rx="47.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="879" y="1447" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">TaskNo</text><line x1="853.5" y1="1455.7" x2="904.5" y2="1455.7" stroke="#1f2328" stroke-width="1.2" stroke-dasharray="4 3"/></g>
-<g data-id="A:TASK.Summary" class="er-attribute"><ellipse cx="997" cy="1398" rx="54.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="997" y="1398" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Summary</text></g>
-<g data-id="A:CONTRIBUTES.HoursPerWeek" class="er-attribute"><ellipse cx="485" cy="835" rx="75.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="485" y="835" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">HoursPerWeek</text></g>
-<g data-id="label:edge:SPONSORS#0:cardinality" class="er-label"><text x="839" y="210" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
-<g data-id="label:edge:SPONSORS#1:cardinality" class="er-label"><text x="877" y="734" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
-<g data-id="label:edge:CONTAINS#0:cardinality" class="er-label"><text x="839" y="810" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
-<g data-id="label:edge:CONTAINS#1:cardinality" class="er-label"><text x="879" y="1334" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
-<g data-id="label:edge:CONTRIBUTES#0:cardinality" class="er-label"><text x="351" y="783" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
-<g data-id="label:edge:CONTRIBUTES#1:cardinality" class="er-label"><text x="775.5" y="761" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
-<g data-id="label:edge:MENTORS#mentor:cardinality" class="er-label"><text x="331" y="734" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
-<g data-id="label:edge:MENTORS#mentor:role" class="er-label"><text x="337" y="701" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">mentor</text></g>
-<g data-id="label:edge:MENTORS#mentee:cardinality" class="er-label"><text x="221.5" y="734" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
-<g data-id="label:edge:MENTORS#mentee:role" class="er-label"><text x="231.5" y="701" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">mentee</text></g>
+<g data-id="E:COMPANY" class="er-entity"><rect x="795" y="144" width="130" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="167" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">COMPANY</text></g>
+<g data-id="E:PROJECT" class="er-entity"><rect x="800.5" y="384" width="119" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="407" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PROJECT</text></g>
+<g data-id="E:EMPLOYEE" class="er-entity"><rect x="194" y="384" width="132" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="260" y="407" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">EMPLOYEE</text></g>
+<g data-id="E:TASK" class="er-entity"><rect x="805" y="624" width="110" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><rect x="810" y="629" width="100" height="36" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="647" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">TASK</text></g>
+<g data-id="R:SPONSORS" class="er-relationship"><polygon points="860,255 945,287 860,319 775,287" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="287" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">SPONSORS</text></g>
+<g data-id="R:CONTAINS" class="er-relationship"><polygon points="860,495 943,527 860,559 777,527" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><polygon points="860,502 924.8,527 860,552 795.2,527" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="860" y="527" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CONTAINS</text></g>
+<g data-id="R:CONTRIBUTES" class="er-relationship"><polygon points="560,375 662,407 560,439 458,407" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="560" y="407" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CONTRIBUTES</text></g>
+<g data-id="R:MENTORS" class="er-relationship"><polygon points="260,175 339.5,207 260,239 180.5,207" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="260" y="207" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">MENTORS</text></g>
+<g data-id="A:COMPANY.CompanyId" class="er-attribute"><ellipse cx="904" cy="97" rx="62" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="904" y="97" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CompanyId</text><line x1="866.1" y1="105.7" x2="941.9" y2="105.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:COMPANY.Name" class="er-attribute"><ellipse cx="999" cy="147" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="999" y="147" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:PROJECT.ProjectId" class="er-attribute"><ellipse cx="1008" cy="407" rx="52" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1008" y="407" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">ProjectId</text><line x1="978.5" y1="415.7" x2="1037.5" y2="415.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:PROJECT.Title" class="er-attribute"><ellipse cx="953" cy="353" rx="34.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="953" y="353" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Title</text></g>
+<g data-id="A:EMPLOYEE.EmployeeId" class="er-attribute"><ellipse cx="95" cy="407" rx="63" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="95" y="407" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">EmployeeId</text><line x1="56.2" y1="415.7" x2="133.8" y2="415.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:EMPLOYEE.Name" class="er-attribute"><ellipse cx="165" cy="462" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="165" y="462" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:TASK.TaskNo" class="er-attribute"><ellipse cx="904" cy="717" rx="47.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="904" y="717" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">TaskNo</text><line x1="878.5" y1="725.7" x2="929.5" y2="725.7" stroke="#1f2328" stroke-width="1.2" stroke-dasharray="4 3"/></g>
+<g data-id="A:TASK.Summary" class="er-attribute"><ellipse cx="1000" cy="667" rx="54.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1000" y="667" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Summary</text></g>
+<g data-id="A:CONTRIBUTES.HoursPerWeek" class="er-attribute"><ellipse cx="485" cy="470" rx="75.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="485" y="470" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">HoursPerWeek</text></g>
+<g data-id="label:edge:SPONSORS#0:cardinality" class="er-label"><text x="839" y="205" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:SPONSORS#1:cardinality" class="er-label"><text x="877" y="369" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:CONTAINS#0:cardinality" class="er-label"><text x="839" y="445" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:CONTAINS#1:cardinality" class="er-label"><text x="879" y="609" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:CONTRIBUTES#0:cardinality" class="er-label"><text x="351" y="418" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:CONTRIBUTES#1:cardinality" class="er-label"><text x="775.5" y="396" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:MENTORS#mentor:cardinality" class="er-label"><text x="331" y="369" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:MENTORS#mentor:role" class="er-label"><text x="337" y="336" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">mentor</text></g>
+<g data-id="label:edge:MENTORS#mentee:cardinality" class="er-label"><text x="228.5" y="369" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:MENTORS#mentee:role" class="er-label"><text x="238.5" y="336" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">mentee</text></g>
 <g data-id="title" class="er-label"><text x="32" y="52" font-size="20" font-weight="700" fill="#1f2328">Company projects</text></g>
-<g data-id="note:0" class="er-label"><text x="32" y="1526" font-size="13" fill="#57606a">Each project has one sponsor; a company may sponsor many projects.</text></g>
-<g data-id="note:1" class="er-label"><text x="32" y="1546" font-size="13" fill="#57606a">Task numbers are unique within a project, not across projects.</text></g>
-<g data-id="note:2" class="er-label"><text x="32" y="1566" font-size="13" fill="#57606a">HoursPerWeek describes an employee&#39;s current contribution to a project.</text></g>
-<g data-id="note:3" class="er-label"><text x="32" y="1586" font-size="13" fill="#57606a">An employee may mentor many colleagues and have at most one mentor.</text></g>
+<g data-id="note:0" class="er-label"><text x="32" y="796" font-size="13" fill="#57606a">Each project has one sponsor; a company may sponsor many projects.</text></g>
+<g data-id="note:1" class="er-label"><text x="32" y="816" font-size="13" fill="#57606a">Task numbers are unique within a project, not across projects.</text></g>
+<g data-id="note:2" class="er-label"><text x="32" y="836" font-size="13" fill="#57606a">HoursPerWeek describes an employee&#39;s current contribution to a project.</text></g>
+<g data-id="note:3" class="er-label"><text x="32" y="856" font-size="13" fill="#57606a">An employee may mentor many colleagues and have at most one mentor.</text></g>
 </svg>
