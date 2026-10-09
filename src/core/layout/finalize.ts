@@ -4,6 +4,7 @@ import { style } from "../style.js";
 /**
  * Shared last step of every layout engine: shift everything so the drawing
  * starts at the margin (leaving room for the title band) and compute the canvas size.
+ * Absolute pins disable the translation, including pins outside the canvas.
  * Notes are drawn by the renderer below `height`; it adds their band itself.
  */
 export function finalize(input: {
@@ -21,15 +22,16 @@ export function finalize(input: {
   const maxX = Math.max(...boxes.map((b) => b.x + b.w), ...points.map((p) => p.x));
   const maxY = Math.max(...boxes.map((b) => b.y + b.h), ...points.map((p) => p.y));
   const top = style.margin + (input.title ? style.title.band : 0);
-  const dx = Number.isFinite(minX) ? style.margin - minX : style.margin;
-  const dy = Number.isFinite(minY) ? top - minY : top;
+  const pinned = input.nodes.some((n) => n.pinned);
+  const dx = pinned ? 0 : Number.isFinite(minX) ? style.margin - minX : style.margin;
+  const dy = pinned ? 0 : Number.isFinite(minY) ? top - minY : top;
 
   for (const n of input.nodes) (n.box.x += dx), (n.box.y += dy);
   for (const l of input.labels) (l.box.x += dx), (l.box.y += dy);
   for (const e of input.edges) e.points = e.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 
-  const width = Number.isFinite(maxX) ? Math.ceil(maxX - minX + 2 * style.margin) : 2 * style.margin;
-  const height = Number.isFinite(maxY) ? Math.ceil(maxY - minY + top + style.margin) : top + style.margin;
+  const width = Math.max(2 * style.margin, Number.isFinite(maxX) ? Math.ceil(maxX + dx + style.margin) : 0);
+  const height = Math.max(top + style.margin, Number.isFinite(maxY) ? Math.ceil(maxY + dy + style.margin) : 0);
   return {
     diagram: {
       width,

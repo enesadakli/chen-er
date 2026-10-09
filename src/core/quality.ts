@@ -1,33 +1,62 @@
-import type { Diagram, Point } from "./geometry.js";
+import { center, type Diagram, type Point } from "./geometry.js";
+import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
-/**
- * Quality contract: measures the final geometry exactly as it will be drawn.
- * Implemented by the layout lane; until then every count is 0 and `implemented` is false.
- */
 export interface QualityIssue {
   kind: "overlap" | "shape-crossing" | "label-collision" | "edge-crossing" | "pin-drift" | "out-of-canvas";
-  /** Ids of the nodes, edges or labels involved. */
   ids: string[];
   message: string;
 }
 
 export interface QualityReport {
   implemented: boolean;
-  /** Shapes (nodes) whose boxes overlap. */
   overlaps: number;
-  /** Edges passing through a shape that is not one of their endpoints. */
   shapeCrossings: number;
-  /** Labels overlapping a shape, another label, or a foreign edge. */
   labelCollisions: number;
-  /** Pairs of edges crossing each other. */
   edgeCrossings: number;
-  /** Pinned nodes further than 0.5px from their pin. */
   pinDrift: number;
   issues: QualityIssue[];
 }
 
 export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}): QualityReport {
-  void diagram;
-  void pins;
-  return { implemented: false, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, edgeCrossings: 0, pinDrift: 0, issues: [] };
+  const issues: QualityIssue[] = [];
+  const add = (kind: QualityIssue["kind"], ids: string[]) => issues.push({ kind, ids, message: `${kind}: ${ids.join(", ")}` });
+  const { nodes, edges, labels } = diagram;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i]!;
+    for (const other of nodes.slice(i + 1)) if (shapesNear(n, other, 4)) add("overlap", [n.id, other.id]);
+    if (pins[n.id] && distance(center(n.box), pins[n.id]!) > 0.5) add("pin-drift", [n.id]);
+  }
+  const paths = new Map(edges.map((e) => [e.id, drawnPaths(e)]));
+  const lines = new Map(edges.map((e) => [e.id, paths.get(e.id)!.flatMap(segments)]));
+  for (const e of edges) for (const n of nodes) {
+    if (n.id !== e.from && n.id !== e.to && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, n))) add("shape-crossing", [e.id, n.id]);
+  }
+  for (let i = 0; i < labels.length; i++) {
+    const l = labels[i]!, shape = boxShape(l.box);
+    for (const n of nodes) if (shapesOverlap(shape, n)) add("label-collision", [l.id, n.id]);
+    for (const other of labels.slice(i + 1)) if (shapesOverlap(shape, boxShape(other.box))) add("label-collision", [l.id, other.id]);
+    for (const e of edges) if (e.id !== l.edge && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, shape))) add("label-collision", [l.id, e.id]);
+  }
+  for (let i = 0; i < edges.length; i++) for (const other of edges.slice(i + 1)) {
+    const e = edges[i]!;
+    const shared = nodes.filter((n) => [e.from, e.to].includes(n.id) && [other.from, other.to].includes(n.id));
+    const crossing = lines.get(e.id)!.some(([a, b]) => lines.get(other.id)!.some(([c, d]) => {
+      const hit = segmentIntersection(a, b, c, d);
+      if (!hit) return false;
+      if (hit === "overlap") return true;
+      const endpoints = paths.get(e.id)!.flatMap((ps) => [ps[0]!, ps.at(-1)!]);
+      const otherEndpoints = paths.get(other.id)!.flatMap((ps) => [ps[0]!, ps.at(-1)!]);
+      if (endpoints.some((p) => distance(p, hit) < 1e-7) && otherEndpoints.some((p) => distance(p, hit) < 1e-7)) return false;
+      return !shared.some((n) => pointInside(hit, n));
+    }));
+    if (crossing) add("edge-crossing", [e.id, other.id]);
+  }
+  const outside = (p: Point) => !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0 || p.x > diagram.width || p.y > diagram.height;
+  for (const item of [...nodes, ...labels]) {
+    const b = item.box;
+    if (outside({ x: b.x, y: b.y }) || outside({ x: b.x + b.w, y: b.y + b.h })) add("out-of-canvas", [item.id]);
+  }
+  for (const e of edges) if (paths.get(e.id)!.some((ps) => ps.some(outside))) add("out-of-canvas", [e.id]);
+  const count = (kind: QualityIssue["kind"]) => issues.filter((i) => i.kind === kind).length;
+  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"), issues };
 }
