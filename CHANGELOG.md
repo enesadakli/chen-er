@@ -3,6 +3,38 @@
 All notable changes to chen-er are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-10-09
+
+### Added
+
+- `diagonalEnds` hard metric: relationship-to-entity edges are always drawn with
+  horizontal and vertical segments. A candidate layout that would need a
+  diagonal end is rejected.
+- `labelOnOwnEdge` hard metric: a participation or role label is never crossed
+  by its own edge.
+- `zRoutes` metric (end edges with two bends whose first and last segments are
+  parallel), used in the layout score and reported by `chen render --report`
+  and the bench.
+
+### Changed
+
+- Denser layouts for models with a highly connected entity: an entity may move
+  down next to its nearest child when this keeps every 1:N relationship
+  top-down, and row and column spacing are chosen by a bounded search. On the
+  public hospital fixture the drawing area is 28% smaller and the total edge
+  length 48% shorter.
+- Edge ports avoid neighbouring relationship diamonds and may use an entity's
+  left or right side when its top is crowded.
+- Fewer Z-shaped routes: a diamond can shift by one grid row or column so a
+  route becomes straight or L-shaped.
+- `pin-conflict` and `layout-conflict` diagnostics use the `warning` severity.
+
+### Known limitations
+
+- Very large models are slow and hard to read in one figure. A 26-entity,
+  36-relationship test model takes about 20 seconds to lay out and has about 30
+  edge crossings. Splitting large models into subject-area diagrams is planned.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added
