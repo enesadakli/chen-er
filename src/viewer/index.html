@@ -33,7 +33,31 @@
     </section>
     <aside id="notes" class="notes" aria-label="Model findings">
       <button id="drawer" class="drawer" aria-label="Resize notes drawer. Arrow keys change its height.">Findings</button>
+      <div id="tabs" class="tabs" role="tablist" aria-label="Notes column" hidden>
+        <button id="tab-notes" role="tab" aria-selected="true" aria-controls="findings">Notes</button>
+        <button id="tab-agent" role="tab" aria-selected="false" aria-controls="agent" tabindex="-1">Agent <span id="tab-agent-state" class="tab-state" hidden></span></button>
+      </div>
       <div id="findings" class="findings"><p>Waiting for findings…</p></div>
+      <section id="agent" class="agent" role="tabpanel" aria-labelledby="tab-agent" hidden>
+        <p id="agent-context" class="agent-context"></p>
+        <div id="agent-empty" class="agent-empty">
+          <p id="agent-empty-lead">Ask the agent for a model change in plain words. It edits the YAML file and the drawing updates here.</p>
+          <p class="agent-try">Try</p>
+          <ul id="agent-examples" class="examples"></ul>
+        </div>
+        <div id="agent-thread" class="agent-thread"></div>
+        <p id="agent-live" class="sr-only" aria-live="polite"></p>
+        <form id="agent-form" class="composer">
+          <div id="agent-chips" class="chips" aria-label="Context for the request" hidden></div>
+          <label class="sr-only" for="agent-input">Request</label>
+          <textarea id="agent-input" rows="2" placeholder="Ask the agent to change the model" aria-describedby="agent-keys"></textarea>
+          <div class="composer-row">
+            <span id="agent-keys" class="composer-keys">Enter sends · Shift+Enter new line</span>
+            <button id="agent-send" type="submit" disabled>Send</button>
+          </div>
+          <p id="agent-notice" class="agent-notice" role="status" hidden></p>
+        </form>
+      </section>
     </aside>
   </main>
   <script type="module" src="./main.ts"></script>

@@ -63,3 +63,38 @@ unpin shortcuts. The viewer does not edit the model; it writes only the layout f
 
 Undo/Redo are session controls in the header and cover layout changes only (pins, reset, relayout, engine).
 Computing, saved, conflict and failure states remain visible in the status strip.
+
+## Agent panel
+
+Only with `chen serve --agent` (contract: docs/agent-panel.md). Without it, `GET /api/agent` answers 404 and the
+notes column looks exactly as before.
+
+- **Tabs.** The notes column becomes a tablist, **Notes | Agent**: plain words on the sheet, graphite when idle,
+  ink 600 with a 2px ink underline when selected, one `--grid-major` rule under the row. Arrow keys, Home and End
+  move between tabs. The Agent tab carries a small graphite suffix: `· working` while a turn runs, `· new` when a
+  turn finished while Notes was open. At ≤ 900px the tabs sit under the drawer handle, inside the drawer.
+- **Thread as margin notes.** Each turn is a note separated by the same `--grid-major` rule as findings. The
+  request is ink (500), with its time in mono graphite on the right and its context below in mono graphite
+  (`▸ STUDENT  ▸ ENROLLS`). Everything the agent says is graphite: the reply, the folded tool steps (a
+  `<details>` whose summary reads `3 steps`, steps in 12px mono), the running line `Claude is working… 12 s`
+  with a Cancel button. No bubbles, avatars, fills, shadows or color blocks.
+- **Change note.** A finished turn ends with one line per element: mono sign (`+` added, `~` changed, `-` removed)
+  and the element name (`BirthDate (STUDENT)`). Added and changed names are links that select the element and fit
+  its neighborhood on the drawing; removed names are graphite and struck through. **Undo agent change** (outlined
+  28px button) appears only under the latest model-changing turn while its status is ok; after undo the note is
+  struck through and reads "Undone. The model is back to how it was before this request."
+- **Changed elements on the drawing.** After a turn finishes, the added and changed elements get the selection
+  halo (graphite 35%, 6px outside the outline) for 3 s, holding then fading. With `prefers-reduced-motion` the halo
+  is static and simply disappears after 3 s. It lives in the overlay, never in exports.
+- **Composer.** Sticky at the bottom of the column on the sheet: context chips (`▸ BOOK ×`, 1px graphite rule,
+  4px radius, 12px mono) showing the current canvas selection, a paper textarea with a 1px graphite rule, a
+  graphite key hint and an outlined Send. × leaves the selection out of the request until something else is
+  selected; the chips are sent as `selection` ids.
+- **Empty state.** One sentence on what the panel does and three example requests as dotted-underline text
+  links that fill the input.
+- **Errors.** Error text uses the red pencil, always as a sentence that names the problem and the fix: CLI not
+  found or not logged in (names the command and `/login`), usage limit, a generic stop with the stderr excerpt in
+  an `Error output` disclosure (12px mono, 1px graphite rule on the left). A request while one is running says
+  "A request is already running."
+- **Keys.** `/` opens the Agent tab and focuses the input from anywhere outside a text field; Enter sends,
+  Shift+Enter adds a line; Escape cancels a running turn while the Agent tab is open.
