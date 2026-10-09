@@ -53,15 +53,13 @@ because the figure is black ink on white and must look the same as the export.
 - Grid, marks, halos or notes in exports.
 - Color-only status; tooltips as the only way to read a finding.
 
-## Selection and attribute edits
+## Selection and focus
 
-Entity and relationship clicks open a small paper toolbar beside the selected shape. Connected relationships
-keep every end and role/cardinality label together; unrelated drawing elements dim. Selection preserves the
-camera; Focus explicitly fits the neighborhood. Dragging hides actions and starts only after 4 screen pixels.
-Enter opens node actions; Escape dismisses them. Attribute nodes retain movement and unpin shortcuts.
+Entity and relationship clicks open a small paper toolbar beside the selected shape with Focus and Close.
+Connected relationships keep every end and role/cardinality label together; unrelated drawing elements dim.
+Selection preserves the camera; Focus explicitly fits the neighborhood. Dragging hides actions and starts only
+after 4 screen pixels. Enter opens node actions; Escape dismisses them. Attribute nodes retain movement and
+unpin shortcuts. The viewer does not edit the model; it writes only the layout file.
 
-Add attribute opens a compact inline form for name, optional display label, multivalued and derived. Save is
-explicit; external edits keep the draft and require review before rebasing. Deleted owners show an invalid-draft
-message. Successful saves dismiss the toolbar, retain the selected owner/camera and briefly mark the new attribute.
-The toolbar and form stay inside the canvas and scroll when needed. Undo/Redo are session controls in the header;
-text fields keep native undo. Computing, saved, conflict and failure states remain visible in the status strip.
+Undo/Redo are session controls in the header and cover layout changes only (pins, reset, relayout, engine).
+Computing, saved, conflict and failure states remain visible in the status strip.

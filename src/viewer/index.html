@@ -23,21 +23,10 @@
           <button id="node-focus" class="node-icon" aria-label="Focus" title="Focus">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5.25 5.25"/></svg>
           </button>
-          <button id="add-attribute" class="node-icon" aria-label="Add attribute" title="Add attribute">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="9" ry="6.75"/><path d="M12 8.5v7M8.5 12h7"/></svg>
-          </button>
           <button id="close-actions" class="node-icon" aria-label="Close node actions" title="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
           </button>
         </div>
-        <form id="attribute-form" hidden>
-          <h2 id="attribute-heading">Add attribute</h2>
-          <label for="attribute-name">Name <input id="attribute-name" name="name" required autocomplete="off" spellcheck="false" placeholder="e.g. Email"></label>
-          <label for="attribute-label">Label <span class="optional">(optional)</span><input id="attribute-label" name="label" autocomplete="off" placeholder="Display text"></label>
-          <div class="attribute-flags"><label><input id="attribute-multivalued" type="checkbox"> Multivalued</label><label><input id="attribute-derived" type="checkbox"> Derived</label></div>
-          <p id="attribute-message" role="status" aria-live="polite"></p>
-          <div class="form-controls"><button id="attribute-save" type="submit">Save attribute</button><button id="attribute-rebase" type="button" hidden>Use current model</button><button id="attribute-cancel" type="button">Cancel</button></div>
-        </form>
       </div>
       <p id="placeholder">Loading the model…</p>
       <div class="zoom-controls"><button id="minus" aria-label="Zoom out">−</button><output id="zoom">100%</output><button id="plus" aria-label="Zoom in">+</button><button id="actual" title="100% (0)">100%</button></div>

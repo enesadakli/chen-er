@@ -91,23 +91,10 @@ h1 { font-size: 15px; font-weight: 600; margin: 0; max-width: 180px; overflow: h
 .figure .unrelated { opacity: .22; }
 .figure .connected { stroke-width: 2.5; }
 .node-actions { position: absolute; z-index: 5; width: max-content; max-width: calc(100% - 16px); color: var(--ink); background: var(--sheet); border: 1px solid var(--graphite); border-radius: var(--radius); color-scheme: light; overflow: auto; scrollbar-color: var(--graphite) var(--sheet); }
-.node-actions[hidden], #attribute-form[hidden], #node-toolbar[hidden], #attribute-rebase[hidden] { display: none; }
+.node-actions[hidden] { display: none; }
 .node-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px; }
 .node-toolbar .node-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 6px; }
 .node-icon svg { width: 20px; height: 20px; pointer-events: none; }
 #node-name { padding: 0 4px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .node-actions button { border-color: var(--graphite); }
-#attribute-form { width: 280px; max-width: 100%; padding: 12px; display: grid; gap: 10px; }
-#attribute-form h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; overflow-wrap: anywhere; }
-#attribute-form > label { display: block; }
-#attribute-form input:not([type="checkbox"]) { display: block; width: 100%; margin-top: 4px; padding: 5px 7px; border: 1px solid var(--graphite); border-radius: 3px; color: var(--ink); background: var(--sheet); font: inherit; caret-color: var(--ink); }
-#attribute-form input::placeholder { color: #62686e; }
-.optional { color: #62686e; }
-.attribute-flags { display: flex; flex-wrap: wrap; gap: 12px; }
-.attribute-flags label { display: flex; align-items: center; gap: 4px; }
-.attribute-flags input { accent-color: var(--ink); margin: 0; }
-#attribute-message { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
-#attribute-message:empty { display: none; }
-.form-controls { display: flex; flex-wrap: wrap; gap: 6px; }
-#attribute-save { background: var(--ink); color: var(--sheet); }
 @media (max-width: 420px) { .header #undo, .header #redo { padding: 3px 5px; font-size: 12px; } .header h1 { max-width: 50px !important; } .node-toolbar { max-width: 280px; } }

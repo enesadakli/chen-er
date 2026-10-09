@@ -21,8 +21,6 @@ export class NotebookCanvas {
   private hoverFinding?: number;
   private space = false;
   private actionsOpen = false;
-  private addedAttribute?: string;
-  private addedTimer?: ReturnType<typeof setTimeout>;
   private savingDrag = false;
   private writing = false;
   setWriting(value: boolean) { this.writing = value; }
@@ -150,10 +148,6 @@ export class NotebookCanvas {
   }
   clear() { this.actionsOpen = false; this.actions(); this.selected = undefined; this.selectedFinding = undefined; this.hovered = undefined; this.hoverFinding = undefined; this.drawOverlay(); }
   closeActions() { this.actionsOpen = false; this.actions(); }
-  revealAddedAttribute(id: string) {
-    this.closeActions(); this.addedAttribute = id; clearTimeout(this.addedTimer); this.drawOverlay();
-    this.addedTimer = setTimeout(() => { this.addedAttribute = undefined; this.drawOverlay(); }, 3000);
-  }
   focusSelection() {
     if (this.good?.diagram && this.selected) this.fit(selectionNeighborhood(this.good.diagram, this.selected).box);
   }
@@ -189,13 +183,13 @@ export class NotebookCanvas {
     this.overlay.querySelector(".halos")?.remove();
     const halos = svg("g", { class: "halos" });
     this.overlay.append(halos);
-    for (const id of new Set([this.selected, this.hovered, this.addedAttribute,
+    for (const id of new Set([this.selected, this.hovered,
       this.list.find((f) => f.number === this.selectedFinding)?.target,
       this.list.find((f) => f.number === this.hoverFinding)?.target])) {
       const box = targetBox(diagram, id);
       if (!box) continue;
       const node = diagram.nodes.find((n) => n.id === id);
-      const attrs = { fill: "none", stroke: "var(--graphite)", "stroke-opacity": id === this.addedAttribute ? .75 : .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) };
+      const attrs = { fill: "none", stroke: "var(--graphite)", "stroke-opacity": .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) };
       if (node?.kind === "attribute") halos.append(svg("ellipse", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, rx: box.w / 2 + 6, ry: box.h / 2 + 6, ...attrs }));
       else if (node?.kind === "relationship") halos.append(svg("polygon", { points: `${box.x + box.w / 2},${box.y - 6} ${box.x + box.w + 6},${box.y + box.h / 2} ${box.x + box.w / 2},${box.y + box.h + 6} ${box.x - 6},${box.y + box.h / 2}`, ...attrs }));
       else halos.append(svg("rect", { x: box.x - 6, y: box.y - 6, width: box.w + 12, height: box.h + 12, ...attrs }));

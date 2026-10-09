@@ -12,12 +12,8 @@ let list: Finding[] = [];
 let selected: number | undefined;
 let connected = false;
 let pendingWrites = 0;
-let ownerId: string | undefined;
 let anchor: Box | undefined;
-let draftOwner: string | undefined;
-type Draft = { name: string; label: string; multivalued: boolean; derived: boolean; revision: string };
-const drafts = new Map<string, Draft>();
-const actions = element("node-actions"), form = element<HTMLFormElement>("attribute-form");
+const actions = element("node-actions");
 function positionActions() {
   if (actions.hidden || !anchor) return;
   const viewport = element("canvas");
@@ -27,44 +23,19 @@ function positionActions() {
   actions.style.left = `${placement.x}px`; actions.style.top = `${placement.y}px`;
   actions.style.maxWidth = `${placement.maxWidth}px`; actions.style.maxHeight = `${placement.maxHeight}px`;
 }
-function readDraft(): Draft {
-  return { name: element<HTMLInputElement>("attribute-name").value, label: element<HTMLInputElement>("attribute-label").value,
-    multivalued: element<HTMLInputElement>("attribute-multivalued").checked, derived: element<HTMLInputElement>("attribute-derived").checked,
-    revision: draftOwner ? drafts.get(draftOwner)?.revision ?? state?.modelRevision ?? "" : state?.modelRevision ?? "" };
-}
-function keepDraft() { if (draftOwner) drafts.set(draftOwner, readDraft()); }
-function draftState() {
-  if (!draftOwner || form.hidden || !state) return;
-  const exists = state.selection.owners.some((o) => o.id === draftOwner);
-  const stale = drafts.get(draftOwner)?.revision !== state.modelRevision;
-  element<HTMLButtonElement>("attribute-save").disabled = !exists || pendingWrites > 0 || state.computing;
-  element<HTMLButtonElement>("attribute-rebase").hidden = !exists || !stale;
-  if (!exists) element("attribute-message").textContent = "This owner was deleted. Your draft is kept; select another owner or cancel.";
-  else if (stale) element("attribute-message").textContent = "The model changed. Your draft is kept. Review the diagram, then use the current model to save.";
-  else {
-    const message = element("attribute-message");
-    if (message.textContent?.startsWith("This owner was deleted.") || message.textContent?.startsWith("The model changed.") || message.textContent?.startsWith("Conflict:")) {
-      message.textContent = "Draft ready to save against the current model.";
-    }
-  }
-  positionActions();
-}
 function nodeActions(id?: string, box?: Box, dragging = false) {
   if (dragging) { actions.hidden = true; return; }
-  if (!id) { if (draftOwner && !form.hidden) { actions.hidden = false; draftState(); } else actions.hidden = true; return; }
-  if (draftOwner && id !== draftOwner) { keepDraft(); form.hidden = true; draftOwner = undefined; }
-  ownerId = id; anchor = box;
+  if (!id) { actions.hidden = true; return; }
+  anchor = box;
   element("node-name").textContent = state?.selection.owners.find((o) => o.id === id)?.label ?? id.slice(2);
-  element("node-toolbar").hidden = !form.hidden;
   actions.hidden = false; positionActions();
 }
 function historyControls() {
   const busy = pendingWrites > 0 || !!state?.computing;
-  for (const id of ["reset", "reset-mobile", "relayout", "relayout-mobile", "add-attribute", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
+  for (const id of ["reset", "reset-mobile", "relayout", "relayout-mobile", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
   element<HTMLSelectElement>("engine").disabled = busy;
   element<HTMLButtonElement>("undo").disabled = busy || !state?.history.canUndo;
   element<HTMLButtonElement>("redo").disabled = busy || !state?.history.canRedo;
-  draftState();
 }
 function status(text: string) { element("status").textContent = text; }
 function choose(number: number) {
@@ -102,8 +73,7 @@ async function write(path: string, method: string, value?: unknown): Promise<boo
   if (pendingWrites || state?.computing) return false;
   pendingWrites++;
   canvas.setWriting(true); historyControls(); status("Saving…");
-  const payload = path === "/api/model/attributes" ? value : { ...(value && typeof value === "object" ? value : {}),
-    expectedRevision: state?.modelRevision, expectedLayoutRevision: state?.layoutRevision };
+  const payload = { ...(value && typeof value === "object" ? value : {}), expectedLayoutRevision: state?.layoutRevision };
   try {
     const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) {
@@ -119,7 +89,6 @@ async function write(path: string, method: string, value?: unknown): Promise<boo
   } catch (error) {
     const message = (error as Error).message;
     status(message.startsWith("Conflict:") ? "Conflict — review changes" : "Save failed"); element("status").title = message;
-    if (!form.hidden) element("attribute-message").textContent = message;
     return false;
   } finally {
     pendingWrites--; canvas.setWriting(false); historyControls();
@@ -168,7 +137,7 @@ window.addEventListener("keydown", (e) => {
     if (state?.history[direction === "undo" ? "canUndo" : "canRedo"]) void write(`/api/history/${direction}`, "POST");
     return;
   }
-  if (e.key === "Escape") { keepDraft(); form.hidden = true; draftOwner = undefined; actions.hidden = true; }
+  if (e.key === "Escape") actions.hidden = true;
   if (e.ctrlKey || e.metaKey || e.altKey || editing) return;
   if (e.key === "Escape") { selected = undefined; notes.select(); canvas.clear(); document.querySelector<HTMLDetailsElement>(".actions")!.open = false; return; }
   if (e.target instanceof Element && e.target.closest("button, a, summary") && [" ", "Enter"].includes(e.key)) return;
@@ -202,29 +171,5 @@ drawer.addEventListener("keydown", (e) => {
 
 for (const direction of ["undo", "redo"]) element(direction).addEventListener("click", () => { void write(`/api/history/${direction}`, "POST"); });
 element("node-focus").addEventListener("click", () => canvas.focusSelection());
-element("close-actions").addEventListener("click", () => { keepDraft(); actions.hidden = true; canvas.closeActions(); });
-element("add-attribute").addEventListener("click", () => {
-  if (!ownerId || !state) return;
-  keepDraft(); draftOwner = ownerId;
-  const draft = drafts.get(ownerId) ?? { name: "", label: "", multivalued: false, derived: false, revision: state.modelRevision };
-  drafts.set(ownerId, draft);
-  element<HTMLInputElement>("attribute-name").value = draft.name; element<HTMLInputElement>("attribute-label").value = draft.label;
-  element<HTMLInputElement>("attribute-multivalued").checked = draft.multivalued; element<HTMLInputElement>("attribute-derived").checked = draft.derived;
-  element("attribute-heading").textContent = `Add attribute to ${state.selection.owners.find((o) => o.id === ownerId)?.label ?? ownerId.slice(2)}`;
-  element("attribute-message").textContent = ""; form.hidden = false; element("node-toolbar").hidden = true;
-  draftState(); element<HTMLInputElement>("attribute-name").focus();
-});
-form.addEventListener("input", keepDraft);
-element("attribute-rebase").addEventListener("click", () => {
-  keepDraft(); if (draftOwner && state) { const draft = drafts.get(draftOwner)!; draft.revision = state.modelRevision; }
-  element("attribute-message").textContent = "Draft ready to save against the current model."; draftState();
-});
-element("attribute-cancel").addEventListener("click", () => { keepDraft(); form.hidden = true; draftOwner = undefined; element("node-toolbar").hidden = false; positionActions(); });
-form.addEventListener("submit", async (event) => {
-  event.preventDefault(); if (!draftOwner || !state || pendingWrites) return;
-  keepDraft(); const id = draftOwner, draft = drafts.get(id)!;
-  const success = await write("/api/model/attributes", "POST", { expectedRevision: draft.revision, ownerId: id,
-    attribute: { name: draft.name.trim(), ...(draft.label ? { label: draft.label } : {}), ...(draft.multivalued ? { multivalued: true } : {}), ...(draft.derived ? { derived: true } : {}) } });
-  if (success) { drafts.delete(id); draftOwner = undefined; form.hidden = true; element("node-toolbar").hidden = false; canvas.revealAddedAttribute(`A:${id.slice(2)}.${draft.name.trim()}`); status(`Saved ${draft.name.trim()}`); }
-});
+element("close-actions").addEventListener("click", () => { actions.hidden = true; canvas.closeActions(); });
 new ResizeObserver(positionActions).observe(element("canvas"));
