@@ -1,5 +1,5 @@
 import { flattenAttrs, type NEnd, type NRelationship } from "../normalize.js";
-import { compareText, finding, type Rule } from "./rule.js";
+import { compareText, finding, justified, type Rule } from "./rule.js";
 
 const parallelRelationships: Rule = {
   id: "parallel-relationships", severity: "heuristic",
@@ -16,9 +16,10 @@ const parallelRelationships: Rule = {
       const first = sorted[0]!;
       const names = sorted.map((rel) => rel.name).join(", ");
       const entities = [...new Set(first.ends.map((end) => end.entity))].sort(compareText).join(", ");
-      return [finding(model, parallelRelationships, first.path,
+      const note = sorted.find((rel) => rel.note)?.note;
+      return [justified(finding(model, parallelRelationships, first.path,
         `Relationships ${names} connect the same entities (${entities}) and may record the same fact twice.`,
-        `Justify the difference between ${names} in a note or merge them into one relationship.`)];
+        `Justify the difference between ${names} in a note on one of them, or merge them into one relationship.`), note)];
     });
   },
 };
@@ -92,12 +93,12 @@ const redundantFunctionalPath: Rule = {
       if (!path) return [];
       const route = [direct.from, ...path.map((hop) => `${hop.rel.name} → ${hop.to}`)].join(" → ");
       const contradiction = direct.end.min === 0 && totalPath !== undefined;
-      return [finding(model, redundantFunctionalPath, `${direct.end.path}.card`,
+      return [justified(finding(model, redundantFunctionalPath, `${direct.end.path}.card`,
         `${direct.rel.name} directly maps ${direct.from} to at most one ${direct.to}, while the to-one path ${route} ` +
         `stores the same fact (${direct.from}'s ${direct.to}) twice and may disagree.` +
         (contradiction ? ` Its direct cardinality ${direct.end.card} permits absence (min = 0), but the path requires a ${direct.to} (min ≥ 1).` : ""),
         `Remove the duplicate ${direct.rel.name} fact or document why it differs from ${path.map((hop) => hop.rel.name).join(" / ")}` +
-        (contradiction ? `, and reconcile ${direct.from}'s optional direct participation with the mandatory path.` : "."))];
+        (contradiction ? `, and reconcile ${direct.from}'s optional direct participation with the mandatory path.` : ".")), direct.rel.note)];
     });
   },
 };

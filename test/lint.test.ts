@@ -281,7 +281,7 @@ describe("course and heuristic details", () => {
     }, THIRD: binary("B", "A") } })).filter((diagnostic) => diagnostic.rule === "parallel-relationships");
     expect(findings).toHaveLength(1);
     expect(findings[0]?.message).toContain("FIRST, SECOND, THIRD");
-    expect(findings[0]?.hint).toContain("note or merge");
+    expect(findings[0]?.hint).toContain("or merge them");
   });
 
   it.each(["b", "bId", "BNO", "bCode", "BName"])("detects hidden relationship attribute %s", (name) => {
@@ -375,3 +375,24 @@ describe("existing example and benchmark fixtures", () => {
     expect(lint(result.model!)).toEqual([]);
   });
 });
+
+describe("justified heuristics", () => {
+  it("downgrades parallel relationships to info when one carries a note", () => {
+    const { model } = parseModel(`version: 1
+entities:
+  EMPLOYEE: {attrs: [Ssn], keys: [[Ssn]]}
+  DEPARTMENT: {attrs: [No], keys: [[No]]}
+relationships:
+  WORKS_FOR:
+    ends: [{entity: EMPLOYEE, card: 1..1}, {entity: DEPARTMENT, card: 1..N}]
+  MANAGES:
+    note: Managing differs from working for.
+    ends: [{entity: EMPLOYEE, card: 0..1}, {entity: DEPARTMENT, card: 1..1}]
+`);
+    const found = lint(model!).filter((d) => d.rule === "parallel-relationships");
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ severity: "info" });
+    expect(found[0]!.message).toContain("Managing differs from working for.");
+  });
+});
+
