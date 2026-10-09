@@ -1,0 +1,26 @@
+version: 1
+entities:
+  STUDENT:
+    attrs: [StudentNo]
+    keys: [[StudentNo]]
+  DEPT:
+    attrs: [DeptNo]
+    keys: [[DeptNo]]
+  CURRICULUM:
+    weak: true
+    attrs: [Year]
+    partialKey: [Year]
+relationships:
+  HAS:
+    ends:
+      - {entity: STUDENT, card: 0..1}
+      - {entity: DEPT, card: 0..N}
+  FOLLOWS:
+    ends:
+      - {entity: STUDENT, card: 1..1}
+      - {entity: CURRICULUM, card: 0..N}
+  DEFINES:
+    identifies: CURRICULUM
+    ends:
+      - {entity: DEPT, card: 1..N}
+      - {entity: CURRICULUM, card: 1..1}

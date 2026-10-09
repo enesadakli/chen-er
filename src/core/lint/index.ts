@@ -1,8 +1,14 @@
 import type { Diagnostic, Severity } from "../diagnostics.js";
 import type { NModel } from "../normalize.js";
+import { courseRules } from "./course.js";
+import { heuristicRules } from "./heuristics.js";
+import { infoRules } from "./info.js";
+import { compareText } from "./rule.js";
+import { structureRules } from "./structure.js";
+import { weakRules } from "./weak.js";
 
 /**
- * Lint contract. Implemented by the lint lane; until then it returns no findings.
+ * Public lint metadata and filtering options.
  */
 export interface RuleInfo {
   id: string;
@@ -18,12 +24,20 @@ export interface LintOptions {
   disableSeverities?: Severity[];
 }
 
-export const RULES: RuleInfo[] = [];
+const rules = [...structureRules, ...weakRules, ...courseRules, ...heuristicRules, ...infoRules];
+
+export const RULES: RuleInfo[] = rules.map(({ id, severity, description }) => ({ id, severity, description }));
+
+const severityOrder: Record<Severity, number> = { error: 0, course: 1, heuristic: 2, info: 3 };
 
 export function lint(model: NModel, options: LintOptions = {}): Diagnostic[] {
-  void model;
-  void options;
-  return [];
+  const disabled = new Set(options.disable);
+  const disabledSeverities = new Set(options.disableSeverities);
+  return rules.filter((rule) => !disabled.has(rule.id) && !disabledSeverities.has(rule.severity))
+    .flatMap((rule) => rule.check(model))
+    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] ||
+      (a.line ?? Infinity) - (b.line ?? Infinity) || compareText(a.rule, b.rule) ||
+      compareText(a.path ?? "", b.path ?? "") || compareText(a.message, b.message));
 }
 
 /** Printed after every lint run: a clean result is not a proof of a correct model. */
