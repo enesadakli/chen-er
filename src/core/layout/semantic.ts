@@ -180,7 +180,8 @@ export function placeSemanticRecursive(model: NModel, nodes: DNode[]): void {
     if (!entity || !diamond || diamond.pinned) continue;
     const p = center(entity.box);
     const sparse = model.entities.length <= 4 && model.entities.find((e) => e.id === entity.id)!.attrs.length <= 3;
-    const gaps = sparse ? [200, 240, 280] : [280, 340, 400];
+    // Large diagrams: tight arms first (about one entity height), wider corridors only when a neighbour is in the way.
+    const gaps = sparse ? [200, 240, 280] : model.entities.length >= 8 ? [130, 160, 200, 280, 340, 400] : [280, 340, 400];
     const candidates = [0, -180, 180, -260, 260].flatMap((x) => [-1, 1].flatMap((sign) => gaps.map((gap) => ({ x: p.x + x, y: p.y + sign * gap }))));
     const neighbours = model.relationships.filter((other) => other !== r && other.ends.some((end) => `E:${end.entity}` === entity.id))
       .map((other) => center(nodes.find((n) => n.id === other.id)!.box));
