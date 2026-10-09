@@ -12,7 +12,9 @@
     "chen": "tsx src/cli/index.ts",
     "mcp": "tsx src/mcp/server.ts",
     "build:viewer": "vite build",
-    "serve": "tsx src/cli/index.ts serve"
+    "serve": "tsx src/cli/index.ts serve",
+    "gen:docs": "tsx scripts/gen-docs.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "er-diagram",
@@ -50,7 +52,7 @@
     "chen": "./bin/chen.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "files": [
     "bin",
@@ -58,7 +60,17 @@
     "assets",
     "schema",
     "skills",
+    "docs",
+    "examples/*.er.yaml",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enesadakli/chen-er.git"
+  },
+  "homepage": "https://github.com/enesadakli/chen-er#readme",
+  "bugs": {
+    "url": "https://github.com/enesadakli/chen-er/issues"
+  }
 }
