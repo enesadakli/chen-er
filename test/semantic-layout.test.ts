@@ -7,13 +7,14 @@ import { parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 
 const load = (path: string) => parseModel(readFileSync(path, "utf8")).model!;
-const hard = (q: ReturnType<typeof assessQuality>) => ({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, pinDrift: q.pinDrift });
-const clear = { overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, pinDrift: 0 };
+const hard = (q: ReturnType<typeof assessQuality>) => ({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts });
+const clear = { overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, pinDrift: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0 };
 
 describe("semantic default layout", () => {
   it.skipIf(!existsSync("examples/private/university-curriculum.er.yaml"))("satisfies the university hierarchy, midpoint, axis, crossing and compactness acceptance", async () => {
     const m = load("examples/private/university-curriculum.er.yaml"), first = await layout(m), q = assessQuality(first.diagram, {}, m);
     expect(hard(q)).toEqual(clear);
+    for (const id of ["edge:A:DEPT.DOffice", "edge:A:STUDENT.Addr"]) expect(first.diagram.edges.find((e) => e.id === id)!.points).toHaveLength(2);
     expect(q.hierarchyViolations).toBe(0);
     expect(q.diamondOffset).toBeLessThanOrEqual(0.15);
     expect(q.axisAligned).toBeGreaterThanOrEqual(0.6);

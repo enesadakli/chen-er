@@ -9,7 +9,7 @@ const diagram = (nodes: DNode[] = [], edges: DEdge[] = [], labels: DLabel[] = []
 
 describe("exact diagram quality", () => {
   it("implements the contract and accepts empty diagrams", () => {
-    expect(assessQuality(diagram())).toEqual({ hierarchyViolations: 0, diamondOffset: 0, relatedDistance: 0, proximityInversions: 0, axisAligned: 1, centralityOffset: 0, gridMisalignment: 0, attributeInwardRatio: 0, implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
+    expect(assessQuality(diagram())).toEqual({ attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0, hierarchyViolations: 0, diamondOffset: 0, relatedDistance: 0, proximityInversions: 0, axisAligned: 1, centralityOffset: 0, gridMisalignment: 0, attributeInwardRatio: 0, implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
   });
   it("measures end polylines once and normalizes by the median entity width", () => {
     const ns = [node("a", 0, 0, "entity", 40, 20), node("b", 100, 100, "entity", 60, 20), node("r", 200, 200, "relationship", 200, 30)];

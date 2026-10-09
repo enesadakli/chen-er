@@ -11,6 +11,7 @@ import { placeLabels } from "./labels.js";
 import { placeSemanticRecursive, placeSemantically, recenterPinnedDiamonds, semanticPlacements } from "./semantic.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
 import { semanticAttributes, semanticRoute } from "./semantic-route.js";
+import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
 import { routeEdge } from "./route.js";
 
 type Candidate = Placement & { engine: "simple" | "layered" | "stress"; seed?: number };
@@ -91,7 +92,6 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     const p = center(n.box);
     n.box = boxAround({ x: Math.round(p.x), y: Math.round(p.y) }, n.box.w, n.box.h);
   }
-  const reservedAnchors = (e: DEdge) => e.kind === "attribute" ? edges.filter((other) => other.kind === "end" && other.to === e.from).map((other) => endPorts.get(other.id)!.anchor) : [];
   const ordered = [...edges.filter((e) => e.kind !== "end"), ...edges.filter((e) => e.kind === "end")];
   const routed: DEdge[] = [];
   const offsets = new Map<string, number>();
@@ -100,18 +100,21 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     if (same.length > 1) offsets.set(`edge:${end.id}`, (same.indexOf(end) - (same.length - 1) / 2) * 0.8);
   }
   for (const e of ordered) {
-    e.points = (semantic ? semanticRoute(e, nodes, routed, endPorts.get(e.id)) : undefined) ?? routeEdge(e, nodes, routed, offsets.get(e.id) ?? 0, [], { endPort: endPorts.get(e.id), reservedAnchors: reservedAnchors(e) });
+    if (e.kind !== "end") e.points = straightSpoke(e, nodes);
+    else e.points = semanticRoute(e, nodes, routed, endPorts.get(e.id)) ?? routeEdge(e, nodes, routed, offsets.get(e.id) ?? 0, [], { endPort: endPorts.get(e.id) });
     routed.push(e);
   }
+  repairAttributeSpokes(nodes, edges, endPorts);
   let labels: DLabel[] = [];
   for (let pass = 0; pass < 4; pass++) {
     labels = placeLabels(model, nodes, edges, metrics);
+    if (repairAttributeSpokes(nodes, edges, endPorts, labels)) labels = placeLabels(model, nodes, edges, metrics);
     const result = assessQuality({ width: Infinity, height: Infinity, nodes, edges, labels, notes: [], meta: { engine: name } });
     if ((!result.shapeCrossings && !result.labelCollisions && !result.labelAmbiguity && !result.overlaps) || pass === 3) break;
     for (const e of edges) {
-      if (result.issues.some((i) => (i.kind === "shape-crossing" || i.kind === "label-collision" || i.kind === "label-ambiguity") && (i.ids.includes(e.id) || labels.some((l) => l.edge === e.id && i.ids.includes(l.id))))) {
+      if (e.kind === "end" && result.issues.some((i) => (i.kind === "shape-crossing" || i.kind === "label-collision" || i.kind === "label-ambiguity") && (i.ids.includes(e.id) || labels.some((l) => l.edge === e.id && i.ids.includes(l.id))))) {
         const reserved = labels.filter((l) => l.edge !== e.id && edges.find((other) => other.id === l.edge)?.to !== e.to).map((l) => l.box);
-        e.points = (semantic ? semanticRoute(e, nodes, edges.filter((other) => other !== e), endPorts.get(e.id), reserved) : undefined) ?? routeEdge(e, nodes, edges.filter((other) => other !== e), offsets.get(e.id) ?? 0, reserved, { endPort: endPorts.get(e.id), forceBend: !offsets.has(e.id), reservedAnchors: reservedAnchors(e) });
+        e.points = semanticRoute(e, nodes, edges.filter((other) => other !== e), endPorts.get(e.id), reserved) ?? routeEdge(e, nodes, edges.filter((other) => other !== e), offsets.get(e.id) ?? 0, reserved, { endPort: endPorts.get(e.id), forceBend: !offsets.has(e.id) });
       }
     }
   }

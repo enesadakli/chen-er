@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { center } from "../src/core/geometry.js";
+import { hierarchyDag, hierarchyPairs, modelRelations } from "../src/core/layout/semantic-graph.js";
 import { DEFAULT_ENGINE, engines, layout } from "../src/core/layout/index.js";
 import { parseModel, type NModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
@@ -19,6 +20,8 @@ for (const input of inputs) {
   const parsed = parseModel(readFileSync(input, "utf8"));
   if (!parsed.model) throw new Error(`${input}: ${JSON.stringify(parsed.diagnostics)}`);
   const model = parsed.model;
+  // The quality metric caps each cyclic component at one unavoidable violation.
+  const hierarchyMinimum = new Set(hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model))).cyclic.values()).size;
   const pinFile = input.replace(/\.er\.yaml$/, ".er.layout.json");
   const pins = resolve(input) === resolve("bench/fixtures/pinned.er.yaml") && existsSync(pinFile) ? LayoutFile.parse(JSON.parse(readFileSync(pinFile, "utf8"))).pins : {};
   for (const engine of Object.keys(engines) as (keyof typeof engines)[]) {
@@ -44,11 +47,11 @@ for (const input of inputs) {
     writeFileSync(join(directory, `${name}.svg`), svg);
     if (engine === DEFAULT_ENGINE && (base === "university-curriculum" || base === "library")) writeFileSync(join("out", `${base}.png`), svgToPng(svg, 1));
     rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
-      hierarchyViolations: q.hierarchyViolations, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
+      hierarchyViolations: q.hierarchyViolations, hierarchyMinimum, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
       aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), density: Number(q.density.toFixed(4)),
       ms: Number(elapsed.toFixed(1)), "stability(px)": Number(stability.toFixed(1)) });
-    if (engine === DEFAULT_ENGINE && (q.hierarchyViolations || q.diamondOffset > 0.2)) failed = true;
-    if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift)) failed = true;
+    if (engine === DEFAULT_ENGINE && (q.hierarchyViolations > hierarchyMinimum || q.diamondOffset > 0.2)) failed = true;
+    if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift || q.attributeEdgeBends || q.edgeOverlap || q.tinySegments || q.endPortCrowding || q.diamondVertexViolations || q.doubleEdgeArtifacts)) failed = true;
     if (engine === DEFAULT_ENGINE && (input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failed = true;
     if (engine === DEFAULT_ENGINE && input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 4 || q.diamondOffset > 0.15 || q.axisAligned < 0.6)) failed = true;
   }

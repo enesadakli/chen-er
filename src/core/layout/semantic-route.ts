@@ -4,19 +4,23 @@ import { attributeSize } from "../style.js";
 import type { EndPort } from "./anchors.js";
 import { attributeNode } from "./attributes.js";
 import type { Cluster } from "./clusters.js";
+import { dominantVertex, edgesOverlap, MIN_ROUTE_SEGMENT, reverses, visibleEdgePaths } from "./semantic-edges.js";
 import { simplify } from "./route.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 /** Fast orthogonal corridor candidates; the existing router handles blocked cases. */
 export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = []): Point[] | undefined {
   if (!port || edge.kind !== "end") return undefined;
+  if (prior.filter((e) => e.kind === "end" && e.from === edge.from).some((e) => e.to === edge.to)) return undefined;
   const from = nodes.find((n) => n.id === edge.from)!;
+  const to = nodes.find((n) => n.id === edge.to)!;
+  const vertex = dominantVertex(from, to);
   const c = center(from.box), b = port.anchor;
   const foreign = nodes.filter((n) => n.id !== edge.from && n.id !== edge.to);
   const tips = [
     { x: c.x + from.box.w / 2, y: c.y, nx: 1, ny: 0 }, { x: c.x - from.box.w / 2, y: c.y, nx: -1, ny: 0 },
     { x: c.x, y: c.y + from.box.h / 2, nx: 0, ny: 1 }, { x: c.x, y: c.y - from.box.h / 2, nx: 0, ny: -1 },
-  ].sort((a, d) => distance(a, b) - distance(d, b));
+  ].filter((tip) => !vertex || distance(tip, vertex.point) < 1e-6).sort((a, d) => distance(a, b) - distance(d, b));
   const goal = { x: b.x + port.normal.x * 64, y: b.y + port.normal.y * 64 };
   const paths: Point[][] = [];
   for (const tip of tips) {
@@ -28,11 +32,13 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   }
   let best: Point[] | undefined, score = Infinity;
   for (const path of paths) {
-    const ps = simplify(path), lines = drawnPaths({ ...edge, points: ps }).flatMap(segments);
+    const ps = simplify(path), candidate = { ...edge, points: ps }, copies = visibleEdgePaths(candidate), lines = copies.flatMap(segments);
+    if (reverses(ps) || [ps, ...copies].some((ps) => segments(ps).some(([a, b]) => distance(a, b) < MIN_ROUTE_SEGMENT - 1e-6))) continue;
+    if (prior.some((other) => edgesOverlap(candidate, other))) continue;
     if (lines.some(([a, b]) => nodes.some((n) => segmentThrough(a, b, n)))) continue;
     if (lines.some(([a, b]) => foreign.some((n) => segmentThrough(a, b, boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 }))) || reserved.some((r) => segmentThrough(a, b, boxShape(r))))) continue;
     let crossings = 0;
-    for (const other of prior) for (const [a, b] of lines) for (const [p, q] of drawnPaths(other).flatMap(segments)) {
+    for (const other of prior) for (const [a, b] of lines) for (const [p, q] of visibleEdgePaths(other).flatMap(segments)) {
       const hit = segmentIntersection(a, b, p, q);
       if (hit === "overlap") crossings += 8;
       else if (hit && ![ps[0]!, ps.at(-1)!].some((p) => distance(p, hit) < 1e-7)) crossings++;
