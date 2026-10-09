@@ -10,7 +10,17 @@ export interface SemanticPlacement { columns: Map<string, number>; ranks: Map<st
 export function semanticPlacements(model: NModel): SemanticPlacement[] {
   const ids = model.entities.map((e) => e.id).sort();
   const relations = modelRelations(model);
-  const hierarchy = hierarchyDag(ids, hierarchyPairs(relations));
+  const pairs = hierarchyPairs(relations);
+  const hierarchy = hierarchyDag(ids, pairs);
+  if (hierarchy.cyclic.size) {
+    const component = (id: string) => hierarchy.cyclic.get(id) ?? id;
+    const ranks = new Map(ids.map((id) => [component(id), 0]));
+    for (let pass = 0; pass < ids.length; pass++) for (const { parent, child } of pairs) {
+      const a = component(parent), b = component(child);
+      if (a !== b) ranks.set(b, Math.max(ranks.get(b)!, ranks.get(a)! + 1));
+    }
+    for (const id of ids) hierarchy.ranks.set(id, ranks.get(component(id))!);
+  }
   const neighbours = new Map(ids.map((id) => [id, [] as string[]]));
   for (const r of relations) for (const a of r.ends) for (const b of r.ends) if (a.entity !== b.entity) neighbours.get(a.entity)?.push(b.entity);
   const constrained = new Set(hierarchy.pairs.flatMap((p) => [p.parent, p.child]));

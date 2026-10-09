@@ -10,6 +10,19 @@ import { renderSvg } from "../src/core/render/svg.js";
 import { svgToPng } from "../src/app/render.js";
 import { LayoutFile } from "../src/core/schema.js";
 
+type RegressionMetric = "edgeCrossings" | "endBendsMax" | "routeDetourMax" | "attributeSpokeMax";
+// Per-metric minima of b51675f, beeb816, and the validated default-engine results.
+const regressionBaseline: Record<string, Record<RegressionMetric, number>> = {
+  "dense-attrs": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 10.168208659840005 },
+  "hub-company": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.2857142857142858, attributeSpokeMax: 2.47972935709149 },
+  "pinned": { edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0360721442885772, attributeSpokeMax: 3.3823529411764706 },
+  "recursive": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1562962962962962, attributeSpokeMax: 1.0588235294117647 },
+  "ternary": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1615798922800717, attributeSpokeMax: 1.0654701843573313 },
+  "turkish-labels": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647 },
+  "library": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106 },
+  "university-curriculum": { edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282 },
+};
+
 const discovered = ["bench/fixtures", "examples", "examples/private"].flatMap((dir) =>
   existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".er.yaml")).sort().map((file) => join(dir, file)) : [],
 );
@@ -54,8 +67,16 @@ for (const input of inputs) {
     rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
       hierarchyViolations: q.hierarchyViolations, hierarchyMinimum, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
       aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), density: Number(q.density.toFixed(4)),
-      routeDetourMax: Number(q.routeDetourMax.toFixed(3)), routeDetourMean: Number(q.routeDetourMean.toFixed(3)), endBendsMax: q.endBendsMax, endBendsMean: Number(q.endBendsMean.toFixed(3)),
+      attributeSpokeMax: Number(q.attributeSpokeMax.toFixed(3)), routeDetourMax: Number(q.routeDetourMax.toFixed(3)), routeDetourMean: Number(q.routeDetourMean.toFixed(3)), endBendsMax: q.endBendsMax, endBendsMean: Number(q.endBendsMean.toFixed(3)),
       ms: Number(elapsed.toFixed(1)), stabilityMax: Number(stabilityMax.toFixed(1)), stabilityMedian: Number(stabilityMedian.toFixed(1)) });
+    if (engine === DEFAULT_ENGINE) {
+      const baseline = regressionBaseline[base];
+      if (!baseline) { console.error(`${input}: missing regression baseline`); failed = true; }
+      else for (const key of Object.keys(baseline) as RegressionMetric[]) if (q[key] > baseline[key] + 1e-6) {
+        console.error(`${input}: ${key} regressed: ${q[key]} > ${baseline[key]}`);
+        failed = true;
+      }
+    }
     if (engine === DEFAULT_ENGINE && (stabilityMax > 60 || stabilityMedian > 20)) failed = true;
     if (engine === DEFAULT_ENGINE && (q.hierarchyViolations > hierarchyMinimum || q.diamondOffset > 0.2)) failed = true;
     if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.labelLoose || q.pinDrift || q.attributeEdgeBends || q.edgeOverlap || q.tinySegments || q.endPortCrowding || q.diamondVertexViolations || q.doubleEdgeArtifacts)) failed = true;

@@ -53,6 +53,7 @@ function endpointSides(p: Point, box: Box): number[] {
 }
 
 export interface EdgeQuality {
+  attributeSpokeMax: number;
   routeDetourMax: number;
   routeDetourMean: number;
   endBendsMax: number;
@@ -140,7 +141,11 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
     }
   }
   const routes = endRouteMetrics(diagram);
-  return { routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
+  const spokes = diagram.edges.filter((e) => e.kind !== "end").map((e) => {
+    const height = byId.get(e.to)?.box.h ?? 0;
+    return height > EPS ? segments(e.points).reduce((sum, [a, b]) => sum + distance(a, b), 0) / height : 0;
+  });
+  return { attributeSpokeMax: Math.max(0, ...spokes), routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
     routeDetourMean: routes.reduce((sum, r) => sum + r.routeDetour, 0) / (routes.length || 1),
     endBendsMax: Math.max(0, ...routes.map((r) => r.endBends)),
     endBendsMean: routes.reduce((sum, r) => sum + r.endBends, 0) / (routes.length || 1),

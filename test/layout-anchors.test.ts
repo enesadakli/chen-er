@@ -3,6 +3,7 @@ import { center, type DEdge, type DNode } from "../src/core/geometry.js";
 import { fanEndAnchors, placeRecursive } from "../src/core/layout/anchors.js";
 import { routeEdge } from "../src/core/layout/route.js";
 import { parseModel } from "../src/core/normalize.js";
+import { orthogonalPath } from "../src/core/layout/semantic-edges.js";
 import { distance, segmentIntersection } from "../src/core/layout/shapes.js";
 
 const entity: DNode = { id: "E:HUB", kind: "entity", label: "Hub", box: { x: 300, y: 300, w: 110, h: 46 }, double: false };
@@ -47,7 +48,7 @@ describe("fanned end anchors", () => {
       }
     }
   });
-  it("routes recursive ends straight to distinct anchors on the same side", () => {
+  it("routes recursive ends orthogonally to distinct anchors on the same side", () => {
     const model = parseModel("version: 1\nentities:\n  HUB: {}\nrelationships:\n  LOOP:\n    ends: [{entity: HUB, role: parent, card: 0..N}, {entity: HUB, role: child, card: 0..1}]\n").model!;
     const nodes = [{ ...entity, box: { ...entity.box } }, diamond("R:LOOP", 700, 100)];
     placeRecursive(model, nodes);
@@ -57,7 +58,7 @@ describe("fanned end anchors", () => {
     expect(ports.get("parent")!.normal).toEqual(ports.get("child")!.normal);
     expect(distance(ports.get("parent")!.anchor, ports.get("child")!.anchor)).toBeGreaterThanOrEqual(28);
     for (const e of edges) e.points = routeEdge(e, nodes, [], 0, [], { endPort: ports.get(e.id) });
-    expect(edges.every((e) => e.points.length === 2)).toBe(true);
+    expect(edges.every((e) => orthogonalPath(e.points))).toBe(true);
     expect(segmentIntersection(edges[0]!.points[0]!, edges[0]!.points[1]!, edges[1]!.points[0]!, edges[1]!.points[1]!)).toBeUndefined();
   });
   it("keeps a pinned recursive diamond exact", () => {

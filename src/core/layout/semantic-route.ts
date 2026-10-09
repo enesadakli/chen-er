@@ -1,7 +1,7 @@
 import { anchor as outline, boxAround, center, intersects, type Box, type DEdge, type DNode, type Point } from "../geometry.js";
 import type { TextMetrics } from "../text/metrics.js";
 import { attributeSize } from "../style.js";
-import type { EndPort } from "./anchors.js";
+import { recursiveDeparture, type EndPort } from "./anchors.js";
 import { attributeNode } from "./attributes.js";
 import type { Cluster } from "./clusters.js";
 import { dominantVertex, edgesOverlap, MIN_ROUTE_SEGMENT, reverses, visibleEdgePaths } from "./semantic-edges.js";
@@ -11,13 +11,13 @@ import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentT
 /** Fast orthogonal corridor candidates; the existing router handles blocked cases. */
 export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = []): Point[] | undefined {
   if (!port || edge.kind !== "end") return undefined;
-  if (prior.filter((e) => e.kind === "end" && e.from === edge.from).some((e) => e.to === edge.to)) return undefined;
   const from = nodes.find((n) => n.id === edge.from)!;
   const to = nodes.find((n) => n.id === edge.to)!;
   const vertex = dominantVertex(from, to);
   const c = center(from.box), b = port.anchor;
   const foreign = nodes.filter((n) => n.id !== edge.from && n.id !== edge.to);
-  const tips = [
+  const departure = recursiveDeparture(from, to, port);
+  const tips = departure ? [{ ...departure.anchor, nx: departure.normal.x, ny: departure.normal.y }] : [
     { x: c.x + from.box.w / 2, y: c.y, nx: 1, ny: 0 }, { x: c.x - from.box.w / 2, y: c.y, nx: -1, ny: 0 },
     { x: c.x, y: c.y + from.box.h / 2, nx: 0, ny: 1 }, { x: c.x, y: c.y - from.box.h / 2, nx: 0, ny: -1 },
   ].filter((tip) => !vertex || distance(tip, vertex.point) < 1e-6).sort((a, d) => distance(a, b) - distance(d, b));
@@ -32,7 +32,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
       for (const x of xs) if (x >= Math.min(a.x, b.x) - 96 && x <= Math.max(a.x, b.x) + 96) paths.push([a, { x, y: a.y }, { x, y: b.y }, b]);
     }
     if (tip.ny && port.normal.y) {
-      const ys = [start.y, goal.y, ...foreign.filter((n) => n.box.x < Math.max(a.x, b.x) + 16 && n.box.x + n.box.w > Math.min(a.x, b.x) - 16)
+      const ys = [(a.y + b.y) / 2, start.y, goal.y, ...foreign.filter((n) => n.box.x < Math.max(a.x, b.x) + 16 && n.box.x + n.box.w > Math.min(a.x, b.x) - 16)
         .flatMap((n) => [n.box.y - 16, n.box.y + n.box.h + 16])];
       for (const y of ys) if (y >= Math.min(a.y, b.y) - 96 && y <= Math.max(a.y, b.y) + 96) paths.push([a, { x: a.x, y }, { x: b.x, y }, b]);
     }
@@ -76,7 +76,7 @@ export function semanticAttributes(clusters: Cluster[], nodes: DNode[], edges: D
       const difference = (t: number) => Math.abs(Math.atan2(Math.sin(t - outward), Math.cos(t - outward)));
       return difference(a) - difference(b) || a - b;
     });
-    const radius = Math.max(c.node.box.w / 2 + 100, c.attrs.reduce((s, a) => s + attributeSize(a.label, metrics).w + 35, 0) / (Math.PI * 1.25));
+    const radius = Math.max(c.node.box.w / 2 + 98, c.attrs.reduce((s, a) => s + attributeSize(a.label, metrics).w + 35, 0) / (Math.PI * 1.25));
     for (const attr of c.attrs) {
       if (nodes.some((n) => n.id === attr.id) || attr.parts.length) continue;
       const size = attributeSize(attr.label, metrics);

@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { boxAround, type DEdge, type Diagram, type DNode } from "../src/core/geometry.js";
+import { boxAround, center, type DEdge, type Diagram, type DNode } from "../src/core/geometry.js";
 import { layout } from "../src/core/layout/index.js";
-import { endRouteMetrics, nearestBorderDistance } from "../src/core/layout/semantic-edges.js";
+import { endRouteMetrics, nearestBorderDistance, orthogonalPath } from "../src/core/layout/semantic-edges.js";
 import { semanticRoute } from "../src/core/layout/semantic-route.js";
-import { parseModel } from "../src/core/normalize.js";
+import { flattenAttrs, parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 
 const diamond: DNode = { id: "R", kind: "relationship", label: "R", box: boxAround({ x: 100, y: 100 }, 100, 40), double: false };
@@ -46,4 +46,41 @@ it.skipIf(!existsSync("examples/private/university-curriculum.er.yaml"))("keeps 
   expect(endRouteMetrics(d).filter((r) => r.endBends > 2)).toEqual([]);
   expect(q.edgeCrossings).toBeLessThanOrEqual(2);
   expect(q.diamondOffset).toBeLessThanOrEqual(0.15);
+  const includes = d.edges.find((e) => e.from === "R:INCLUDES" && e.to === "E:COURSE")!;
+  expect(includes.points).toHaveLength(2);
+  expect(includes.points[0]!.y).toBe(includes.points[1]!.y);
 }, 10000);
+
+it("keeps the COMPANY block readable with symmetric recursive ends and complete short attribute fans", async () => {
+  const model = parseModel(readFileSync("bench/fixtures/hub-company.er.yaml", "utf8")).model!;
+  const { diagram: d } = await layout(model);
+  const q = assessQuality(d, {}, model);
+  for (const metric of ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const) expect(q[metric], metric).toBe(0);
+  expect(q.edgeCrossings).toBe(0);
+  expect(q.endBendsMax).toBeLessThanOrEqual(2);
+  expect(q.routeDetourMax).toBeLessThanOrEqual(1.347241);
+  expect(q.attributeSpokeMax).toBeLessThanOrEqual(2.5);
+  const byId = new Map(d.nodes.map((n) => [n.id, n]));
+  const employee = byId.get("E:EMPLOYEE")!, department = byId.get("E:DEPARTMENT")!;
+  const project = byId.get("E:PROJECT")!, dependent = byId.get("E:DEPENDENT")!;
+  expect(center(employee.box).y).toBe(center(department.box).y);
+  expect(center(project.box).y).toBe(center(dependent.box).y);
+  expect(center(employee.box).y).toBeLessThan(center(dependent.box).y);
+  for (const owner of [...model.entities, ...model.relationships]) for (const attr of flattenAttrs(owner.attrs)) expect(byId.has(attr.id), attr.id).toBe(true);
+  const diamond = byId.get("R:SUPERVISES")!, c = center(diamond.box);
+  const recursive = d.edges.filter((e) => e.from === diamond.id && e.kind === "end").sort((a, b) => a.points[0]!.x - b.points[0]!.x);
+  expect(recursive).toHaveLength(2);
+  for (const e of recursive) {
+    expect(orthogonalPath(e.points)).toBe(true);
+    expect(e.points).toHaveLength(4);
+    const first = e.points[0]!, last = e.points.at(-1)!;
+    expect(first.y).toBeGreaterThan(c.y);
+    expect(Math.abs(first.x - c.x) / (diamond.box.w / 2) + Math.abs(first.y - c.y) / (diamond.box.h / 2)).toBeCloseTo(1);
+    expect(last.y).toBe(employee.box.y);
+  }
+  for (let i = 0; i < recursive[0]!.points.length; i++) {
+    const left = recursive[0]!.points[i]!, right = recursive[1]!.points[i]!;
+    expect(left.x + right.x).toBeCloseTo(c.x * 2);
+    expect(left.y).toBeCloseTo(right.y);
+  }
+});

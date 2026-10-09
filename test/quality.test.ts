@@ -9,7 +9,7 @@ const diagram = (nodes: DNode[] = [], edges: DEdge[] = [], labels: DLabel[] = []
 
 describe("exact diagram quality", () => {
   it("implements the contract and accepts empty diagrams", () => {
-    expect(assessQuality(diagram())).toEqual({ routeDetourMax: 0, routeDetourMean: 0, endBendsMax: 0, endBendsMean: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0, hierarchyViolations: 0, diamondOffset: 0, relatedDistance: 0, proximityInversions: 0, axisAligned: 1, centralityOffset: 0, gridMisalignment: 0, attributeInwardRatio: 0, implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
+    expect(assessQuality(diagram())).toEqual({ attributeSpokeMax: 0, routeDetourMax: 0, routeDetourMean: 0, endBendsMax: 0, endBendsMean: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0, hierarchyViolations: 0, diamondOffset: 0, relatedDistance: 0, proximityInversions: 0, axisAligned: 1, centralityOffset: 0, gridMisalignment: 0, attributeInwardRatio: 0, implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
   });
   it("measures end polylines once and normalizes by the median entity width", () => {
     const ns = [node("a", 0, 0, "entity", 40, 20), node("b", 100, 100, "entity", 60, 20), node("r", 200, 200, "relationship", 200, 30)];
@@ -155,4 +155,15 @@ describe("end label ambiguity", () => {
     const closer = edge("other", [{ x: 100, y: 129 }, { x: 300, y: 129 }]);
     expect(assessQuality(diagram([], [{ ...own, double: true }, closer], [label("l", 250, 106)])).labelAmbiguity).toBe(0);
   });
+});
+
+it("normalizes the longest attribute or composite-part spoke by its destination oval height", () => {
+  const ns = [node("owner", 0, 0), node("oval", 100, 0, "attribute", 80, 20), node("part", 200, 0, "attribute", 100, 40)];
+  const es: DEdge[] = [
+    { ...edge("root", [{ x: 0, y: 0 }, { x: 30, y: 40 }, { x: 80, y: 40 }], "owner", "oval"), kind: "attribute" },
+    { ...edge("child", [{ x: 0, y: 0 }, { x: 240, y: 0 }], "oval", "part"), kind: "part" },
+    edge("end", [{ x: 0, y: 0 }, { x: 10000, y: 0 }]),
+  ];
+  expect(assessQuality(diagram(ns, es)).attributeSpokeMax).toBe(6);
+  expect(assessQuality(diagram(ns, es.slice(0, 1))).attributeSpokeMax).toBe(5);
 });
