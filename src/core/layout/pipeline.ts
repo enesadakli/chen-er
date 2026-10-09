@@ -14,6 +14,7 @@ import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.j
 import { endRouteMetrics } from "./semantic-edges.js";
 import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
 import { routeEdge } from "./route.js";
+import { chooseSpacing } from "./semantic-spacing.js";
 
 export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine {
   return async (model, metrics, options) => {
@@ -25,8 +26,11 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
     // Entity cells depend only on topology; attribute clearance never selects a new skeleton.
     if (name !== "simple") {
       const placement = semanticPlacements(model)[0]!;
-      placeSemantically(clusters, model, placement, model.relationships.some((r) => r.ends.length > 1 && r.ends.every((e) => e.entity === r.ends[0]!.entity)) && model.entities.length > 1 ? 600 : 430, pinnedAttributes.map((n) => n.box));
-      result = refineDiamonds(clusters, semanticBuild, pins, model);
+      const base = model.relationships.some((r) => r.ends.length > 1 && r.ends.every((e) => e.entity === r.ends[0]!.entity)) && model.entities.length > 1 ? 600 : 430;
+      const reserved = pinnedAttributes.map((n) => n.box);
+      const spacing = chooseSpacing(clusters, model, placement, base, reserved, pins, semanticBuild);
+      placeSemantically(clusters, model, placement, spacing.spacing.columns, reserved, spacing.spacing.rows);
+      result = refineDiamonds(clusters, semanticBuild, pins, model, spacing.initial);
       const hierarchy = hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model)));
       if (!Object.keys(pins).length && model.entities.length <= 4 && new Set(placement.columns.values()).size > 1 && hierarchy.pairs.length && !hierarchy.cyclic.size) {
         result = compactRows(result, clusters, placement.ranks, semanticBuild, model);
@@ -69,8 +73,8 @@ function diamondRouteScore(result: LayoutResult, id: string, dx: number, dy: num
 }
 
 /** Only diamonds move during clearance refinement; entity ranks and cells stay fixed. */
-function refineDiamonds(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel): LayoutResult {
-  let best = build(clusters);
+function refineDiamonds(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
+  let best = initial ?? build(clusters);
   const score = (result: LayoutResult) => {
     const q = assessQuality(result.diagram, pins, model);
     return layoutScore(q) + q.edgeCrossings * 14 + q.endBendsMax * 2 + q.endBendsMean * 2 + q.routeDetourMax * 4 + Math.max(0, q.endBendsMax - 2) * 1000;

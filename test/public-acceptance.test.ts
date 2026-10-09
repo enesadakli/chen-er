@@ -36,6 +36,14 @@ describe("public acceptance on the campus fixture", () => {
     const y = (id: string) => center(d.nodes.find((n) => n.id === `E:${id}`)!.box).y;
     for (const [parent, child] of [["HOSPITAL", "WARD"], ["WARD", "ROOM"], ["ROOM", "BED"], ["WARD", "ADMISSION"]]) expect(y(parent!)).toBeLessThan(y(child!) - 20);
 
+    // Compact ranks and spacing: v0.2 drew this model at 1700x2162 with 9821px of end edges and a 6.8 longest end.
+    expect(q.longEdgeMax).toBeLessThanOrEqual(4);
+    expect(d.width * d.height).toBeLessThanOrEqual(1700 * 2162 * 0.75);
+    expect(q.edgeLength).toBeLessThanOrEqual(9821 * 0.75);
+    // The patient sinks next to the staff hub it shares TREATS with, still above its admissions.
+    expect(Math.abs(y("PATIENT") - y("STAFF"))).toBeLessThan(20);
+    expect(y("PATIENT")).toBeLessThan(y("ADMISSION") - 20);
+
     // Layout is deterministic; time the faster of the two runs so a cold start does not decide the result.
     const again = performance.now();
     expect(await layout(model)).toEqual(first);

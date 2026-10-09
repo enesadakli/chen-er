@@ -4,6 +4,7 @@ import { attributeSize } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
 import type { EndPort } from "./anchors.js";
 import { boxShape, distance, segmentIntersection, segmentThrough, segments } from "./shapes.js";
+import { MIN_ROUTE_SEGMENT } from "./semantic-edges.js";
 import type { Cluster } from "./clusters.js";
 
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -63,6 +64,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
 
   function clear(node: DNode, parent: DNode, edge: DEdge, pendingNodes: DNode[], pendingEdges: DEdge[]): boolean {
     const [a, b] = edge.points as [Point, Point], box = node.box;
+    if (distance(a, b) < MIN_ROUTE_SEGMENT) return false;
     const others = [...nodes, ...pendingNodes].filter((n) => n.id !== node.id);
     if (others.some((n) => intersects(box, n.box, 14)) || labels.some((l) => intersects(box, l.box, 8))) return false;
     if (others.some((n) => n.id !== parent.id && segmentThrough(a, b, boxShape(n.box)))) return false;

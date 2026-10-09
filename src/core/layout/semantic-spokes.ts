@@ -1,7 +1,7 @@
 import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
 import { attributeAnchors } from "./attributes.js";
 import type { EndPort } from "./anchors.js";
-import { edgesOverlap, visibleEdgePaths } from "./semantic-edges.js";
+import { edgesOverlap, MIN_ROUTE_SEGMENT, visibleEdgePaths } from "./semantic-edges.js";
 import { boxShape, distance, segmentIntersection, segmentThrough, segments } from "./shapes.js";
 
 export function straightSpoke(edge: DEdge, nodes: DNode[], radial = true): Point[] {
@@ -47,6 +47,8 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
     }
     function clear(candidate: DNode, points: Point[]): boolean {
       const [a, b] = points as [Point, Point];
+      // A spoke shorter than the route minimum counts as a tiny segment.
+      if (distance(a, b) < MIN_ROUTE_SEGMENT) return false;
       if (nodes.some((n) => n.id !== oval.id && intersects(candidate.box, n.box, 14))) return false;
       if (nodes.some((n) => n.id !== parent.id && n.id !== oval.id && segmentThrough(a, b, n))) return false;
       if (labels.some((l) => intersects(candidate.box, l.box, 3) || segmentThrough(a, b, boxShape({ x: l.box.x - 3, y: l.box.y - 3, w: l.box.w + 6, h: l.box.h + 6 })))) return false;

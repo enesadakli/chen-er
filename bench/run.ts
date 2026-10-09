@@ -25,7 +25,10 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   "turkish-labels": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8434353146897209 },
   "library": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106, emptyAreaRatio: 0.9271289508500763 },
   // Measured on the default engine; campus is the public stand-in for the private university model.
-  "campus": { edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.1653061224489796, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9427710864638472 },
+  // Compact ranks and spacing (0.3): canvas 1700x2162 -> 1669x1588, end-edge length 9821 -> 5148 px,
+  // longEdgeMax 6.80 -> 3.40, crossings 1 -> 0. Accepted trade-off within the general limits (1.6, 2.5):
+  // routeDetourMax 1.1653 -> 1.3129 and attributeSpokeMax 1.0735 -> 1.5882.
+  "campus": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.312937062937063, attributeSpokeMax: 1.588235294117647, emptyAreaRatio: 0.9206378769430194 },
   "university-curriculum": { edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282, emptyAreaRatio: 0.923729974724041 },
 };
 

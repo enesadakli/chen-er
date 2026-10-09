@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { center } from "../src/core/geometry.js";
 import { layout } from "../src/core/layout/index.js";
-import { semanticPlacements } from "../src/core/layout/semantic.js";
+import { semanticPlacements, sinkRanks } from "../src/core/layout/semantic.js";
 import { parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 
@@ -12,6 +12,20 @@ const privateTitle = (title: string) => existsSync(privateModel) ? `university: 
 const load = (path: string) => parseModel(readFileSync(path, "utf8")).model!;
 const hard = (q: ReturnType<typeof assessQuality>) => ({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts });
 const clear = { overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0, pinDrift: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0 };
+
+describe("rank sinking", () => {
+  it("moves a parent down to one row above its nearest child and keeps every 1:N pair top-down", () => {
+    const ids = ["E:A", "E:B", "E:C", "E:D"];
+    const pairs = [{ parent: "E:A", child: "E:B" }, { parent: "E:B", child: "E:C" }, { parent: "E:D", child: "E:C" }];
+    const ranks = sinkRanks(ids, new Map([["E:A", 0], ["E:B", 1], ["E:C", 2], ["E:D", 0]]), pairs)!;
+    expect(ranks.get("E:D")).toBe(1);
+    for (const { parent, child } of pairs) expect(ranks.get(parent)!).toBeLessThan(ranks.get(child)!);
+  });
+
+  it("returns nothing when every parent already sits right above a child", () => {
+    expect(sinkRanks(["E:A", "E:B"], new Map([["E:A", 0], ["E:B", 1]]), [{ parent: "E:A", child: "E:B" }])).toBeUndefined();
+  });
+});
 
 describe("semantic default layout", () => {
   it.skipIf(!existsSync(privateModel))(privateTitle("satisfies the hierarchy, midpoint, axis, crossing and compactness acceptance"), async () => {

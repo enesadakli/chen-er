@@ -30,8 +30,9 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
   for (const r of relations) for (const a of r.ends) for (const b of r.ends) if (a.entity !== b.entity) neighbours.get(a.entity)?.push(b.entity);
   const constrained = new Set(hierarchy.pairs.flatMap((p) => [p.parent, p.child]));
   const variants: SemanticPlacement[] = [];
-  for (let variant = 0; variant < 6; variant++) {
-    const ranks = new Map(hierarchy.ranks);
+  const sunk = hierarchy.cyclic.size ? undefined : sinkRanks(ids, hierarchy.ranks, hierarchy.pairs);
+  for (let variant = 0; variant < (sunk ? 12 : 6); variant++) {
+    const ranks = new Map(variant < 6 ? hierarchy.ranks : sunk!);
     // An unconstrained entity belongs beside its neighbours, not in an arbitrary root row.
     for (const id of ids.filter((id) => !constrained.has(id))) {
       const nearby = neighbours.get(id)!.map((n) => ranks.get(n)!).sort((a, b) => a - b);
@@ -95,6 +96,22 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
   return [...unique.values()];
 }
 
+/**
+ * Longest-path ranks put every root in the top row. A parent may instead sit one row above its
+ * nearest child, which keeps the 1:N order while pulling it next to its other neighbours.
+ */
+export function sinkRanks(ids: string[], ranks: Map<string, number>, pairs: { parent: string; child: string }[]): Map<string, number> | undefined {
+  const result = new Map(ranks);
+  const order = [...ids].sort((a, b) => ranks.get(b)! - ranks.get(a)! || a.localeCompare(b));
+  for (const id of order) {
+    const children = pairs.filter((p) => p.parent === id).map((p) => result.get(p.child)!);
+    if (children.length) result.set(id, Math.max(result.get(id)!, Math.min(...children) - 1));
+  }
+  const used = [...new Set(result.values())].sort((a, b) => a - b);
+  for (const id of ids) result.set(id, used.indexOf(result.get(id)!));
+  return ids.some((id) => result.get(id) !== ranks.get(id)) ? result : undefined;
+}
+
 function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<string, number>): number {
   const point = (name: string) => ({ x: columns.get(`E:${name}`) ?? 0, y: ranks.get(`E:${name}`) ?? 0 });
   const entities = model.entities.map((e) => ({ id: e.id, ...point(e.name) }));
@@ -131,11 +148,11 @@ function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<s
   return score;
 }
 
-export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = []): void {
+export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = [], rowSpacing = spacing): void {
   const byId = new Map(clusters.map((c) => [c.node.id, c]));
   const isolatedTernary = model.entities.length === 3 && model.relationships.length === 1 && new Set(model.relationships[0]!.ends.map((e) => e.entity)).size === 3 && !hierarchyPairs(modelRelations(model)).length;
   if (isolatedTernary) spacing = 480;
-  const rankSpacing = isolatedTernary ? 200 : new Set(placement.columns.values()).size === 1 ? Math.min(spacing, 280) : spacing;
+  const rankSpacing = isolatedTernary ? 200 : new Set(placement.columns.values()).size === 1 ? Math.min(rowSpacing, 280) : rowSpacing;
   for (const c of clusters.filter((c) => c.node.kind === "entity" && !c.node.pinned)) {
     c.node.box = boxAround({ x: 350 + placement.columns.get(c.node.id)! * spacing, y: 350 + placement.ranks.get(c.node.id)! * rankSpacing }, c.node.box.w, c.node.box.h);
   }
