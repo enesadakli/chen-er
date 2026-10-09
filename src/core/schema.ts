@@ -100,6 +100,11 @@ export const LayoutFile = z
     version: z.literal(1),
     engine: z.enum(["layered", "stress", "simple"]).optional(),
     pins: z.record(z.string(), z.object({ x: z.number(), y: z.number() }).strict()).default({}),
+    /**
+     * Soft positions: the last accepted layout (node id → center). Unlike pins they are hints, not
+     * constraints; incremental layout keeps them so a drag or a model edit changes as little as possible.
+     */
+    positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() }).strict()).optional(),
   })
   .strict();
 export type LayoutFileInput = z.infer<typeof LayoutFile>;

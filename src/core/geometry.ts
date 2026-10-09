@@ -86,6 +86,11 @@ export interface LayoutOptions {
   engine?: "layered" | "stress" | "simple";
   /** Node id → center position. */
   pins?: Record<string, Point>;
+  /**
+   * Soft positions from the previous layout (node id → center). When present, the engine runs
+   * incrementally: nodes keep these positions, only new, moved or colliding nodes are placed.
+   */
+  positions?: Record<string, Point>;
   seed?: number;
 }
 
