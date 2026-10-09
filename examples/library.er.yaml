@@ -1,0 +1,33 @@
+version: 1
+title: Library
+entities:
+  BOOK:
+    attrs: [ISBN, Title, {name: Authors, multivalued: true}, Year]
+    keys: [[ISBN]]
+  COPY:
+    weak: true
+    attrs: [CopyNo, Shelf]
+    partialKey: [CopyNo]
+  MEMBER:
+    attrs: [MemberId, {name: Name, parts: [First, Last]}, Email, {name: Age, derived: true}]
+    keys: [[MemberId], [Email]]
+  PUBLISHER:
+    attrs: [PubName, City]
+    keys: [[PubName]]
+relationships:
+  COPY_OF:
+    identifies: COPY
+    ends:
+      - {entity: BOOK, card: 0..N}
+      - {entity: COPY, card: 1..1}
+  BORROWS:
+    ends:
+      - {entity: MEMBER, card: 0..N}
+      - {entity: COPY, card: 0..N}
+    attrs: [LoanDate, DueDate]
+  PUBLISHES:
+    ends:
+      - {entity: PUBLISHER, card: 0..N}
+      - {entity: BOOK, card: 1..1}
+notes:
+  - "A copy only exists as a copy of a book."

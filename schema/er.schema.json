@@ -1,0 +1,240 @@
+{
+  "$id": "https://github.com/enesadakli/chen-er/schema/er.schema.json",
+  "title": "chen-er model",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "entities": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "weak": {
+            "description": "Weak entity: needs an identifying relationship and a partial key.",
+            "type": "boolean"
+          },
+          "attrs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "keys": {
+            "description": "Candidate keys. [[A], [B]] = two single keys; [[A, B]] = one composite key.",
+            "type": "array",
+            "items": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+              }
+            }
+          },
+          "partialKey": {
+            "description": "Partial key of a weak entity (drawn with a dashed underline).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "identifies": {
+            "description": "Makes this an identifying relationship for the named weak entity; the other ends are its owners.",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+          },
+          "ends": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Stable end id; required to tell the ends of a recursive relationship apart.",
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+                },
+                "entity": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+                },
+                "role": {
+                  "description": "Role name, required when the same entity appears at more than one end.",
+                  "type": "string"
+                },
+                "card": {
+                  "type": "string",
+                  "pattern": "^\\s*\\d+\\s*\\.\\.\\s*(\\d+|[NnMm*])\\s*$",
+                  "description": "(min,max) participation of the entity at this end, e.g. \"1..1\", \"0..N\", \"1..3\"."
+                }
+              },
+              "required": [
+                "entity",
+                "card"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Two ends = binary, three or more = n-ary (one diamond)."
+          },
+          "attrs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ends"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "description": "Free text printed under the diagram.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "specializations": {
+      "description": "Reserved for EER. Version 1 does not draw these and reports a diagnostic if present.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "supertype": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+          },
+          "subtypes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+            }
+          },
+          "disjointness": {
+            "type": "string",
+            "enum": [
+              "disjoint",
+              "overlapping"
+            ]
+          },
+          "completeness": {
+            "type": "string",
+            "enum": [
+              "total",
+              "partial"
+            ]
+          }
+        },
+        "required": [
+          "supertype",
+          "subtypes",
+          "disjointness",
+          "completeness"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "entities"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$",
+              "description": "Attribute name, unique within its owner."
+            },
+            "label": {
+              "description": "Display text if different from name.",
+              "type": "string"
+            },
+            "parts": {
+              "description": "Component attributes: makes this a composite attribute.",
+              "minItems": 2,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "multivalued": {
+              "description": "Drawn as a double ellipse.",
+              "type": "boolean"
+            },
+            "derived": {
+              "description": "Drawn as a dashed ellipse.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

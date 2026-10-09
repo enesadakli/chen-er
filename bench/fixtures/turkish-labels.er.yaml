@@ -1,0 +1,27 @@
+version: 1
+title: Türkçe ve uzun etiketler
+entities:
+  ÖĞRENCİ:
+    attrs: [ÖğrenciNumarası, AdıSoyadı, DoğumTarihi, {name: TelefonNumaraları, multivalued: true}]
+    keys: [[ÖğrenciNumarası]]
+  DERS_PROGRAMI:
+    label: DERS PROGRAMI
+    weak: true
+    attrs: [YürürlüğeGirişYılı, ProgramTürü]
+    partialKey: [YürürlüğeGirişYılı, ProgramTürü]
+  BÖLÜM:
+    attrs: [BölümKodu, BölümAdı, FakülteAdı]
+    keys: [[BölümKodu]]
+relationships:
+  TANIMLAR:
+    identifies: DERS_PROGRAMI
+    ends:
+      - {entity: BÖLÜM, card: 1..N}
+      - {entity: DERS_PROGRAMI, card: 1..1}
+  İZLER:
+    ends:
+      - {entity: ÖĞRENCİ, card: 1..3}
+      - {entity: DERS_PROGRAMI, card: 0..N}
+    attrs: [Rolü]
+notes:
+  - "Uzun Türkçe etiketler: ı, İ, ğ, ş, ö, ü, ç doğru ölçülmeli."

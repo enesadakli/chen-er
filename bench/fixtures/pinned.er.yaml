@@ -1,0 +1,22 @@
+version: 1
+title: Pinned layout
+entities:
+  AUTHOR:
+    attrs: [AuthorId, Name]
+    keys: [[AuthorId]]
+  ARTICLE:
+    attrs: [Doi, Title]
+    keys: [[Doi]]
+  JOURNAL:
+    attrs: [Issn, JournalName]
+    keys: [[Issn]]
+relationships:
+  WRITES:
+    ends:
+      - {entity: AUTHOR, card: 1..N}
+      - {entity: ARTICLE, card: 1..N}
+    attrs: [AuthorOrder]
+  APPEARS_IN:
+    ends:
+      - {entity: ARTICLE, card: 1..1}
+      - {entity: JOURNAL, card: 0..N}

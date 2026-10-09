@@ -1,0 +1,19 @@
+version: 1
+title: Ternary relationship
+entities:
+  SUPPLIER:
+    attrs: [SupplierNo, SupplierName]
+    keys: [[SupplierNo]]
+  PROJECT:
+    attrs: [ProjectNo, Budget]
+    keys: [[ProjectNo]]
+  PART:
+    attrs: [PartNo, Weight, Color]
+    keys: [[PartNo]]
+relationships:
+  SUPPLY:
+    ends:
+      - {entity: SUPPLIER, card: 0..N}
+      - {entity: PROJECT, card: 0..N}
+      - {entity: PART, card: 1..N}
+    attrs: [Quantity]

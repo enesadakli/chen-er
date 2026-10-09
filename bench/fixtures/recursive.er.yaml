@@ -1,0 +1,19 @@
+version: 1
+title: Recursive relationship
+entities:
+  EMPLOYEE:
+    attrs: [EmpId, Name, Salary, BirthDate]
+    keys: [[EmpId]]
+  DEPARTMENT:
+    attrs: [DeptNo, DeptName]
+    keys: [[DeptNo]]
+relationships:
+  SUPERVISION:
+    ends:
+      - {id: boss, entity: EMPLOYEE, role: supervisor, card: 0..N}
+      - {id: sub, entity: EMPLOYEE, role: supervisee, card: 0..1}
+  WORKS_FOR:
+    ends:
+      - {entity: EMPLOYEE, card: 1..1}
+      - {entity: DEPARTMENT, card: 1..N}
+    attrs: [StartDate]

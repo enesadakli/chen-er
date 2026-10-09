@@ -1,0 +1,26 @@
+version: 1
+title: Dense attributes
+entities:
+  PATIENT:
+    attrs:
+      - PatientId
+      - NationalId
+      - {name: FullName, parts: [GivenName, MiddleName, FamilyName]}
+      - {name: Address, parts: [Street, District, City, PostalCode]}
+      - {name: Phones, multivalued: true}
+      - {name: Allergies, multivalued: true}
+      - BirthDate
+      - {name: Age, derived: true}
+      - BloodType
+      - Insurance
+      - EmergencyContact
+    keys: [[PatientId], [NationalId]]
+  DOCTOR:
+    attrs: [DoctorId, Name, Specialty, Office]
+    keys: [[DoctorId]]
+relationships:
+  TREATS:
+    ends:
+      - {entity: DOCTOR, card: 0..N}
+      - {entity: PATIENT, card: 0..N}
+    attrs: [Since, Diagnosis]
