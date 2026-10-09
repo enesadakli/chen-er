@@ -1,6 +1,7 @@
 import type { LayoutEngine, LayoutOptions, LayoutResult } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { interMetrics, type TextMetrics } from "../text/metrics.js";
+import { incrementalLayout } from "./incremental.js";
 import { makeEngine } from "./pipeline.js";
 import { simpleLayout } from "./simple.js";
 
@@ -14,5 +15,7 @@ export const engines: Record<NonNullable<LayoutOptions["engine"]>, LayoutEngine>
 export const DEFAULT_ENGINE: NonNullable<LayoutOptions["engine"]> = "layered";
 
 export async function layout(model: NModel, options: LayoutOptions = {}, metrics: TextMetrics = interMetrics): Promise<LayoutResult> {
-  return engines[options.engine ?? DEFAULT_ENGINE](model, metrics, options);
+  const engine = engines[options.engine ?? DEFAULT_ENGINE];
+  if (options.positions && Object.keys(options.positions).length) return incrementalLayout(engine, model, metrics, options);
+  return engine(model, metrics, options);
 }
