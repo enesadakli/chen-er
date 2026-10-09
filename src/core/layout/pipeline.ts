@@ -137,9 +137,9 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     labels = placeLabels(model, nodes, edges, metrics);
     if (repairAttributeSpokes(nodes, edges, endPorts, labels)) labels = placeLabels(model, nodes, edges, metrics);
     const result = assessQuality({ width: Infinity, height: Infinity, nodes, edges, labels, notes: [], meta: { engine: name } });
-    if ((!result.shapeCrossings && !result.labelCollisions && !result.labelAmbiguity && !result.overlaps) || pass === 3) break;
+    if ((!result.shapeCrossings && !result.labelCollisions && !result.labelAmbiguity && !result.labelLoose && !result.overlaps) || pass === 3) break;
     for (const e of edges) {
-      if (e.kind === "end" && result.issues.some((i) => (i.kind === "shape-crossing" || i.kind === "label-collision" || i.kind === "label-ambiguity") && (i.ids.includes(e.id) || labels.some((l) => l.edge === e.id && i.ids.includes(l.id))))) {
+      if (e.kind === "end" && result.issues.some((i) => (i.kind === "shape-crossing" || i.kind === "label-collision" || i.kind === "label-ambiguity" || i.kind === "label-loose") && (i.ids.includes(e.id) || labels.some((l) => l.edge === e.id && i.ids.includes(l.id))))) {
         const reserved = labels.filter((l) => l.edge !== e.id && edges.find((other) => other.id === l.edge)?.to !== e.to).map((l) => l.box);
         e.points = semanticRoute(e, nodes, edges.filter((other) => other !== e), endPorts.get(e.id), reserved) ?? routeEdge(e, nodes, edges.filter((other) => other !== e), offsets.get(e.id) ?? 0, reserved, { endPort: endPorts.get(e.id), forceBend: !offsets.has(e.id) });
       }

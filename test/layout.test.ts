@@ -25,6 +25,7 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     expect({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, pinDrift: q.pinDrift }).toEqual({ overlaps: 0, shapeCrossings: 0, labelCollisions: 0, pinDrift: 0 });
     if (engine === DEFAULT_ENGINE) {
       expect(q.labelAmbiguity).toBe(0);
+      expect(q.labelLoose).toBe(0);
       for (const entity of first.diagram.nodes.filter((n) => n.kind === "entity")) {
         const ends = first.diagram.edges.filter((e) => e.kind === "end" && e.to === entity.id);
         for (let i = 0; i < ends.length; i++) for (const other of ends.slice(i + 1)) {

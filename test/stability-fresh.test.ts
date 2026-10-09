@@ -9,7 +9,7 @@ import { LayoutFile } from "../src/core/schema.js";
 const fixtures = readdirSync("bench/fixtures").filter((f) => f.endsWith(".er.yaml")).sort().map((f) => `bench/fixtures/${f}`);
 fixtures.push("examples/library.er.yaml");
 if (existsSync("examples/private/university-curriculum.er.yaml")) fixtures.push("examples/private/university-curriculum.er.yaml");
-const hardMetrics = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
+const hardMetrics = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
 
 describe("fresh attribute edit stability", () => {
   it.each(fixtures)("keeps entity cells and local displacement within budget: %s", async (file) => {
