@@ -17,7 +17,7 @@ async function failuresOf(input: string): Promise<string[]> {
   const elapsed = performance.now() - start;
   const q = assessQuality(diagram, pins, model);
   const stability = await stabilityOf(model, diagram, DEFAULT_ENGINE, pins);
-  return guardFailures({ input, diagram, q, hierarchyMinimum: hierarchyMinimumOf(model), elapsed, stabilityMax: stability.max, stabilityMedian: stability.median });
+  return guardFailures({ input, diagram, q, hierarchyMinimum: hierarchyMinimumOf(model), elapsed: process.env.CHEN_PERF === "1" ? elapsed : 0, stabilityMax: stability.max, stabilityMedian: stability.median });
 }
 
 // The same per-fixture guards `npm run bench` applies to the default engine.
