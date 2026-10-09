@@ -20,7 +20,10 @@ export function measureClusters(model: NModel, metrics: TextMetrics, pins: Recor
   }));
 }
 
-export async function placeClusters(clusters: Cluster[], model: NModel, options: LayoutOptions, name: NonNullable<LayoutOptions["engine"]>, reserved: Box[]): Promise<void> {
+export interface Placement { direction?: "RIGHT" | "DOWN"; edgeLength?: number; compact?: boolean }
+
+export async function placeClusters(clusters: Cluster[], model: NModel, options: LayoutOptions, name: NonNullable<LayoutOptions["engine"]>, reserved: Box[], placement: Placement = {}): Promise<void> {
+  if (placement.compact) for (const c of clusters) c.radius = Math.max(c.node.box.w / 2 + 20, c.attrs.length ? 140 : 65);
   const maxDiameter = Math.max(240, ...clusters.map((c) => c.radius * 2));
   if (name !== "simple" && clusters.length) {
     const elk = new ElkConstructor();
@@ -28,12 +31,12 @@ export async function placeClusters(clusters: Cluster[], model: NModel, options:
       id: "root",
       layoutOptions: {
         "elk.algorithm": name,
-        "elk.direction": "RIGHT",
+        "elk.direction": placement.direction ?? "RIGHT",
         "elk.randomSeed": String(options.seed ?? 1),
         "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
         "elk.spacing.nodeNode": String(Math.max(100, maxDiameter / 6)),
         "elk.layered.spacing.nodeNodeBetweenLayers": String(Math.max(140, maxDiameter / 5)),
-        "elk.stress.desiredEdgeLength": String(maxDiameter + 180),
+        "elk.stress.desiredEdgeLength": String(placement.edgeLength ?? maxDiameter + 180),
         "elk.stress.iterationLimit": "150",
       },
       children: clusters.map(({ node, radius }) => ({

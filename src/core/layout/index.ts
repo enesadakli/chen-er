@@ -10,7 +10,7 @@ export const engines: Record<NonNullable<LayoutOptions["engine"]>, LayoutEngine>
   stress: makeEngine("stress"),
 };
 
-// All engines pass clearance checks; layered has the fewest bench edge crossings.
+// Layered evaluates compact layered and stress candidates with hard clearance checks.
 export const DEFAULT_ENGINE: NonNullable<LayoutOptions["engine"]> = "layered";
 
 export async function layout(model: NModel, options: LayoutOptions = {}, metrics: TextMetrics = interMetrics): Promise<LayoutResult> {

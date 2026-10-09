@@ -23,6 +23,18 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     expect(JSON.stringify(await layout(model, { engine, pins }))).toBe(JSON.stringify(first));
     const q = assessQuality(first.diagram, pins);
     expect({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, pinDrift: q.pinDrift }).toEqual({ overlaps: 0, shapeCrossings: 0, labelCollisions: 0, pinDrift: 0 });
+    if (engine === DEFAULT_ENGINE) {
+      expect(q.aspect).toBeGreaterThanOrEqual(0.5);
+      expect(q.aspect).toBeLessThanOrEqual(2);
+      expect(q.meanEdgeRatio).toBeLessThanOrEqual(3.5);
+      if (input.endsWith("/university-curriculum.er.yaml")) {
+        expect(q.aspect).toBeGreaterThanOrEqual(0.6);
+        expect(q.aspect).toBeLessThanOrEqual(1.8);
+        expect(q.longestEdgeRatio).toBeLessThanOrEqual(7);
+        expect(Math.max(first.diagram.width, first.diagram.height)).toBeLessThanOrEqual(2800);
+        expect(q.edgeCrossings).toBeLessThanOrEqual(4);
+      }
+    }
     if (!Object.keys(pins).length) expect(q.issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);
     for (const [id, pin] of Object.entries(pins)) expect(center(first.diagram.nodes.find((n) => n.id === id)!.box)).toEqual(pin);
     for (const e of first.diagram.edges) {

@@ -1,5 +1,5 @@
 import { anchor, center, type Box, type DEdge, type DNode, type Point } from "../geometry.js";
-import { boxShape, distance, segmentIntersection, segments, segmentThrough } from "./shapes.js";
+import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 const expand = (b: Box, gap: number): Box => ({ x: b.x - gap, y: b.y - gap, w: b.w + gap * 2, h: b.h + gap * 2 });
 const inBox = (p: Point, b: Box) => p.x > b.x + 1e-6 && p.x < b.x + b.w - 1e-6 && p.y > b.y + 1e-6 && p.y < b.y + b.h - 1e-6;
@@ -116,7 +116,9 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
   const from = nodes.find((n) => n.id === edge.from)!, to = nodes.find((n) => n.id === edge.to)!;
   const a = anchor(from, center(to.box)), b = anchor(to, center(from.box));
   const foreign = nodes.filter((n) => n.id !== from.id && n.id !== to.id);
-  if (!offset && foreign.every((n) => !segmentThrough(a, b, boxShape(expand(n.box, 8)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
+  const direct = drawnPaths({ ...edge, points: [a, b] });
+  // Recursive ends need separate ports even when their centerlines are clear.
+  if (!offset && foreign.every((n) => direct.every((ps) => segments(ps).every(([p, q]) => !segmentThrough(p, q, n)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
   const obstacles = [...nodes.map((n) => expand(n.box, 10)), ...reserved.map((r) => expand(r, 5))];
   const starts = ports(from, center(to.box), nodes, offset);
   const goals = ports(to, center(from.box), nodes, -offset);

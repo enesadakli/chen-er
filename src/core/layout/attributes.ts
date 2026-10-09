@@ -3,12 +3,16 @@ import type { NAttribute } from "../normalize.js";
 import { attributeSize } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
 import type { Cluster } from "./clusters.js";
-import { boxShape, segmentThrough } from "./shapes.js";
+import { boxShape, segmentIntersection, segmentThrough } from "./shapes.js";
 
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics): void {
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  const skeleton = edges.filter((e) => e.kind === "end").map((e) => {
+    const from = byId.get(e.from)!, to = byId.get(e.to)!;
+    return { a: anchor(from, center(to.box)), b: anchor(to, center(from.box)) };
+  });
   for (const c of clusters) {
     const oc = center(c.node.box);
     const used = edges.filter((e) => e.from === c.node.id || e.to === c.node.id).map((e) => {
@@ -34,6 +38,12 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
         if (nodes.some((n) => intersects(box, n.box, 14))) continue;
         const start = anchor(parent, p), end = anchor({ kind: "attribute", box }, pc);
         if (nodes.some((n) => n.id !== parent.id && segmentThrough(start, end, boxShape(n.box)))) continue;
+        if (skeleton.some((s) => segmentThrough(s.a, s.b, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(start, end, s.a, s.b))) continue;
+        if (edges.filter((e) => e.kind !== "end").some((e) => {
+          const from = byId.get(e.from)!, to = byId.get(e.to)!;
+          const a = anchor(from, center(to.box)), b = anchor(to, center(from.box));
+          return segmentThrough(a, b, boxShape(box)) || (e.from !== parent.id && e.to !== parent.id && !!segmentIntersection(start, end, a, b));
+        })) continue;
         node = attributeNode(a, p, metrics, false);
         angle = t;
         break search;

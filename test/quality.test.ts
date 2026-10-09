@@ -9,7 +9,25 @@ const diagram = (nodes: DNode[] = [], edges: DEdge[] = [], labels: DLabel[] = []
 
 describe("exact diagram quality", () => {
   it("implements the contract and accepts empty diagrams", () => {
-    expect(assessQuality(diagram())).toEqual({ implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, edgeCrossings: 0, pinDrift: 0, issues: [] });
+    expect(assessQuality(diagram())).toEqual({ implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
+  });
+  it("measures end polylines once and normalizes by the median entity width", () => {
+    const ns = [node("a", 0, 0, "entity", 40, 20), node("b", 100, 100, "entity", 60, 20), node("r", 200, 200, "relationship", 200, 30)];
+    const es = [edge("e1", [{ x: 0, y: 0 }, { x: 30, y: 40 }, { x: 30, y: 90 }]), { ...edge("e2", [{ x: 0, y: 0 }, { x: 60, y: 80 }]), double: true }, { ...edge("attr", [{ x: 0, y: 0 }, { x: 500, y: 0 }]), kind: "attribute" as const }];
+    const q = assessQuality({ ...diagram(ns, es), width: 600, height: 300 });
+    expect(q.aspect).toBe(2);
+    expect(q.edgeLength).toBe(200);
+    expect(q.meanEdgeLength).toBe(100);
+    expect(q.meanEdgeRatio).toBe(2);
+    expect(q.longestEdgeRatio).toBe(2);
+    expect(q.density).toBeCloseTo(8000 / 180000);
+  });
+  it("uses the middle width for an odd entity count and handles missing entities", () => {
+    const es = [edge("e", [{ x: 0, y: 0 }, { x: 300, y: 0 }])];
+    const ns = [node("a", 0, 0, "entity", 200), node("b", 0, 100, "entity", 50), node("c", 0, 200, "entity", 100)];
+    expect(assessQuality(diagram(ns, es)).meanEdgeRatio).toBe(3);
+    expect(assessQuality(diagram([], es)).meanEdgeRatio).toBe(0);
+    expect(assessQuality({ ...diagram(), width: 0, height: 0 })).toMatchObject({ aspect: 0, density: 0 });
   });
   it.each(["entity", "relationship", "attribute"] as const)("finds overlapping %s shapes", (kind) => {
     const q = assessQuality(diagram([node("a", 20, 20, kind), node("b", 30, 30, kind)]));

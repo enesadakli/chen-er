@@ -14,6 +14,15 @@ export interface QualityReport {
   labelCollisions: number;
   edgeCrossings: number;
   pinDrift: number;
+  aspect: number;
+  /** Sum of end-edge centerline polyline lengths in px; double ends count once. */
+  edgeLength: number;
+  meanEdgeLength: number;
+  /** End-edge length divided by median entity width; zero without entities. */
+  meanEdgeRatio: number;
+  /** Node bounding-box area divided by canvas area. */
+  density: number;
+  longestEdgeRatio: number;
   issues: QualityIssue[];
 }
 
@@ -58,5 +67,16 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   }
   for (const e of edges) if (paths.get(e.id)!.some((ps) => ps.some(outside))) add("out-of-canvas", [e.id]);
   const count = (kind: QualityIssue["kind"]) => issues.filter((i) => i.kind === kind).length;
-  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"), issues };
+  const lengths = edges.filter((e) => e.kind === "end").map((e) => segments(e.points).reduce((sum, [a, b]) => sum + distance(a, b), 0));
+  const widths = nodes.filter((n) => n.kind === "entity").map((n) => n.box.w).sort((a, b) => a - b);
+  const middle = Math.floor(widths.length / 2);
+  const median = widths.length ? (widths[middle]! + widths[Math.floor((widths.length - 1) / 2)]!) / 2 : 0;
+  const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
+  const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
+  const area = diagram.width * diagram.height;
+  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+    aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
+    meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
+    longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,
+    density: area > 0 ? nodes.reduce((sum, n) => sum + n.box.w * n.box.h, 0) / area : 0, issues };
 }
