@@ -31,13 +31,9 @@ The render command writes an SVG and, with `--png`, a PNG using bundled Inter
 fonts. Keep the YAML alongside the output so changes can be reviewed and rendered
 again. Do not use a clean lint result as proof that a conceptual model is correct.
 
-**Current checkout:** rendering and the MCP tools are implemented. The semantic
-lint API currently returns no findings. The CLI and viewer lanes are adding the
-other commands documented below; until integrated, they are command contracts,
-not available features. EER specializations are reserved in the schema and are
-not drawn in version 1. Only the `simple` layout engine is registered here;
-`layered` and `stress` fall back to it with an informational diagnostic. The
-example shows the current layout, including some label and edge overlaps.
+**Status:** v0.1. Rendering, layout (`layered` by default; `stress` and `simple`
+available), lint, the CLI, the MCP tools and the live viewer (`chen serve`) work.
+EER specializations are reserved in the schema and are not drawn in version 1.
 
 ## Model reference
 
@@ -88,14 +84,12 @@ for a larger example including recursive and n-ary relationships.
 ## CLI reference
 
 Use `chen` for a built installation, or `npx tsx src/cli/index.ts` from source.
-`render` exists in this checkout; the remaining commands and `--report` are
-integration contracts for the CLI/viewer lanes. Consult `chen <command> --help`
-after integration for their final options.
+`chen <command> --help` lists every option.
 
 | Command | Purpose |
 | --- | --- |
 | `chen render model.er.yaml -o diagram.svg --png` | Write SVG and optional PNG; read sibling layout pins. `--engine layered\|stress\|simple` selects layout. |
-| `chen render model.er.yaml --png --report` | Render and write a diagnostic report once the CLI lane is integrated. |
+| `chen render model.er.yaml --png --report` | Render and print the layout quality report (overlaps, crossings, compactness). |
 | `chen lint model.er.yaml` | Print parsing and semantic diagnostics with the correctness disclaimer. |
 | `chen schema` | Export the model's JSON Schema. |
 | `chen init` | Create a starter model. |
@@ -166,9 +160,8 @@ provide the same workflow when the CLI is unavailable.
 
 Severities distinguish broken rules (`error`), teaching conventions (`course`),
 suspicions that require judgment (`heuristic`) and guidance (`info`). Course and
-heuristic findings are not proof of a wrong model. The following is the planned
-rule inventory; the integrated `chen rules` or MCP `get_schema` result is the
-runtime authority. The current lint stub exposes an empty inventory.
+heuristic findings are not proof of a wrong model. `chen rules` prints the
+current inventory with descriptions.
 
 | Severity | Rule ids |
 | --- | --- |
