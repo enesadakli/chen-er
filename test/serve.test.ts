@@ -79,6 +79,28 @@ describe("local viewer server", () => {
       await eventually(async () => text.includes('"engine":"layered"'));
     } finally { abort.abort(); await reading; }
   });
+  it("picks up edits through the stat poll when fs.watch reports nothing, without idle state events", async () => {
+    await viewer.close();
+    viewer = await serve(model, { port: 0, watch: false });
+    const abort = new AbortController();
+    const response = await fetch(`${viewer.url}/api/events`, { signal: abort.signal });
+    const reader = response.body!.getReader();
+    let text = "";
+    const reading = (async () => {
+      try { while (true) { const chunk = await reader.read(); if (chunk.done) break; text += new TextDecoder().decode(chunk.value); } }
+      catch { /* Aborting the SSE request ends the test stream. */ }
+    })();
+    const states = () => text.split("event: state").length - 1;
+    try {
+      await eventually(async () => states() > 0);
+      const idle = states();
+      await new Promise((done) => setTimeout(done, 2500));
+      expect(states()).toBe(idle);
+      writeFileSync(model, STARTER_MODEL.replace("Course enrollment", "Polled notebook"));
+      await eventually(async () => text.includes('"title":"Polled notebook"'), 5000);
+      expect((await getState()).title).toBe("Polled notebook");
+    } finally { abort.abort(); await reading; }
+  }, 20_000);
   it("returns null figures and diagnostics for invalid models, then recovers", async () => {
     writeFileSync(model, "version: [\n");
     await eventually(async () => { const s = await getState(); return s.yaml === "version: [\n" && s.svg === null; });

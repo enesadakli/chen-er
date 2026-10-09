@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, lstatSync, readFileSync, realpathSync, watch, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { dirname, extname, join, resolve, sep, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -45,7 +45,13 @@ export interface AgentOptions {
   /** Delay between SIGTERM and SIGKILL on cancel (default 3000 ms). */
   killAfterMs?: number;
 }
-export interface ServeOptions { port?: number; open?: boolean; engine?: LayoutOptions["engine"]; agent?: AgentOptions }
+export interface ServeOptions {
+  port?: number; open?: boolean; engine?: LayoutOptions["engine"]; agent?: AgentOptions;
+  /** Use fs.watch for fast reaction to file edits (default true). The stat poll always runs as a fallback. */
+  watch?: boolean;
+}
+/** How often the fallback poll compares the model and layout file stats. */
+const POLL_MS = 1000;
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 let viewerBuild: Promise<void> | undefined;
 
@@ -413,21 +419,40 @@ export async function serve(model: string, options: ServeOptions = {}) {
       else res.end();
     });
   });
+  // fs.watch reacts fast but can miss changes (on macOS its FSEvents stream starts asynchronously and
+  // may drop or coalesce events), so it only schedules a check; the decision is made in the queue,
+  // and a cheap stat poll catches anything the watcher never reported.
   let debounce: ReturnType<typeof setTimeout> | undefined;
-  const watcher = watch(dirname(modelPath), (_event, filename) => {
+  const check = () => serial(async () => { if (!closed && !same(snapshot(), observed)) await refresh(); });
+  const schedule = () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { if (!closed) void check().catch(() => undefined); }, 100);
+  };
+  const watcher: FSWatcher | undefined = options.watch === false ? undefined : watch(dirname(modelPath), (_event, filename) => {
     if (filename && ![basename(modelPath), basename(pinsPath)].includes(filename.toString())) return;
     if (filename?.toString() === basename(pinsPath) && lastWrite !== undefined) {
-      try { if (readFileSync(pinsPath, "utf8") === lastWrite) return; } catch { /* deleted: refresh */ }
+      try { if (readFileSync(pinsPath, "utf8") === lastWrite) return; } catch { /* deleted: check */ }
     }
-    if (same(snapshot(), observed)) return;
-    clearTimeout(debounce);
-    debounce = setTimeout(() => { if (!closed) void serial(refresh); }, 100);
+    schedule();
   });
+  const stamp = (path: string) => {
+    try { const stat = statSync(path, { throwIfNoEntry: false }); return stat ? `${stat.ino}:${stat.size}:${stat.mtimeMs}` : "-"; }
+    catch { return "?"; }
+  };
+  const stamps = () => `${stamp(modelPath)}|${stamp(pinsPath)}`;
+  let polled = ""; // The first tick always compares bytes, covering edits made while the server started.
+  const poll = setInterval(() => {
+    const now = stamps();
+    if (now === polled) return;
+    polled = now;
+    schedule();
+  }, POLL_MS);
+  poll.unref();
   const heartbeat = setInterval(() => { for (const client of clients) client.write(": keepalive\n\n"); }, 15000);
   heartbeat.unref();
   try {
     await new Promise<void>((done, reject) => { server.once("error", reject); server.listen(port, "127.0.0.1", () => { server.off("error", reject); done(); }); });
-  } catch (error) { watcher.close(); clearInterval(heartbeat); throw error; }
+  } catch (error) { watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearInterval(heartbeat); throw error; }
   const address = server.address();
   const url = `http://127.0.0.1:${typeof address === "object" && address ? address.port : port}`;
   // With the agent panel, the page reads the one-time token from `t` and removes it from the address bar.
@@ -440,7 +465,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
   return { server, url, pageUrl, token, async close() {
     closed = true;
     await agent?.close();
-    watcher.close(); clearTimeout(debounce); clearInterval(heartbeat);
+    watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearInterval(heartbeat);
     await queue;
     for (const client of clients) client.end();
     const closing = new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done()));
