@@ -35,6 +35,8 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
   (glance, live reload, occasional drag) and full screen when polishing a diagram for submission (drag, export).
 - The YAML is edited only by the agent or a text editor; the viewer does not edit the model. It writes only
   the layout file (`model.er.layout.json`): pins and accepted positions.
+- With `--agent`, the notes column gains an Agent tab: the student asks for model changes in plain language, the
+  agent edits the YAML, and the diagram reloads, without switching to a terminal.
 - Output goes into lecture notes (Obsidian), homework PDFs and printed reports.
 
 ## Capabilities and Constraints
@@ -58,6 +60,8 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
 ## Product Principles
 
 1. The model file is the source of truth; the viewer never changes meaning, only positions, and never writes the model file.
+   The optional agent panel (`chen serve --agent`) runs the user's own coding agent, which writes the model; the only
+   server-side model write is an explicit Undo of an agent turn. See docs/agent-panel.md.
 2. Show the reasoning: diagnostics, notes and assumptions stay next to the diagram, not hidden.
 3. The exported figure must be submittable without touch-up.
 4. Every finding points to an exact element and YAML line.
