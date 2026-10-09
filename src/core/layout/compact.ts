@@ -88,3 +88,38 @@ export function compactLocally(initial: LayoutResult, clusters: Cluster[], build
   }
   return best;
 }
+
+/** Compress gaps using only shapes facing an adjacent row in the same corridor. */
+export function compactRows(initial: LayoutResult, clusters: Cluster[], ranks: Map<string, number>, build: (cs: Cluster[]) => LayoutResult, model: NModel): LayoutResult {
+  const diagram = initial.diagram;
+  const owners = new Map(diagram.nodes.filter((n) => n.kind === "entity").map((n) => [n.id, n.id]));
+  for (const r of model.relationships) if (r.ends.every((e) => e.entity === r.ends[0]!.entity)) owners.set(r.id, `E:${r.ends[0]!.entity}`);
+  for (const e of diagram.edges.filter((e) => e.kind !== "end")) if (owners.has(e.from)) owners.set(e.to, owners.get(e.from)!);
+  const entities = new Map(diagram.nodes.filter((n) => n.kind === "entity").map((n) => [n.id, center(n.box)]));
+  const rows = [...new Set(ranks.values())].sort((a, b) => a - b);
+  const positions = new Map<number, number>();
+  for (const [i, rank] of rows.entries()) {
+    const original = entities.get([...ranks].find(([, r]) => r === rank)![0])!.y;
+    if (!i) { positions.set(rank, original); continue; }
+    const previous = rows[i - 1]!;
+    const previousY = entities.get([...ranks].find(([, r]) => r === previous)![0])!.y;
+    // A 64px diamond, two readable 60px ends, and two 23px entity halves.
+    let gap = 240;
+    const upper = diagram.nodes.filter((n) => ranks.get(owners.get(n.id) ?? "") === previous);
+    const lower = diagram.nodes.filter((n) => ranks.get(owners.get(n.id) ?? "") === rank);
+    for (const a of upper) for (const b of lower) if (a.box.x < b.box.x + b.box.w + 32 && b.box.x < a.box.x + a.box.w + 32) {
+      gap = Math.max(gap, a.box.y + a.box.h - previousY + original - b.box.y + 32);
+    }
+    positions.set(rank, positions.get(previous)! + Math.min(original - previousY, Math.ceil(gap / 16) * 16));
+  }
+  const shifts = new Map([...ranks].map(([id, rank]) => [id, positions.get(rank)! - entities.get(id)!.y]));
+  const cs = clusters.map((c) => ({ ...c, node: { ...c.node, box: { ...c.node.box } } }));
+  for (const c of cs) if (c.node.kind === "entity") c.node.box.y += shifts.get(c.node.id)!;
+  for (const r of model.relationships) {
+    const diamond = cs.find((c) => c.node.id === r.id)!.node;
+    const shift = r.ends.reduce((sum, e) => sum + shifts.get(`E:${e.entity}`)!, 0) / r.ends.length;
+    diamond.box.y += shift;
+  }
+  const next = build(cs), before = assessQuality(diagram, {}, model), after = assessQuality(next.diagram, {}, model);
+  return Number.isFinite(layoutScore(after)) && readableEnds(next) && after.edgeCrossings <= before.edgeCrossings ? next : initial;
+}

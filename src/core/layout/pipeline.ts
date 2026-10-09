@@ -5,11 +5,12 @@ import type { TextMetrics } from "../text/metrics.js";
 import { alignDiamondPorts, fanEndAnchors, placeRecursive } from "./anchors.js";
 import { attributeNode, placeAttributes, placeRadialAttributes } from "./attributes.js";
 import { measureClusters, placeClusters, type Cluster } from "./clusters.js";
-import { layoutScore } from "./compact.js";
+import { compactRows, layoutScore } from "./compact.js";
 import { finalize } from "./finalize.js";
 import { placeLabels } from "./labels.js";
 import { clearPinnedSpokes, placeSemanticRecursive, placeSemantically, semanticPlacements } from "./semantic.js";
 import { semanticAttributes, semanticRoute } from "./semantic-route.js";
+import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
 import { endRouteMetrics } from "./semantic-edges.js";
 import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
 import { routeEdge } from "./route.js";
@@ -26,6 +27,10 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       const placement = semanticPlacements(model)[0]!;
       placeSemantically(clusters, model, placement, model.relationships.some((r) => r.ends.length > 1 && r.ends.every((e) => e.entity === r.ends[0]!.entity)) && model.entities.length > 1 ? 600 : 430, pinnedAttributes.map((n) => n.box));
       result = refineDiamonds(clusters, semanticBuild, pins, model);
+      const hierarchy = hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model)));
+      if (!Object.keys(pins).length && model.entities.length <= 4 && new Set(placement.columns.values()).size > 1 && hierarchy.pairs.length && !hierarchy.cyclic.size) {
+        result = compactRows(result, clusters, placement.ranks, semanticBuild, model);
+      }
     } else {
       await placeClusters(clusters, model, options, name, pinnedAttributes.map((n) => n.box));
       result = buildDiagram(clusters, pinnedAttributes, model, metrics, name);

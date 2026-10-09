@@ -11,6 +11,11 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
   const ids = model.entities.map((e) => e.id).sort();
   const relations = modelRelations(model);
   const pairs = hierarchyPairs(relations);
+  const ternary = model.relationships.length === 1 && model.entities.length === 3 ? model.relationships[0] : undefined;
+  if (ternary && !pairs.length && new Set(ternary.ends.map((e) => e.entity)).size === 3) {
+    const [left, below, right] = ternary.ends.map((e) => `E:${e.entity}`);
+    return [{ columns: new Map([[left!, 0], [below!, 0.5], [right!, 1]]), ranks: new Map([[left!, 0], [below!, 1], [right!, 0]]), score: 0 }];
+  }
   const hierarchy = hierarchyDag(ids, pairs);
   if (hierarchy.cyclic.size) {
     const component = (id: string) => hierarchy.cyclic.get(id) ?? id;
@@ -128,7 +133,9 @@ function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<s
 
 export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = []): void {
   const byId = new Map(clusters.map((c) => [c.node.id, c]));
-  const rankSpacing = new Set(placement.columns.values()).size === 1 ? Math.min(spacing, 280) : spacing;
+  const isolatedTernary = model.entities.length === 3 && model.relationships.length === 1 && new Set(model.relationships[0]!.ends.map((e) => e.entity)).size === 3 && !hierarchyPairs(modelRelations(model)).length;
+  if (isolatedTernary) spacing = 480;
+  const rankSpacing = isolatedTernary ? 200 : new Set(placement.columns.values()).size === 1 ? Math.min(spacing, 280) : spacing;
   for (const c of clusters.filter((c) => c.node.kind === "entity" && !c.node.pinned)) {
     c.node.box = boxAround({ x: 350 + placement.columns.get(c.node.id)! * spacing, y: 350 + placement.ranks.get(c.node.id)! * rankSpacing }, c.node.box.w, c.node.box.h);
   }
@@ -149,7 +156,7 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     if (c.node.pinned) continue;
     const ends = [...new Set(r.ends.map((e) => `E:${e.entity}`))].map((id) => byId.get(id)).filter((c): c is Cluster => !!c).map((c) => center(c.node.box));
     if (!ends.length) continue;
-    const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: ends.reduce((s, p) => s + p.y, 0) / ends.length };
+    const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: isolatedTernary ? Math.min(...ends.map((p) => p.y)) : ends.reduce((s, p) => s + p.y, 0) / ends.length };
     const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
     const norm = Math.hypot(dx, dy) || 1;
     // Parallel relationships use a small perpendicular lane around their shared midpoint.
@@ -172,7 +179,9 @@ export function placeSemanticRecursive(model: NModel, nodes: DNode[]): void {
     const entity = nodes.find((n) => n.id === `E:${r.ends[0]!.entity}`), diamond = nodes.find((n) => n.id === r.id);
     if (!entity || !diamond || diamond.pinned) continue;
     const p = center(entity.box);
-    const candidates = [0, -180, 180, -260, 260].flatMap((x) => [-1, 1].flatMap((sign) => [280, 340, 400].map((gap) => ({ x: p.x + x, y: p.y + sign * gap }))));
+    const sparse = model.entities.length <= 4 && model.entities.find((e) => e.id === entity.id)!.attrs.length <= 3;
+    const gaps = sparse ? [200, 240, 280] : [280, 340, 400];
+    const candidates = [0, -180, 180, -260, 260].flatMap((x) => [-1, 1].flatMap((sign) => gaps.map((gap) => ({ x: p.x + x, y: p.y + sign * gap }))));
     const neighbours = model.relationships.filter((other) => other !== r && other.ends.some((end) => `E:${end.entity}` === entity.id))
       .map((other) => center(nodes.find((n) => n.id === other.id)!.box));
     const score = (point: Point) => neighbours.filter((other) => (other.y - p.y) * (point.y - p.y) > 0).length * 10000 + distance(point, p);

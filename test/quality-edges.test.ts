@@ -36,15 +36,32 @@ describe("visible edge quality", () => {
     const double = edge("d", [{ x: 100, y: 100 }, { x: 300, y: 100 }], "end", true);
     expect(q([double, edge("b", [{ x: 200, y: 102 }, { x: 400, y: 102 }], "attribute")]).edgeOverlap).toBe(1);
   });
-  it("detects a tiny jog and accepts the exact 12px boundary", () => {
-    const a = edge("a", [{ x: 100, y: 100 }, { x: 164, y: 100 }, { x: 164, y: 111 }, { x: 250, y: 111 }]);
+  it("detects a tiny jog and accepts the exact 16px boundary", () => {
+    const a = edge("a", [{ x: 100, y: 100 }, { x: 164, y: 100 }, { x: 164, y: 115 }, { x: 250, y: 115 }]);
     expect(q([a]).tinySegments).toBe(1);
-    a.points[2]!.y = a.points[3]!.y = 112;
+    a.points[2]!.y = a.points[3]!.y = 116;
     expect(q([a]).tinySegments).toBe(0);
-    expect(q([edge("d", [{ x: 100, y: 100 }, { x: 114, y: 100 }, { x: 114, y: 110 }, { x: 250, y: 110 }], "end", true)]).tinySegments).toBe(1);
+    expect(q([edge("d", [{ x: 100, y: 100 }, { x: 120, y: 100 }, { x: 120, y: 114 }, { x: 250, y: 114 }], "end", true)]).tinySegments).toBe(1);
   });
   it("counts a short axis-aligned attribute segment too", () => {
-    expect(q([edge("a", [{ x: 100, y: 100 }, { x: 100, y: 111 }], "attribute")]).tinySegments).toBe(1);
+    expect(q([edge("a", [{ x: 100, y: 100 }, { x: 100, y: 115 }], "attribute")]).tinySegments).toBe(1);
+  });
+  it("detects short diagonal segments and shallow intermediate steps", () => {
+    expect(q([edge("short", [{ x: 100, y: 100 }, { x: 109, y: 109 }])]).tinySegments).toBe(1);
+    const step = edge("step", [{ x: 100, y: 100 }, { x: 150, y: 100 }, { x: 164, y: 140 }, { x: 220, y: 140 }]);
+    expect(q([step]).tinySegments).toBe(1);
+    step.points[2]!.x = 166;
+    expect(q([step]).tinySegments).toBe(0);
+  });
+  it("measures actual occupied shape area and plain segments without counting double ends twice", () => {
+    const ns = [node("rect", 100, 100, "entity"), node("diamond", 300, 100, "relationship"), node("oval", 500, 100, "attribute")];
+    const report = q([
+      edge("a", [{ x: 100, y: 300 }, { x: 200, y: 300 }]),
+      edge("b", [{ x: 100, y: 400 }, { x: 300, y: 400 }], "end", true),
+      edge("c", [{ x: 100, y: 500 }, { x: 500, y: 500 }]),
+    ], ns);
+    expect(report.emptyAreaRatio).toBeCloseTo(1 - (4000 + 2000 + Math.PI * 1000) / 1000000);
+    expect(report.plainSegmentRatio).toBe(2);
   });
   it("measures 16px end separation on a shared entity side", () => {
     const entity = node("E", 300, 300, "entity", 100, 100);
@@ -96,7 +113,7 @@ describe("visible edge quality", () => {
     const report = q([{ ...e, points }, other], nodes);
     expect(report).toMatchObject({ tinySegments: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0, edgeOverlap: 0 });
   });
-  it.each(["attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const)("hard-rejects %s in candidate selection", (metric) => {
+  it.each(["labelLoose", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const)("hard-rejects %s in candidate selection", (metric) => {
     const report = q([]);
     expect(layoutScore({ ...report, [metric]: 1 })).toBe(Infinity);
   });

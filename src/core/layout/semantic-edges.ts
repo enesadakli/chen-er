@@ -2,7 +2,7 @@ import { center, type Box, type DEdge, type Diagram, type DNode, type Point } fr
 import { style } from "../style.js";
 import { distance, segmentIntersection, segments } from "./shapes.js";
 
-export const MIN_ROUTE_SEGMENT = 12;
+export const MIN_ROUTE_SEGMENT = 16;
 export const MIN_END_SEPARATION = 16;
 const EPS = 1e-6;
 
@@ -54,6 +54,10 @@ function endpointSides(p: Point, box: Box): number[] {
 
 export interface EdgeQuality {
   attributeSpokeMax: number;
+  /** Unoccupied shape area / canvas area; diamonds and ellipses use their actual area. */
+  emptyAreaRatio: number;
+  /** Longest end segment / median total end-edge length. */
+  plainSegmentRatio: number;
   routeDetourMax: number;
   routeDetourMean: number;
   endBendsMax: number;
@@ -62,7 +66,7 @@ export interface EdgeQuality {
   attributeEdgeBends: number;
   /** Number of edge pairs (including an edge with itself) sharing rendered segment length. */
   edgeOverlap: number;
-  /** Number of sub-12px segments in orthogonal routes, including rendered copies. */
+  /** Number of sub-16px segments or offsets, in any route, including rendered copies. */
   tinySegments: number;
   /** Number of end pairs less than 16px apart on the same entity side. */
   endPortCrowding: number;
@@ -105,6 +109,14 @@ export function endRouteMetrics(diagram: Diagram): { id: string; routeDetour: nu
   });
 }
 
+/** Count each centerline segment once, including shortened rendered copies. */
+export function tinyRouteSegments(edge: DEdge): number {
+  const copies = [edge.points, ...visibleEdgePaths(edge)];
+  return segments(edge.points).filter(([a, b], j, lines) => copies.some((ps) => distance(ps[j]!, ps[j + 1]!) < MIN_ROUTE_SEGMENT - EPS)
+    || (j > 0 && j < lines.length - 1 && Math.min(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) > EPS
+      && Math.min(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) < MIN_ROUTE_SEGMENT - EPS)).length;
+}
+
 export function edgeQuality(diagram: Diagram): EdgeQuality {
   const byId = new Map(diagram.nodes.map((n) => [n.id, n]));
   let edgeOverlap = 0, tinySegments = 0, endPortCrowding = 0, diamondVertexViolations = 0, doubleEdgeArtifacts = 0;
@@ -114,11 +126,7 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
     const lines = visible.get(e.id)!;
     if (lines.some(([a, b], j) => lines.slice(j + 1).some(([c, d]) => segmentIntersection(a, b, c, d) === "overlap"))) edgeOverlap++;
     for (const other of diagram.edges.slice(i + 1)) if (lines.some(([a, b]) => visible.get(other.id)!.some(([c, d]) => segmentIntersection(a, b, c, d) === "overlap"))) edgeOverlap++;
-    if (orthogonalPath(e.points)) {
-      // Count centerline segments once, even if both copies have the same short segment.
-      const copies = [e.points, ...visibleEdgePaths(e)];
-      tinySegments += segments(e.points).filter((_, j) => copies.some((ps) => distance(ps[j]!, ps[j + 1]!) < MIN_ROUTE_SEGMENT - EPS)).length;
-    }
+    tinySegments += tinyRouteSegments(e);
     if (e.kind !== "end") continue;
     if (orthogonalPath(e.points)) {
       const diamond = byId.get(e.from), entity = byId.get(e.to);
@@ -145,7 +153,13 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
     const height = byId.get(e.to)?.box.h ?? 0;
     return height > EPS ? segments(e.points).reduce((sum, [a, b]) => sum + distance(a, b), 0) / height : 0;
   });
-  return { attributeSpokeMax: Math.max(0, ...spokes), routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
+  const lengths = diagram.edges.filter((e) => e.kind === "end").map((e) => segments(e.points).reduce((sum, [a, b]) => sum + distance(a, b), 0)).sort((a, b) => a - b);
+  const median = lengths.length ? (lengths[Math.floor(lengths.length / 2)]! + lengths[Math.floor((lengths.length - 1) / 2)]!) / 2 : 0;
+  const longestSegment = Math.max(0, ...diagram.edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points).map(([a, b]) => distance(a, b))));
+  const occupied = diagram.nodes.reduce((sum, n) => sum + n.box.w * n.box.h * (n.kind === "relationship" ? 0.5 : n.kind === "attribute" ? Math.PI / 4 : 1), 0)
+    + diagram.labels.reduce((sum, l) => sum + l.box.w * l.box.h, 0);
+  return { emptyAreaRatio: diagram.width * diagram.height > 0 ? Math.max(0, 1 - occupied / (diagram.width * diagram.height)) : 0,
+    plainSegmentRatio: median > EPS ? longestSegment / median : 0, attributeSpokeMax: Math.max(0, ...spokes), routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
     routeDetourMean: routes.reduce((sum, r) => sum + r.routeDetour, 0) / (routes.length || 1),
     endBendsMax: Math.max(0, ...routes.map((r) => r.endBends)),
     endBendsMean: routes.reduce((sum, r) => sum + r.endBends, 0) / (routes.length || 1),

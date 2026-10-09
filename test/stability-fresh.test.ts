@@ -7,7 +7,7 @@ import { assessQuality } from "../src/core/quality.js";
 import { LayoutFile } from "../src/core/schema.js";
 
 const fixtures = readdirSync("bench/fixtures").filter((f) => f.endsWith(".er.yaml")).sort().map((f) => `bench/fixtures/${f}`);
-fixtures.push("examples/library.er.yaml");
+fixtures.push(...readdirSync("examples").filter((f) => f.endsWith(".er.yaml")).sort().map((f) => `examples/${f}`));
 if (existsSync("examples/private/university-curriculum.er.yaml")) fixtures.push("examples/private/university-curriculum.er.yaml");
 const hardMetrics = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
 

@@ -1,6 +1,7 @@
 import { boxAround, center, intersects, type DEdge, type DNode, type Point } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { distance } from "./shapes.js";
+import { MIN_ROUTE_SEGMENT } from "./semantic-edges.js";
 
 export interface EndPort { anchor: Point; normal: Point; recursive?: { index: number; count: number } }
 type Side = "top" | "right" | "bottom" | "left";
@@ -35,8 +36,9 @@ export function recursiveDeparture(from: DNode, to: DNode, port: EndPort): EndPo
   const fraction = (port.recursive.index + 1) / (port.recursive.count + 1) * 2 - 1;
   if (port.normal.y) {
     const sign = Math.sign(target.y - c.y);
-    const x = fraction * from.box.w / 2;
-    return { anchor: { x: c.x + x, y: c.y + sign * from.box.h / 2 * (1 - Math.abs(fraction)) }, normal: { x: 0, y: sign } };
+    const aligned = port.anchor.x - c.x;
+    const x = Math.abs(aligned) < from.box.w / 2 - 4 ? aligned : fraction * from.box.w / 2;
+    return { anchor: { x: c.x + x, y: c.y + sign * from.box.h / 2 * (1 - Math.abs(x) / (from.box.w / 2)) }, normal: { x: 0, y: sign } };
   }
   const sign = Math.sign(target.x - c.x);
   return { anchor: { x: c.x + sign * from.box.w / 2 * (1 - Math.abs(fraction)), y: c.y + fraction * from.box.h / 2 }, normal: { x: sign, y: 0 } };
@@ -111,13 +113,33 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[]): Map<string, EndPo
         const separation = count === 1 ? b.h / 2 : count ? 9 : 28;
         return Math.max(9, Math.ceil(Math.sqrt(Math.max(0, 28 ** 2 - separation ** 2))));
       };
-      const first = horizontal(side) && span === b.w ? corner("left") : 9;
-      const last = horizontal(side) && span === b.w ? corner("right") : 9;
+      const leftClearance = horizontal(side) && span === b.w ? corner("left") : 9;
+      const rightClearance = horizontal(side) && span === b.w ? corner("right") : 9;
+      const first = recursiveGroup ? Math.max(leftClearance, rightClearance) : leftClearance;
+      const last = recursiveGroup ? first : rightClearance;
       const step = group.length > 1 ? (span - first - last) / (group.length - 1) : 0;
+      const offsets = group.map((e, i) => recursiveGroup || !horizontal(side) ? -span / 2 + first + i * step
+        : Math.max(-span / 2 + first, Math.min(span / 2 - last, endpoint(e).x - c.x)));
+      if (horizontal(side) && !recursiveGroup && group.length > 1) {
+        const preferred = [...offsets];
+        const separate = (spacing: number) => {
+          const separation = Math.min(spacing, step);
+          offsets.splice(0, offsets.length, ...preferred);
+          for (let i = 1; i < offsets.length; i++) offsets[i] = Math.max(offsets[i]!, offsets[i - 1]! + separation);
+          offsets[offsets.length - 1] = Math.min(offsets.at(-1)!, span / 2 - last);
+          for (let i = offsets.length - 2; i >= 0; i--) offsets[i] = Math.min(offsets[i]!, offsets[i + 1]! - separation);
+        };
+        separate(spacing(side));
+        // Preserve an exactly aligned end when wide label spacing would create a tiny jog.
+        if (offsets.some((offset, i) => Math.abs(preferred[i]! - (endpoint(group[i]!).x - c.x)) < 1e-6
+          && Math.abs(offset - preferred[i]!) > 1e-6 && Math.abs(offset - preferred[i]!) < MIN_ROUTE_SEGMENT)) separate(28);
+      }
       group.forEach((e, i) => {
         const p = endpoint(e);
-        const aligned = horizontal(side) ? p.x - c.x : 0;
-        const offset = group.length > 1 ? -span / 2 + first + i * step : Math.max(-span / 2 + first, Math.min(span / 2 - last, aligned));
+        const otherEnds = edges.filter((other) => other.kind === "end" && other.from === e.from && other.to !== e.to);
+        const sameRow = otherEnds.length === 1 && Math.abs(center(nodes.find((node) => node.id === otherEnds[0]!.to)!.box).y - c.y) < 1e-6;
+        const aligned = horizontal(side) ? p.x - c.x : sameRow ? p.y - c.y : 0;
+        const offset = group.length > 1 ? offsets[i]! : Math.max(-span / 2 + first, Math.min(span / 2 - last, aligned));
         const repeated = group.filter((other) => other.from === e.from).sort((a, b) => a.id.localeCompare(b.id));
         const recursive = repeated.length > 1 ? { index: repeated.indexOf(e), count: repeated.length } : undefined;
         result.set(e.id, { recursive, anchor: { x: c.x + n.x * b.w / 2 + (horizontal(side) ? offset : 0), y: c.y + n.y * b.h / 2 + (horizontal(side) ? 0 : offset) }, normal: n });

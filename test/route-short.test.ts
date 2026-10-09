@@ -46,9 +46,10 @@ it.skipIf(!existsSync("examples/private/university-curriculum.er.yaml"))("keeps 
   expect(endRouteMetrics(d).filter((r) => r.endBends > 2)).toEqual([]);
   expect(q.edgeCrossings).toBeLessThanOrEqual(2);
   expect(q.diamondOffset).toBeLessThanOrEqual(0.15);
-  const includes = d.edges.find((e) => e.from === "R:INCLUDES" && e.to === "E:COURSE")!;
-  expect(includes.points).toHaveLength(2);
-  expect(includes.points[0]!.y).toBe(includes.points[1]!.y);
+  for (const e of d.edges.filter((e) => e.kind === "end" && (e.from === "R:INCLUDES" || e.from === "R:LISTS"))) {
+    expect(e.points, e.id).toHaveLength(2);
+    expect(orthogonalPath(e.points), e.id).toBe(true);
+  }
 }, 10000);
 
 it("keeps the COMPANY block readable with symmetric recursive ends and complete short attribute fans", async () => {
@@ -72,7 +73,7 @@ it("keeps the COMPANY block readable with symmetric recursive ends and complete 
   expect(recursive).toHaveLength(2);
   for (const e of recursive) {
     expect(orthogonalPath(e.points)).toBe(true);
-    expect(e.points).toHaveLength(4);
+    expect(e.points).toHaveLength(2);
     const first = e.points[0]!, last = e.points.at(-1)!;
     expect(first.y).toBeGreaterThan(c.y);
     expect(Math.abs(first.x - c.x) / (diamond.box.w / 2) + Math.abs(first.y - c.y) / (diamond.box.h / 2)).toBeCloseTo(1);
