@@ -40,9 +40,25 @@ class Heap {
     return first;
   }
 }
-function orthogonal(start: Point, goal: Point, boxes: Box[], prior: DEdge[]): Point[] | undefined {
-  const xs = [...new Set([start.x, goal.x, ...boxes.flatMap((b) => [b.x, b.x + b.w])])].sort((a, b) => a - b);
-  const ys = [...new Set([start.y, goal.y, ...boxes.flatMap((b) => [b.y, b.y + b.h])])].sort((a, b) => a - b);
+/** Routing only looks at obstacles near the two endpoints; a detour never needs the far side of the drawing. */
+const ROUTE_MARGIN = 360;
+/** Hard cap on A* expansions so an impossible pair fails fast instead of exploring the whole grid. */
+const MAX_EXPANSIONS = 12000;
+/** Port pairs tried per edge before falling back to the straight segment. */
+const MAX_PORTS = 4;
+
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+function orthogonal(start: Point, goal: Point, allBoxes: Box[], prior: DEdge[]): Point[] | undefined {
+  const region: Box = {
+    x: Math.min(start.x, goal.x) - ROUTE_MARGIN,
+    y: Math.min(start.y, goal.y) - ROUTE_MARGIN,
+    w: Math.abs(start.x - goal.x) + 2 * ROUTE_MARGIN,
+    h: Math.abs(start.y - goal.y) + 2 * ROUTE_MARGIN,
+  };
+  const boxes = allBoxes.filter((b) => overlaps(b, region));
+  const xs = [...new Set([start.x, goal.x, region.x, region.x + region.w, ...boxes.flatMap((b) => [b.x, b.x + b.w])])].sort((a, b) => a - b);
+  const ys = [...new Set([start.y, goal.y, region.y, region.y + region.h, ...boxes.flatMap((b) => [b.y, b.y + b.h])])].sort((a, b) => a - b);
   const cols = xs.length, count = cols * ys.length;
   const point = (id: number): Point => ({ x: xs[id % cols]!, y: ys[Math.floor(id / cols)]! });
   const source = ys.indexOf(start.y) * cols + xs.indexOf(start.x);
@@ -53,11 +69,14 @@ function orthogonal(start: Point, goal: Point, boxes: Box[], prior: DEdge[]): Po
   const heuristic = (p: Point) => Math.abs(p.x - goal.x) + Math.abs(p.y - goal.y);
   costs[source] = 0;
   heap.push({ id: source, score: heuristic(start) });
-  const priorSegments = prior.flatMap((e) => segments(e.points));
+  const priorSegments = prior.flatMap((e) => segments(e.points)).filter(([c, d]) =>
+    overlaps({ x: Math.min(c.x, d.x), y: Math.min(c.y, d.y), w: Math.abs(c.x - d.x) + 1e-6, h: Math.abs(c.y - d.y) + 1e-6 }, region));
   let item;
+  let expansions = 0;
   while ((item = heap.pop())) {
     const id = item.id;
     if (seen[id]) continue;
+    if (++expansions > MAX_EXPANSIONS) return undefined;
     if (id === target) {
       const path: Point[] = [];
       for (let k = id; k >= 0; k = parents[k]!) path.push(point(k));
@@ -71,6 +90,8 @@ function orthogonal(start: Point, goal: Point, boxes: Box[], prior: DEdge[]): Po
       if (!validity[next]) validity[next] = boxes.some((r) => inBox(b, r)) ? 2 : 1;
       if (validity[next] === 2 || blocked(a, b, boxes)) continue;
       const crossingCost = priorSegments.reduce((sum, [c, d]) => {
+        if (Math.max(c.x, d.x) < Math.min(a.x, b.x) || Math.min(c.x, d.x) > Math.max(a.x, b.x) ||
+          Math.max(c.y, d.y) < Math.min(a.y, b.y) || Math.min(c.y, d.y) > Math.max(a.y, b.y)) return sum;
         const hit = segmentIntersection(a, b, c, d);
         return sum + (hit === "overlap" ? 240 : hit ? 45 : 0);
       }, 0);
@@ -127,7 +148,7 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
   const obstacles = [...nodes.map((n) => expand(n.box, 10)), ...reserved.map((r) => expand(r, 5))];
   const starts = ports(from, center(to.box), nodes, offset).filter((p) => freeAnchor(p.anchor));
   const goals = endPort ? [{ anchor: b, escape: { x: b.x + endPort.normal.x * 90, y: b.y + endPort.normal.y * 90 } }] : ports(to, center(from.box), nodes, -offset);
-  for (const start of starts) for (const goal of goals) {
+  for (const start of starts.slice(0, MAX_PORTS)) for (const goal of goals.slice(0, MAX_PORTS)) {
     if (reserved.some((r) => segmentThrough(start.anchor, start.escape, boxShape(expand(r, 4))) || segmentThrough(goal.anchor, goal.escape, boxShape(expand(r, 4))))) continue;
     const path = orthogonal(start.escape, goal.escape, obstacles, prior);
     if (path) return simplify([start.anchor, ...path, goal.anchor]);
