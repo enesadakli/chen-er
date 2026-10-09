@@ -32,7 +32,7 @@ export function createServer(io: ToolIO = fileIO): McpServer {
     annotations: { readOnlyHint: true },
   }, (input) => safely(() => lintEr(input, io)));
   server.registerTool("render_er", {
-    description: "Render Chen ER YAML and return a PNG image for visual inspection plus JSON diagnostics and written paths. Supply exactly one of model or path. File input loads sibling .er.layout.json pins. Optional out writes SVG and PNG, replacing existing files. Inspect the image and revise the model or pins as needed.",
+    description: "Render Chen ER YAML and return a PNG image for visual inspection plus JSON diagnostics and written paths. Supply exactly one of model or path. File input loads sibling .er.layout.json pins (set noPins to ignore them); diagnostics then include a pins-degrade-layout warning when the saved pins make the drawing clearly worse, and notes says which engine the layout file chose. Optional out writes SVG and PNG, replacing existing files. Inspect the image and revise the model or pins as needed.",
     inputSchema: renderInput,
     annotations: { readOnlyHint: false, destructiveHint: true },
   }, (input) => safely(() => renderEr(input, io)));

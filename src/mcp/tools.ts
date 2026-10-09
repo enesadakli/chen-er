@@ -23,6 +23,7 @@ export const renderInput = z.object({
   engine: z.enum(["layered", "stress", "simple"]).optional(),
   out: z.string().regex(/\.svg$/i).optional().describe("Optional SVG output path. Also writes a sibling PNG; existing files are replaced."),
   scale: z.number().finite().positive().optional().describe("PNG zoom factor; default 2. Does not change SVG geometry."),
+  noPins: z.boolean().optional().describe("Ignore the sibling .er.layout.json (pins, soft positions, stored engine). Only applies to path input."),
 }).strict().refine(exactlyOne, "Supply exactly one of model or path.");
 
 export interface ToolIO {
@@ -76,10 +77,10 @@ export async function renderEr(input: z.infer<typeof renderInput>, io: ToolIO): 
   const options = args.engine ? { engine: args.engine } : {};
   const result = args.model !== undefined
     ? await renderText(args.model, options)
-    : await renderFile(args.path!, options);
+    : await renderFile(args.path!, options, { noPins: args.noPins, advise: true });
   const diagnostics = [...result.diagnostics, ...(result.model ? lint(result.model) : [])];
   if (!result.svg || hasErrors(diagnostics)) {
-    return textResult({ diagnostics, summary: summary(diagnostics), writtenPaths: [], disclaimer: LINT_DISCLAIMER }, true);
+    return textResult({ diagnostics, summary: summary(diagnostics), notes: result.notes ?? [], writtenPaths: [], disclaimer: LINT_DISCLAIMER }, true);
   }
   const png = svgToPng(result.svg, args.scale);
   const writtenPaths: string[] = [];
@@ -92,7 +93,7 @@ export async function renderEr(input: z.infer<typeof renderInput>, io: ToolIO): 
   }
   return {
     content: [
-      { type: "text", text: JSON.stringify({ diagnostics, summary: summary(diagnostics), writtenPaths, disclaimer: LINT_DISCLAIMER }) },
+      { type: "text", text: JSON.stringify({ diagnostics, summary: summary(diagnostics), notes: result.notes ?? [], writtenPaths, disclaimer: LINT_DISCLAIMER }) },
       { type: "image", data: png.toString("base64"), mimeType: "image/png" },
     ],
   };

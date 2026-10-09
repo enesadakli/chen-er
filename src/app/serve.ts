@@ -120,7 +120,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
         all = [...all, ...result.diagnostics];
         if (!saved.diagnostics.length) {
           try { writeLayout({ positions: diagramPositions(diagram) }); }
-          catch (error) { all.push({ rule: "layout-file", severity: "info", message: `Positions not saved: ${(error as Error).message}` }); }
+          catch (error) { all.push({ rule: "layout-file", severity: "warning", message: `Positions not saved: ${(error as Error).message}` }); }
         }
       }
       diagnostics = all.map((d) => ({ ...d, target: diagnosticTarget(d.path, parsed.model) }));
