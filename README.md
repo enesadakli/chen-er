@@ -161,9 +161,9 @@ npx vitest run
 
 ## Status and roadmap
 
-Version 0.1.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, three engine choices, saved pins/positions, the local viewer and three MCP tools. Automatic layout still needs visual review, especially for crossings and dense models. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn.
+Version 0.2.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, the default `layered` engine with semantic placement (1:N hierarchy top-down, diamonds between their entities, participation labels on their own edge) plus `stress` and `simple` alternatives, saved pins and soft positions with stable re-layout, the local viewer, and three MCP tools. Automatic layout still needs visual review on large models with a highly connected entity, where some edges stay long. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn. See [CHANGELOG.md](CHANGELOG.md).
 
-Next work: complete npm metadata and publication checks, improve layout quality on larger models, and design EER rendering. These are planned areas, not supported features or release dates.
+Next work: npm publication, more compact layouts around highly connected entities, and EER rendering. These are planned areas, not supported features or release dates.
 
 ## License
 

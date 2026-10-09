@@ -25,6 +25,9 @@ acceptance tests and a CI workflow.
   `labelLoose`, `endPortCrowding`).
 - Public examples (`company-project`, `ternary`), model reference documentation,
   and `npm run gen:docs` to regenerate the example images.
+- MCP: `render_er` returns the same warnings and notes as `chen render` and
+  accepts `noPins`. An installed package starts the MCP server with
+  `chen-er-mcp`.
 - A public hospital acceptance fixture, bench guard tests and a GitHub Actions
   workflow that runs the type check and tests on every push and pull request.
 

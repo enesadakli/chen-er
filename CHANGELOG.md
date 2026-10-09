@@ -90,7 +90,16 @@ All notable changes to chen-er are recorded here. The format follows
   are avoided.
 - Layout is up to 6 times faster on larger models because the orthogonal router
   now searches only the neighbourhood of the two endpoints.
-- <!-- PLACEHOLDER: add entries for the long-edge layout fixes and the MCP and package fixes that land before release. -->
+- The MCP `render_er` tool now returns the same rendering advice as
+  `chen render`: the `pins-degrade-layout` warning in its diagnostics and the
+  engine note in a `notes` field. It accepts `noPins` to ignore the layout file.
+- `chen serve` reports a failure to save positions as a `warning` instead of
+  `info`.
+- An installed package could not start the MCP server. The package now ships a
+  `chen-er-mcp` command (`bin/chen-mcp.js`).
+- Recursive relationship diamonds sit closer to their entity on larger models.
+- New quality metrics in `chen render --report` and the bench: `longEdgeMax`,
+  `longEdgeMean`, `spokeEdgeClearance` and `spokeLabelClearance`.
 
 ## [0.1.0] - 2026-10-09
 
