@@ -2,7 +2,7 @@ import { boxAround, intersects, type Box, type DEdge, type DLabel, type DNode } 
 import type { NModel } from "../normalize.js";
 import { cardText, labelSize, style } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
-import { boxDistance, boxSegmentDistance, labelAmbiguityReasons, labelGeometry, labelLooseReasons, type LabelGeometry } from "./label-geometry.js";
+import { boxDistance, boxSegmentDistance, labelAmbiguityReasons, labelGeometry, labelLooseReasons, labelOnOwnEdge, type LabelGeometry } from "./label-geometry.js";
 import { boxShape, distance, drawnPaths, segments, shapesNear } from "./shapes.js";
 
 interface Slot {
@@ -26,7 +26,7 @@ export function placeLabels(model: NModel, nodes: DNode[], edges: DEdge[], metri
     const box = label.box, shape = boxShape(box);
     const expanded = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };
     // Valid ownership slots already clear shapes and other ends by at least four pixels.
-    return edges.some((other) => other.id !== edge.id && (!ownershipClear || other.kind !== "end") && lines.get(other.id)!.some(([a, b]) => boxSegmentDistance(expanded, a, b) < 1e-7))
+    return labelOnOwnEdge(box, edge, geometry) || edges.some((other) => other.id !== edge.id && (!ownershipClear || other.kind !== "end") && lines.get(other.id)!.some(([a, b]) => boxSegmentDistance(expanded, a, b) < 1e-7))
       || (!ownershipClear && nodes.some((node) => shapesNear(shape, node, 2)));
   };
   const options = new Map<string, DLabel[]>();
@@ -80,11 +80,16 @@ function* candidates({ label, edge }: Slot): Generator<DLabel> {
   const { w, h } = label.box;
   const alongRadius = (w * Math.abs(ux) + h * Math.abs(uy)) / 2;
   const normalRadius = (w * Math.abs(uy) + h * Math.abs(ux)) / 2;
+  const beforeTurn = edge.points.at(-3);
+  const turnSide = beforeTurn ? -uy * (beforeTurn.x - previous.x) + ux * (beforeTurn.y - previous.y) : 0;
+  // Preserve distant-turn slots; only nearby bends can enter the first 48px label region.
+  const preferred = length <= 48 + alongRadius && turnSide > 0 ? -1 : 1;
   for (const gap of [2, 4, 8]) {
     const start = Math.min(48, alongRadius + gap * 2 + 2);
-    const positions = [start, 30, 40, 48, 20, 10];
-    for (const along of new Set(positions)) for (const sign of [1, -1]) {
-      const side = sign * (normalRadius + gap + (edge.double ? style.doubleEdgeGap / 2 : 0));
+    const positions = [start, start + 2, start + 4, 30, 40, 48, 20, 10];
+    for (const along of new Set(positions)) for (const sign of [preferred, -preferred]) {
+      // Keep the inflated box strictly clear of the first segment, including boundary contact.
+      const side = sign * (normalRadius + Math.max(gap, 2.01) + (edge.double ? style.doubleEdgeGap / 2 : 0));
       yield { ...label, box: boxAround({ x: end.x + ux * along - uy * side, y: end.y + uy * along + ux * side }, w, h) };
     }
   }

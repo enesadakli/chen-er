@@ -26,6 +26,13 @@ export function boxSegmentDistance(box: Box, a: Point, b: Point): number {
     cornerDistance(right, bottom), cornerDistance(box.x, bottom)));
 }
 
+/** Include every drawn segment, including both lines of total participation. */
+export function labelOnOwnEdge(box: Box, edge: DEdge, geometry?: LabelGeometry): boolean {
+  const expanded = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };
+  return (geometry?.lines.get(edge.id) ?? drawnPaths(edge).flatMap(segments))
+    .some(([a, b]) => boxSegmentDistance(expanded, a, b) < 1e-7);
+}
+
 export function labelAmbiguityReasons(box: Box, edge: DEdge, edges: DEdge[], geometry?: LabelGeometry): string[] {
   const end = edge.points.at(-1), previous = edge.points.at(-2);
   if (!end || !previous) return ["missing entity-end segment"];
@@ -74,6 +81,7 @@ export function labelLooseReasons(label: DLabel, edge: DEdge, geometry: LabelGeo
   const normal = -(c.x - end.x) * uy + (c.y - end.y) * ux;
   const radius = (label.box.w * Math.abs(uy) + label.box.h * Math.abs(ux)) / 2;
   const reasons: string[] = [];
+  if (labelOnOwnEdge(label.box, edge, geometry)) reasons.push("intersects own edge within 2px");
   if (along < -1e-7 || along > Math.min(48, length) + 1e-7) reasons.push("outside first 48px of entity-end segment");
   if (Math.abs(normal) < radius - 1e-7) reasons.push("straddles entity-end segment");
   if (own > 8 + 1e-7) reasons.push("more than 8px from entity-end segment");

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Box, DEdge, DLabel, DNode, Diagram, Point } from "../src/core/geometry.js";
+import { layoutScore } from "../src/core/layout/compact.js";
 import { layout } from "../src/core/layout/index.js";
 import { boxSegmentDistance, labelGeometry, labelLooseReasons } from "../src/core/layout/label-geometry.js";
 import { placeLabels } from "../src/core/layout/labels.js";
@@ -18,7 +19,7 @@ const model = normalize({ version: 1, entities: { HUB: {} }, relationships: { LI
 
 function repaired(edges: DEdge[], nodes = [entity]): DLabel[] {
   const labels = placeLabels(model, nodes, edges, interMetrics);
-  expect(assessQuality(diagram(nodes, edges, labels))).toMatchObject({ labelLoose: 0, labelAmbiguity: 0, labelCollisions: 0 });
+  expect(assessQuality(diagram(nodes, edges, labels))).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelAmbiguity: 0, labelCollisions: 0 });
   return labels;
 }
 
@@ -66,7 +67,7 @@ describe("entity-end label ownership", () => {
     const withRoles = normalize({ version: 1, entities: { HUB: {} }, relationships: { LINK: { ends: [{ entity: "HUB", card: "0..N", role: "parent" }, { entity: "HUB", card: "0..1", role: "child" }] } } });
     const labels = placeLabels(withRoles, [entity], [own], interMetrics);
     expect(labels).toHaveLength(2);
-    expect(assessQuality(diagram([entity], [own], labels))).toMatchObject({ labelLoose: 0, labelCollisions: 0, labelAmbiguity: 0 });
+    expect(assessQuality(diagram([entity], [own], labels))).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelCollisions: 0, labelAmbiguity: 0 });
   });
   it("only accepts the first segment from the entity, including its finite extent", () => {
     const bent = edge(undefined, [{ x: 100, y: 100 }, { x: 400, y: 100 }, { x: 400, y: 180 }]);
@@ -104,6 +105,38 @@ describe("entity-end label ownership", () => {
     expect(labels).toHaveLength(1);
     expect(assessQuality(diagram([entity], [blocked], labels)).labelLoose).toBe(1);
   });
+  it("rejects a label on its own bend and places it away from the turn", () => {
+    const bent = edge(undefined, [{ x: 100, y: 250 }, { x: 370, y: 250 }, { x: 370, y: 220 }, { x: 400, y: 220 }]);
+    const bad = label({ x: 360, y: 224, w: 30, h: 18 });
+    const q = assessQuality(diagram([entity], [bent], [bad]));
+    expect(q).toMatchObject({ labelOnOwnEdge: 1, labelCollisions: 0, labelAmbiguity: 0 });
+    expect(q.issues.filter((issue) => issue.kind === "label-on-own-edge")).toHaveLength(1);
+    expect(labelLooseReasons(bad, bent, labelGeometry([entity], [bent]))).toEqual(["intersects own edge within 2px"]);
+    expect(layoutScore(q)).toBe(Infinity);
+    const labels = repaired([bent]);
+    expect(labels[0]!.box.y + labels[0]!.box.h).toBeLessThan(220 - 2);
+  });
+  it("prefers the opposite side when a nearby route turns above the end segment", () => {
+    const bent = edge(undefined, [{ x: 100, y: 190 }, { x: 370, y: 190 }, { x: 370, y: 220 }, { x: 400, y: 220 }]);
+    const labels = repaired([bent]);
+    expect(labels[0]!.box.y).toBeGreaterThan(220 + 2);
+  });
+  it.each(["cardinality", "role"] as const)("counts %s once across multiple own segments with inclusive 2px clearance", (kind) => {
+    const bent = edge(undefined, [{ x: 100, y: 220 }, { x: 370, y: 220 }, { x: 370, y: 250 }, { x: 400, y: 250 }]);
+    const bad = { ...label({ x: 355, y: 222, w: 30, h: 18 }), kind };
+    expect(assessQuality(diagram([], [bent], [bad])).labelOnOwnEdge).toBe(1);
+    const straight = edge();
+    expect(assessQuality(diagram([], [straight], [{ ...bad, box: { x: 330, y: 222, w: 30, h: 18 } }])).labelOnOwnEdge).toBe(1);
+    expect(assessQuality(diagram([], [straight], [{ ...bad, box: { x: 330, y: 222.01, w: 30, h: 18 } }])).labelOnOwnEdge).toBe(0);
+    expect(assessQuality(diagram([], [{ ...bent, kind: "attribute" }], [bad])).labelOnOwnEdge).toBe(0);
+  });
+  it("checks both drawn lines of a double own edge", () => {
+    const own = { ...edge(), double: true };
+    const bad = label({ x: 330, y: 224, w: 30, h: 18 });
+    expect(assessQuality(diagram([], [edge()], [bad])).labelOnOwnEdge).toBe(0);
+    expect(assessQuality(diagram([], [own], [bad])).labelOnOwnEdge).toBe(1);
+    repaired([own]);
+  });
   it("measures finite diagonal, horizontal, vertical and degenerate segments", () => {
     const b = { x: 10, y: 10, w: 10, h: 10 };
     expect(boxSegmentDistance(b, { x: 0, y: 0 }, { x: 30, y: 30 })).toBe(0);
@@ -114,7 +147,7 @@ describe("entity-end label ownership", () => {
   });
 });
 
-const fixtures = [...readdirSync("bench/fixtures").filter((file) => file.endsWith(".er.yaml")).map((file) => `bench/fixtures/${file}`), "examples/library.er.yaml"];
+const fixtures = [...readdirSync("bench/fixtures").filter((file) => file.endsWith(".er.yaml")).map((file) => `bench/fixtures/${file}`), ...readdirSync("examples").filter((file) => file.endsWith(".er.yaml")).map((file) => `examples/${file}`)];
 if (existsSync("examples/private/university-curriculum.er.yaml")) fixtures.push("examples/private/university-curriculum.er.yaml");
 
 it.each(fixtures)("keeps hard label and geometry metrics at zero for %s", async (file) => {
@@ -124,6 +157,6 @@ it.each(fixtures)("keeps hard label and geometry metrics at zero for %s", async 
   const { diagram } = await layout(parsed.model!, { pins });
   const q = assessQuality(diagram, pins, parsed.model!);
   expect(q.issues.filter((issue) => issue.kind === "label-loose")).toEqual([]);
-  expect(q).toMatchObject({ labelLoose: 0, labelAmbiguity: 0, labelCollisions: 0, overlaps: 0, shapeCrossings: 0, pinDrift: 0,
+  expect(q).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelAmbiguity: 0, labelCollisions: 0, overlaps: 0, shapeCrossings: 0, pinDrift: 0,
     attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0 });
 }, 30000);
