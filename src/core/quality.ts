@@ -1,12 +1,12 @@
 import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
-import { labelAmbiguityReasons } from "./layout/label-geometry.js";
+import { labelAmbiguityReasons, labelGeometry, labelLooseReasons } from "./layout/label-geometry.js";
 import { center, type Diagram, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
-  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "edge-crossing" | "pin-drift" | "out-of-canvas";
+  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "label-loose" | "edge-crossing" | "pin-drift" | "out-of-canvas";
   ids: string[];
   message: string;
 }
@@ -17,6 +17,8 @@ export interface QualityReport extends SemanticQuality, EdgeQuality {
   shapeCrossings: number;
   labelCollisions: number;
   labelAmbiguity: number;
+  /** Labels that fail entity-end proximity, ownership or spacing requirements; hard target zero. */
+  labelLoose: number;
   edgeCrossings: number;
   pinDrift: number;
   aspect: number;
@@ -41,6 +43,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     if (pins[n.id] && distance(center(n.box), pins[n.id]!) > 0.5) add("pin-drift", [n.id]);
   }
   const paths = new Map(edges.map((e) => [e.id, drawnPaths(e)]));
+  const labelContext = labelGeometry(nodes, edges, paths);
   const lines = new Map(edges.map((e) => [e.id, paths.get(e.id)!.flatMap(segments)]));
   for (const e of edges) for (const n of nodes) {
     if (n.id !== e.from && n.id !== e.to && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, n))) add("shape-crossing", [e.id, n.id]);
@@ -49,7 +52,9 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     const l = labels[i]!, shape = boxShape(l.box);
     const own = edges.find((e) => e.id === l.edge && e.kind === "end");
     if (own) {
-      const reasons = labelAmbiguityReasons(l.box, own, edges);
+      const loose = labelLooseReasons(l, own, labelContext, labels);
+      if (loose.length) issues.push({ kind: "label-loose", ids: [l.id, own.id], message: `label-loose: ${l.id}: ${loose.join("; ")}` });
+      const reasons = labelAmbiguityReasons(l.box, own, edges, labelContext);
       if (reasons.length) issues.push({ kind: "label-ambiguity", ids: [l.id, own.id], message: `label-ambiguity: ${l.id}: ${reasons.join("; ")}` });
     }
     for (const n of nodes) if (shapesOverlap(shape, n)) add("label-collision", [l.id, n.id]);
@@ -84,7 +89,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { ...edgeQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { ...edgeQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,
