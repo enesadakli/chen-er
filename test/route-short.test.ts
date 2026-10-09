@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { boxAround, center, type DEdge, type Diagram, type DNode } from "../src/core/geometry.js";
 import { layout } from "../src/core/layout/index.js";
+import { layoutScore } from "../src/core/layout/compact.js";
+import { routeEdge } from "../src/core/layout/route.js";
 import { endRouteMetrics, nearestBorderDistance, orthogonalPath } from "../src/core/layout/semantic-edges.js";
 import { semanticRoute } from "../src/core/layout/semantic-route.js";
 import { flattenAttrs, parseModel } from "../src/core/normalize.js";
@@ -28,6 +30,17 @@ describe("end route metrics", () => {
     expect(assessQuality(d)).toMatchObject({ routeDetourMax: 1.625, routeDetourMean: 1.625, endBendsMax: 1, endBendsMean: 1 });
     expect(assessQuality(diagram([]))).toMatchObject({ routeDetourMax: 0, routeDetourMean: 0, endBendsMax: 0, endBendsMean: 0 });
   });
+  it("keeps a blocked fallback orthogonal and rejects its candidate", () => {
+    const target: DNode = { ...entity, box: boxAround({ x: 400, y: 200 }, 100, 40) };
+    const wall: DNode = { ...entity, id: "wall", box: { x: 160, y: 40, w: 100, h: 120 } };
+    const nodes = [diamond, target, wall];
+    const points = routeEdge(edge, nodes, [], 0, [], { endPort: { anchor: { x: 350, y: 200 }, normal: { x: -1, y: 0 } } });
+    expect(orthogonalPath(points)).toBe(true);
+    const report = assessQuality({ ...diagram([]), nodes, edges: [{ ...edge, points }] });
+    expect(report.diagonalEnds).toBe(0);
+    expect(report.shapeCrossings).toBeGreaterThan(0);
+    expect(layoutScore(report)).toBe(Infinity);
+  });
   it("finds a two-bend corridor next to a blocking shape", () => {
     const target: DNode = { ...entity, box: boxAround({ x: 400, y: 200 }, 100, 40) };
     const obstacle: DNode = { ...entity, id: "obstacle", box: boxAround({ x: 250, y: 100 }, 60, 60) };
@@ -45,6 +58,8 @@ it.skipIf(!existsSync(privateModel))(privateTitle("keeps routes short with at mo
   const model = parseModel(readFileSync("examples/private/university-curriculum.er.yaml", "utf8")).model!;
   const { diagram: d } = await layout(model);
   const q = assessQuality(d, {}, model);
+  expect(q.diagonalEnds).toBe(0);
+  expect(q.zRoutes).toBeLessThanOrEqual(6);
   expect(q.routeDetourMax).toBeLessThanOrEqual(1.6);
   expect(q.routeDetourMean).toBeLessThanOrEqual(1.2);
   expect(endRouteMetrics(d).filter((r) => r.endBends > 2)).toEqual([]);
@@ -61,6 +76,8 @@ it("keeps the COMPANY block readable with symmetric recursive ends and complete 
   const { diagram: d } = await layout(model);
   const q = assessQuality(d, {}, model);
   for (const metric of ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const) expect(q[metric], metric).toBe(0);
+  expect(q.diagonalEnds).toBe(0);
+  expect(q.zRoutes).toBeLessThanOrEqual(5);
   expect(q.edgeCrossings).toBe(0);
   expect(q.endBendsMax).toBeLessThanOrEqual(2);
   expect(q.routeDetourMax).toBeLessThanOrEqual(1.347241);

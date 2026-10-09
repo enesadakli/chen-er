@@ -1,6 +1,6 @@
-import { boxAround, center, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Point } from "../geometry.js";
+import { boxAround, center, intersects, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
-import { assessQuality } from "../quality.js";
+import { assessQuality, type QualityReport } from "../quality.js";
 import type { TextMetrics } from "../text/metrics.js";
 import { alignDiamondPorts, fanEndAnchors, placeRecursive } from "./anchors.js";
 import { attributeNode, placeAttributes, placeRadialAttributes } from "./attributes.js";
@@ -11,9 +11,10 @@ import { placeLabels } from "./labels.js";
 import { clearPinnedSpokes, placeSemanticRecursive, placeSemantically, semanticPlacements } from "./semantic.js";
 import { semanticAttributes, semanticRoute } from "./semantic-route.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
-import { endRouteMetrics } from "./semantic-edges.js";
+import { endRouteMetrics, isZRoute, orthogonalPath } from "./semantic-edges.js";
 import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
 import { routeEdge } from "./route.js";
+import { distance } from "./shapes.js";
 import { chooseSpacing } from "./semantic-spacing.js";
 
 export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine {
@@ -30,7 +31,8 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       const reserved = pinnedAttributes.map((n) => n.box);
       const spacing = chooseSpacing(clusters, model, placement, base, reserved, pins, semanticBuild);
       placeSemantically(clusters, model, placement, spacing.spacing.columns, reserved, spacing.spacing.rows);
-      result = refineDiamonds(clusters, semanticBuild, pins, model, spacing.initial);
+      result = refineClearance(clusters, semanticBuild, pins, model, spacing.initial);
+      result = reduceZRoutes(clusters, semanticBuild, pins, model, result);
       const hierarchy = hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model)));
       if (!Object.keys(pins).length && model.entities.length <= 4 && new Set(placement.columns.values()).size > 1 && hierarchy.pairs.length && !hierarchy.cyclic.size) {
         result = compactRows(result, clusters, placement.ranks, semanticBuild, model);
@@ -42,16 +44,16 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
     const quality = assessQuality(result.diagram, pins, model);
     const pinConflict = (issue: (typeof quality.issues)[number]) => issue.ids.some((id) => !!pins[id]) || (issue.kind === "out-of-canvas" && Object.keys(pins).length > 0);
     for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && pinConflict(issue)) result.diagnostics.push({
-      rule: "pin-conflict", severity: "info", message: `Keeping exact pins causes ${issue.message}.`, hint: "Move the conflicting pin to free space inside the canvas.",
+      rule: "pin-conflict", severity: "warning", message: `Keeping exact pins causes ${issue.message}.`, hint: "Move the conflicting pin to free space inside the canvas.",
     });
     for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && !pinConflict(issue)) result.diagnostics.push({
-      rule: "layout-conflict", severity: "info", message: issue.message, hint: "Allow more space around this node or adjust the layout pins.",
+      rule: "layout-conflict", severity: "warning", message: issue.message, hint: "Allow more space around this node or adjust the layout pins.",
     });
     return result;
   };
 }
 
-function diamondRouteScore(result: LayoutResult, id: string, dx: number, dy: number, model: NModel): number {
+function clearanceRouteScore(result: LayoutResult, id: string, dx: number, dy: number, model: NModel): number {
   const nodes = result.diagram.nodes.map((n) => ({ ...n, box: { ...n.box } }));
   const moved = new Set([id]);
   for (const e of result.diagram.edges.filter((e) => e.kind !== "end")) if (moved.has(e.from)) moved.add(e.to);
@@ -73,7 +75,7 @@ function diamondRouteScore(result: LayoutResult, id: string, dx: number, dy: num
 }
 
 /** Only diamonds move during clearance refinement; entity ranks and cells stay fixed. */
-function refineDiamonds(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
+function refineClearance(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
   let best = initial ?? build(clusters);
   const score = (result: LayoutResult) => {
     const q = assessQuality(result.diagram, pins, model);
@@ -88,12 +90,93 @@ function refineDiamonds(clusters: Cluster[], build: (cs: Cluster[]) => LayoutRes
   for (const c of ranked.slice(0, 6)) {
     const original = { ...c.node.box };
     let chosen = original;
-    const proposals = [[-48, 0], [48, 0], [0, -48], [0, 48], [-96, 0], [96, 0], [0, -96], [0, 96]].map(([dx, dy]) => ({ dx: dx!, dy: dy!, score: diamondRouteScore(best, c.node.id, dx!, dy!, model) }));
+    const proposals = [[-48, 0], [48, 0], [0, -48], [0, 48], [-96, 0], [96, 0], [0, -96], [0, 96]].map(([dx, dy]) => ({ dx: dx!, dy: dy!, score: clearanceRouteScore(best, c.node.id, dx!, dy!, model) }));
     proposals.sort((a, b) => a.score - b.score);
     for (const { dx, dy } of proposals.slice(0, 1)) {
       c.node.box = { ...original, x: original.x + dx, y: original.y + dy };
       const result = build(clusters), next = score(result);
       if (next < value - 1e-6) { best = result; value = next; chosen = { ...c.node.box }; }
+    }
+    c.node.box = chosen;
+  }
+  return best;
+}
+
+
+/** Rank moves on the skeleton; full builds validate attributes and labels after selection. */
+function zRouteScore(result: LayoutResult, id: string, dx: number, dy: number, model: NModel): number {
+  const nodes = result.diagram.nodes.filter((n) => n.kind !== "attribute").map((n) => ({ ...n, box: { ...n.box } }));
+  for (const n of nodes) if (n.id === id) { n.box.x += dx; n.box.y += dy; }
+  const edges = result.diagram.edges.filter((e) => e.kind === "end").map((e) => ({ ...e, points: [...e.points] }));
+  const ports = fanEndAnchors(nodes, edges);
+  const routed: DEdge[] = [];
+  for (const e of edges) {
+    const points = semanticRoute(e, nodes, routed, ports.get(e.id), [], 4);
+    if (points) e.points = points;
+    else return Infinity;
+    routed.push(e);
+  }
+  const q = assessQuality({ ...result.diagram, nodes, edges, labels: [] }, {}, model);
+  if (q.diagonalEnds) return Infinity;
+  return q.zRoutes * 12 + q.shapeCrossings * 100 + q.edgeOverlap * 100 + q.overlaps * 100 + q.edgeCrossings * 16
+    + q.endBendsMax * 2 + q.endBendsMean * 2 + q.routeDetourMax * 4 + Math.max(0, q.endBendsMax - 2) * 1000;
+}
+
+/** Bound Z refinement to three diamonds and two full builds each; entity cells stay fixed. */
+function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
+  let best = initial ?? build(clusters);
+  const baseline = assessQuality(best.diagram, pins, model);
+  const symmetric = model.relationships.filter((r) => r.ends.length === 2 && r.ends.every((e) => e.entity === r.ends[0]!.entity)).filter((r) => {
+    const ends = best.diagram.edges.filter((e) => e.kind === "end" && e.from === r.id), p = center(best.diagram.nodes.find((n) => n.id === r.id)!.box);
+    const a = ends[0]!.points.at(-1)!, b = ends[1]!.points.at(-1)!;
+    return Math.abs(a.x - b.x) < 1e-6 ? Math.abs(a.y + b.y - p.y * 2) < 1e-6 : Math.abs(a.x + b.x - p.x * 2) < 1e-6;
+  });
+  const score = (result: LayoutResult, q: QualityReport) => {
+    const ends = result.diagram.edges.filter((e) => e.kind === "end");
+    for (const r of symmetric) {
+      const pair = ends.filter((e) => e.from === r.id), p = center(result.diagram.nodes.find((n) => n.id === r.id)!.box);
+      const a = pair[0]!.points.at(-1)!, b = pair[1]!.points.at(-1)!;
+      if (Math.abs(a.x - b.x) < 1e-6 ? Math.abs(a.y + b.y - p.y * 2) > 1e-6 : Math.abs(a.x + b.x - p.x * 2) > 1e-6) return Infinity;
+    }
+    if (ends.some((e, i) => ends.slice(i + 1).some((other) => e.to === other.to && distance(e.points.at(-1)!, other.points.at(-1)!) < 28 - 1e-6))) return Infinity;
+    if (q.endBendsMax > 2 || q.routeDetourMax > baseline.routeDetourMax + 1e-6 || q.longEdgeMax > (model.relationships.some((r) => r.ends.every((e) => e.entity === r.ends[0]!.entity)) ? 4 : 7) + 1e-6 || q.attributeSpokeMax > baseline.attributeSpokeMax + 1e-6 || q.spokeEdgeViolations || q.spokeLabelViolations || q.hierarchyViolations > baseline.hierarchyViolations || q.edgeCrossings > baseline.edgeCrossings || q.emptyAreaRatio > baseline.emptyAreaRatio + 1e-6) return Infinity;
+    return layoutScore(q) + q.edgeCrossings * 14 + q.endBendsMax * 2 + q.endBendsMean * 2 + q.routeDetourMax * 4 + Math.max(0, q.endBendsMax - 2) * 1000;
+  };
+  let bestQuality = baseline;
+  let value = score(best, baseline);
+  const q = baseline;
+  const edges = new Map(best.diagram.edges.map((e) => [e.id, e]));
+  const involved = new Set(q.issues.flatMap((i) => i.ids.map((id) => edges.get(id)?.from).filter((id): id is string => !!id)));
+  for (const route of endRouteMetrics(best.diagram)) if (route.endBends > 2 || route.routeDetour > 1.35 || isZRoute(edges.get(route.id)!.points) || !orthogonalPath(edges.get(route.id)!.points)) involved.add(edges.get(route.id)!.from);
+  const priority = new Map<string, number>();
+  for (const route of endRouteMetrics(best.diagram)) {
+    const edge = edges.get(route.id)!;
+    const weight = !orthogonalPath(edge.points) ? 1000 : route.endBends > 2 ? 100 : route.routeDetour > 1.35 ? 50 : isZRoute(edge.points) ? 1 : 0;
+    priority.set(edge.from, (priority.get(edge.from) ?? 0) + weight);
+  }
+  const ranked = clusters.filter((c) => involved.has(c.node.id) && c.node.kind === "relationship" && !c.node.pinned)
+    .sort((a, b) => (priority.get(b.node.id) ?? 0) - (priority.get(a.node.id) ?? 0) || a.node.id.localeCompare(b.node.id));
+  for (const c of ranked.slice(0, 3)) {
+    const original = { ...c.node.box };
+    let chosen = original;
+    const endMoves = best.diagram.edges.filter((e) => e.from === c.node.id && e.kind === "end" && (isZRoute(e.points) || !orthogonalPath(e.points))).flatMap((e) => {
+      const p = center(best.diagram.nodes.find((n) => n.id === c.node.id)!.box), port = e.points.at(-1)!;
+      return [[port.x - p.x, 0], [0, port.y - p.y]];
+    });
+    const detours = endMoves.filter(([dx, dy]) => {
+      const box = { ...c.node.box, x: c.node.box.x + dx!, y: c.node.box.y + dy! };
+      return clusters.some((other) => other !== c && intersects(box, other.node.box, 18));
+    }).flatMap(([dx, dy]) => dx ? [[dx, -64], [dx, 64], [dx, -96], [dx, 96]] : [[-64, dy], [64, dy], [-96, dy], [96, dy]]);
+    const proposals = [...endMoves, ...detours, [-48, 0], [48, 0], [0, -48], [0, 48], [-96, 0], [96, 0], [0, -96], [0, 96], [-192, 0], [192, 0], [0, -192], [0, 192]].map(([dx, dy]) => ({ dx: dx!, dy: dy!, score: zRouteScore(best, c.node.id, dx!, dy!, model) }));
+    proposals.sort((a, b) => a.score - b.score);
+    const previousZ = bestQuality.zRoutes;
+    for (const { dx, dy } of proposals.filter((p) => Number.isFinite(p.score)).slice(0, 2)) {
+      c.node.box = { ...original, x: original.x + dx, y: original.y + dy };
+      const result = build(clusters), quality = assessQuality(result.diagram, pins, model), next = score(result, quality);
+      if (next < value - 1e-6) {
+        best = result; bestQuality = quality; value = next; chosen = { ...c.node.box };
+        if (quality.zRoutes < previousZ) break;
+      }
     }
     c.node.box = chosen;
   }

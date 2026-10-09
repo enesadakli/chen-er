@@ -22,6 +22,8 @@ describe("public acceptance on the campus fixture", () => {
     const q = assessQuality(d, {}, model);
 
     expect({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts }).toEqual(clear);
+    expect(q.diagonalEnds).toBe(0);
+    expect(q.zRoutes).toBeLessThanOrEqual(1);
     expect(q.hierarchyViolations).toBe(hierarchyMinimumOf(model));
     expect(q.diamondOffset).toBeLessThanOrEqual(0.15);
     expect(q.axisAligned).toBeGreaterThanOrEqual(0.6);

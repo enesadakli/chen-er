@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DEdge, DNode, Diagram } from "../src/core/geometry.js";
 import { layoutScore } from "../src/core/layout/compact.js";
+import { orthogonalPath } from "../src/core/layout/semantic-edges.js";
 import { routeEdge } from "../src/core/layout/route.js";
 import { assessQuality } from "../src/core/quality.js";
 
@@ -18,7 +19,7 @@ describe("compact candidate selection", () => {
     expect(layoutScore({ ...q, aspect: 2.8 })).toBeCloseTo(8.6);
     expect(layoutScore({ ...q, density: 0.2 })).toBeLessThan(layoutScore(q));
   });
-  it("keeps a clear end straight through the empty corner of a diamond box", () => {
+  it("routes a clear diagonal pair orthogonally around a foreign diamond", () => {
     const nodes: DNode[] = [
       { id: "r", kind: "relationship", label: "r", box: { x: 0, y: 150, w: 40, h: 40 }, double: false },
       { id: "e", kind: "entity", label: "e", box: { x: 200, y: -50, w: 40, h: 40 }, double: false },
@@ -26,7 +27,7 @@ describe("compact candidate selection", () => {
     ];
     const edge: DEdge = { id: "end", kind: "end", from: "r", to: "e", points: [], double: false };
     edge.points = routeEdge(edge, nodes, []);
-    expect(edge.points).toHaveLength(2);
+    expect(orthogonalPath(edge.points)).toBe(true);
     expect(assessQuality({ ...empty, nodes, edges: [edge] }).shapeCrossings).toBe(0);
   });
 });

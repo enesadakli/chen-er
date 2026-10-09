@@ -81,7 +81,7 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     const res = await layout(model, { engine, pins });
     expect(assessQuality(res.diagram, pins).pinDrift).toBe(0);
     expect(assessQuality(res.diagram, pins).overlaps).toBe(1);
-    expect(res.diagnostics.some((d) => d.rule === "pin-conflict" && d.severity === "info")).toBe(true);
+    expect(res.diagnostics.some((d) => d.rule === "pin-conflict" && d.severity === "warning")).toBe(true);
   });
   it("routes pinned ends around a foreign shape", async () => {
     const model = parseModel("version: 1\nentities:\n  A: {}\n  B: {}\n  OBSTACLE: {}\nrelationships:\n  LINKS:\n    ends: [{entity: A, card: 1..1}, {entity: B, card: 0..N}]\n").model!;

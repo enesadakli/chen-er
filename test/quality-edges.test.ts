@@ -12,6 +12,19 @@ const diagram = (edges: DEdge[], nodes: DNode[] = []): Diagram => ({ edges, node
 const q = (edges: DEdge[], nodes: DNode[] = []) => assessQuality(diagram(edges, nodes));
 
 describe("visible edge quality", () => {
+  it("counts diagonal ends once while leaving diagonal attribute spokes valid", () => {
+    const points = [{ x: 100, y: 100 }, { x: 180, y: 180 }, { x: 250, y: 220 }];
+    expect(q([edge("a", points), edge("b", points, "attribute")]).diagonalEnds).toBe(1);
+    expect(q([edge("a", [{ x: 100, y: 100 }, { x: 180, y: 100 }, { x: 180, y: 200 }])]).diagonalEnds).toBe(0);
+  });
+  it("counts two-bend Z routes with redundant points and zero segments", () => {
+    const z = [{ x: 100, y: 100 }, { x: 150, y: 100 }, { x: 150, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }, { x: 300, y: 200 }];
+    expect(q([edge("z", z), edge("double", z, "end", true), edge("attr", z, "attribute")]).zRoutes).toBe(2);
+    expect(q([edge("l", z.slice(0, -1))]).zRoutes).toBe(0);
+    expect(q([edge("diagonal", [{ x: 100, y: 100 }, { x: 150, y: 150 }, { x: 150, y: 200 }, { x: 250, y: 300 }])]).zRoutes).toBe(0);
+    const report = q([]);
+    expect(layoutScore({ ...report, zRoutes: 1 })).toBeCloseTo(layoutScore(report) + 0.75);
+  });
   it.each(["attribute", "part"] as const)("rejects bent %s spokes including triangular detours", (kind) => {
     expect(q([edge("a", [{ x: 100, y: 100 }, { x: 200, y: 200 }], kind)]).attributeEdgeBends).toBe(0);
     expect(q([edge("a", [{ x: 100, y: 100 }, { x: 160, y: 180 }, { x: 80, y: 180 }, { x: 200, y: 200 }], kind)]).attributeEdgeBends).toBe(1);
@@ -113,7 +126,7 @@ describe("visible edge quality", () => {
     const report = q([{ ...e, points }, other], nodes);
     expect(report).toMatchObject({ tinySegments: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0, edgeOverlap: 0 });
   });
-  it.each(["labelLoose", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const)("hard-rejects %s in candidate selection", (metric) => {
+  it.each(["diagonalEnds", "labelLoose", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const)("hard-rejects %s in candidate selection", (metric) => {
     const report = q([]);
     expect(layoutScore({ ...report, [metric]: 1 })).toBe(Infinity);
   });

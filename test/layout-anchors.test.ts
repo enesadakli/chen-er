@@ -4,7 +4,7 @@ import { fanEndAnchors, placeRecursive } from "../src/core/layout/anchors.js";
 import { routeEdge } from "../src/core/layout/route.js";
 import { parseModel } from "../src/core/normalize.js";
 import { orthogonalPath } from "../src/core/layout/semantic-edges.js";
-import { distance, segmentIntersection } from "../src/core/layout/shapes.js";
+import { boxShape, distance, segmentIntersection, segmentThrough } from "../src/core/layout/shapes.js";
 
 const entity: DNode = { id: "E:HUB", kind: "entity", label: "Hub", box: { x: 300, y: 300, w: 110, h: 46 }, double: false };
 const diamond = (id: string, x: number, y: number): DNode => ({ id, kind: "relationship", label: id, box: { x, y, w: 110, h: 64 }, double: false });
@@ -12,7 +12,7 @@ const end = (from: string, id = from): DEdge => ({ id, from, to: entity.id, kind
 
 describe("fanned end anchors", () => {
   it("spaces a crowded side by at least 28px and spills to an adjacent side", () => {
-    const nodes = [entity, ...Array.from({ length: 6 }, (_, i) => diamond(`R:${i}`, 600, 100 + i * 60))];
+    const nodes = [{ ...entity, box: { ...entity.box } }, ...Array.from({ length: 6 }, (_, i) => diamond(`R:${i}`, 700, 100 + i * 60))];
     const edges = nodes.slice(1).map((n) => end(n.id));
     const ports = fanEndAnchors(nodes, edges);
     const right = [...ports.values()].filter((p) => p.normal.x === 1);
@@ -27,6 +27,14 @@ describe("fanned end anchors", () => {
       const side = [...ports.values()].filter((p) => p.normal.x === normal.x && p.normal.y === normal.y);
       for (let i = 1; i < side.length; i++) expect(distance(side[i - 1]!.anchor, side[i]!.anchor)).toBeGreaterThanOrEqual(28);
     }
+  });
+  it("uses an adjacent entity side when a neighbouring diamond blocks every top port", () => {
+    const target: DNode = { ...entity, box: { x: 300, y: 300, w: 110, h: 46 } };
+    const nodes = [target, diamond("R:FAR", 300, 0), { ...diamond("R:BLOCK", 240, 230), box: { x: 240, y: 230, w: 230, h: 40 } }];
+    const port = fanEndAnchors(nodes, [end("R:FAR")]).get("R:FAR")!;
+    expect(Math.abs(port.normal.x)).toBe(1);
+    const escape = { x: port.anchor.x + port.normal.x * 96, y: port.anchor.y + port.normal.y * 96 };
+    expect(segmentThrough(port.anchor, escape, boxShape(nodes[2]!.box))).toBe(false);
   });
   it("orders ports by the other endpoint and ignores input order", () => {
     const nodes = [entity, diamond("R:TOP", 600, 250), diamond("R:BOTTOM", 600, 350)];

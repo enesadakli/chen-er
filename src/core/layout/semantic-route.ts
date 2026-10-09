@@ -9,7 +9,7 @@ import { simplify } from "./route.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 /** Fast orthogonal corridor candidates; the existing router handles blocked cases. */
-export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = []): Point[] | undefined {
+export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = [], diamondClearance = 6): Point[] | undefined {
   if (!port || edge.kind !== "end") return undefined;
   const from = nodes.find((n) => n.id === edge.from)!;
   const to = nodes.find((n) => n.id === edge.to)!;
@@ -51,7 +51,8 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
     if (reverses(ps) || [ps, ...copies].some((ps) => segments(ps).some(([a, b]) => distance(a, b) < MIN_ROUTE_SEGMENT - 1e-6))) continue;
     if (prior.some((other) => edgesOverlap(candidate, other))) continue;
     if (lines.some(([a, b]) => nodes.some((n) => segmentThrough(a, b, n)))) continue;
-    if (lines.some(([a, b]) => foreign.some((n) => segmentThrough(a, b, boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 }))) || reserved.some((r) => segmentThrough(a, b, boxShape(r))))) continue;
+    if (lines.some(([a, b]) => foreign.some((n) => segmentThrough(a, b, n.kind === "relationship" && diamondClearance < 6 ? { ...n, box: { x: n.box.x - diamondClearance, y: n.box.y - diamondClearance, w: n.box.w + diamondClearance * 2, h: n.box.h + diamondClearance * 2 } }
+      : boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 }))) || reserved.some((r) => segmentThrough(a, b, boxShape(r))))) continue;
     let crossings = 0;
     for (const other of prior) for (const [a, b] of lines) for (const [p, q] of visibleEdgePaths(other).flatMap(segments)) {
       const hit = segmentIntersection(a, b, p, q);

@@ -1,6 +1,6 @@
 import { boxAround, center, intersects, type DEdge, type DNode, type Point } from "../geometry.js";
 import type { NModel } from "../normalize.js";
-import { distance } from "./shapes.js";
+import { boxShape, distance, segmentThrough } from "./shapes.js";
 import { MIN_ROUTE_SEGMENT } from "./semantic-edges.js";
 
 export interface EndPort { anchor: Point; normal: Point; recursive?: { index: number; count: number } }
@@ -145,6 +145,30 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[]): Map<string, EndPo
         result.set(e.id, { recursive, anchor: { x: c.x + n.x * b.w / 2 + (horizontal(side) ? offset : 0), y: c.y + n.y * b.h / 2 + (horizontal(side) ? 0 : offset) }, normal: n });
       });
     }
+  }
+  for (const edge of edges.filter((e) => e.kind === "end")) {
+    const port = result.get(edge.id);
+    if (!port || port.recursive) continue;
+    const entity = nodes.find((n) => n.id === edge.to)!;
+    const c = center(entity.box), b = entity.box;
+    const blocked = (candidate: EndPort) => {
+      const escape = { x: candidate.anchor.x + candidate.normal.x * 96, y: candidate.anchor.y + candidate.normal.y * 96 };
+      return nodes.some((n) => n.kind === "relationship" && n.id !== edge.from && segmentThrough(candidate.anchor, escape,
+        boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 })));
+    };
+    if (!blocked(port)) continue;
+    const currentSide = sides.find((s) => normal(s).x === port.normal.x && normal(s).y === port.normal.y)!;
+    const alternatives = [currentSide, ...sides.filter((s) => s !== currentSide)].flatMap((side) => {
+      const n = normal(side), span = horizontal(side) ? b.w : b.h;
+      const wanted = horizontal(side) ? port.anchor.x - c.x : port.anchor.y - c.y;
+      return [0, -16, 16, -32, 32, -48, 48, -64, 64].map((delta): EndPort => {
+        const offset = Math.max(-span / 2 + 9, Math.min(span / 2 - 9, wanted + delta));
+        return { normal: n, anchor: { x: c.x + n.x * b.w / 2 + (horizontal(side) ? offset : 0), y: c.y + n.y * b.h / 2 + (horizontal(side) ? 0 : offset) } };
+      });
+    });
+    const clear = alternatives.find((candidate) => !blocked(candidate) && [...result].every(([id, other]) =>
+      id === edge.id || edges.find((e) => e.id === id)?.to !== edge.to || distance(candidate.anchor, other.anchor) >= 28 - 1e-6));
+    if (clear) result.set(edge.id, clear);
   }
   return result;
 }

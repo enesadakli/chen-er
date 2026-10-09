@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { guardFailures, guardInputs, hierarchyMinimumOf, loadPins, regressionBaseline, stabilityOf } from "../bench/run.js";
+import type { Diagram } from "../src/core/geometry.js";
 import { DEFAULT_ENGINE, layout } from "../src/core/layout/index.js";
 import { parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
@@ -29,6 +30,12 @@ describe("bench regression guards", () => {
     expect(inputs).toContain("bench/fixtures/hub-company.er.yaml");
     expect(inputs).toContain("examples/library.er.yaml");
     expect(Object.keys(regressionBaseline)).toContain("campus");
+  });
+
+  it("rejects diagonal ends independently of the fixture baselines", () => {
+    const diagram: Diagram = { width: 400, height: 400, nodes: [], edges: [{ id: "end", from: "R", to: "E", kind: "end", double: false, points: [{ x: 100, y: 100 }, { x: 200, y: 200 }] }], labels: [], notes: [], meta: { engine: DEFAULT_ENGINE } };
+    const q = assessQuality(diagram);
+    expect(guardFailures({ input: "examples/library.er.yaml", diagram, q, hierarchyMinimum: 0, elapsed: 0, stabilityMax: 0, stabilityMedian: 0 })).toContain("diagonalEnds: 1");
   });
 
   for (const input of inputs) it(input, async () => {

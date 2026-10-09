@@ -11,25 +11,25 @@ import { renderSvg } from "../src/core/render/svg.js";
 import { svgToPng } from "../src/app/render.js";
 import { LayoutFile } from "../src/core/schema.js";
 
-export type RegressionMetric = "edgeCrossings" | "endBendsMax" | "routeDetourMax" | "attributeSpokeMax" | "emptyAreaRatio";
+export type RegressionMetric = "zRoutes" | "edgeCrossings" | "endBendsMax" | "routeDetourMax" | "attributeSpokeMax" | "emptyAreaRatio";
 // Preserve the best existing route guards and bound empty area by the pre-compaction render.
 // Public examples are read directly; the two ternary inputs have separate baselines.
 export const regressionBaseline: Record<string, Record<RegressionMetric, number>> = {
-  "examples/ternary": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1.1423611111111112, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9407170277233993 },
-  "company-project": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1.1829629629629628, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9528637261622064 },
-  "dense-attrs": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 10.168208659840005, emptyAreaRatio: 0.9262881531759711 },
-  "hub-company": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.2857142857142858, attributeSpokeMax: 2.47972935709149, emptyAreaRatio: 0.9053139114525204 },
-  "pinned": { edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0360721442885772, attributeSpokeMax: 3.3823529411764706, emptyAreaRatio: 0.9324797452787567 },
-  "recursive": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1562962962962962, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8690333701650775 },
-  "ternary": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1615798922800717, attributeSpokeMax: 1.0654701843573313, emptyAreaRatio: 0.9313489034397789 },
-  "turkish-labels": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8434353146897209 },
-  "library": { edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106, emptyAreaRatio: 0.9271289508500763 },
+  "examples/ternary": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1.1423611111111112, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9407170277233993 },
+  "company-project": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1.1829629629629628, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9528637261622064 },
+  "dense-attrs": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 10.168208659840005, emptyAreaRatio: 0.9262881531759711 },
+  "hub-company": { zRoutes: 5, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.2857142857142858, attributeSpokeMax: 2.47972935709149, emptyAreaRatio: 0.9053139114525204 },
+  "pinned": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0360721442885772, attributeSpokeMax: 3.3823529411764706, emptyAreaRatio: 0.9324797452787567 },
+  "recursive": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1562962962962962, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8690333701650775 },
+  "ternary": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1615798922800717, attributeSpokeMax: 1.0654701843573313, emptyAreaRatio: 0.9313489034397789 },
+  "turkish-labels": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8434353146897209 },
+  "library": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106, emptyAreaRatio: 0.9271289508500763 },
   // Measured on the default engine; campus is the public stand-in for the private university model.
   // Compact ranks and spacing (0.3): canvas 1700x2162 -> 1669x1588, end-edge length 9821 -> 5148 px,
   // longEdgeMax 6.80 -> 3.40, crossings 1 -> 0. Accepted trade-off within the general limits (1.6, 2.5):
   // routeDetourMax 1.1653 -> 1.3129 and attributeSpokeMax 1.0735 -> 1.5882.
-  "campus": { edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.312937062937063, attributeSpokeMax: 1.588235294117647, emptyAreaRatio: 0.9206378769430194 },
-  "university-curriculum": { edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282, emptyAreaRatio: 0.923729974724041 },
+  "campus": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.312937062937063, attributeSpokeMax: 1.588235294117647, emptyAreaRatio: 0.9206378769430194 },
+  "university-curriculum": { zRoutes: 6, edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282, emptyAreaRatio: 0.923729974724041 },
 };
 
 export type Quality = ReturnType<typeof assessQuality>;
@@ -84,7 +84,7 @@ export function guardFailures({ input, diagram, q, hierarchyMinimum, elapsed, st
   if (stabilityMax > 60 || stabilityMedian > 20) failures.push(`stability: max ${stabilityMax.toFixed(1)}, median ${stabilityMedian.toFixed(1)}`);
   if (q.hierarchyViolations > hierarchyMinimum || q.diamondOffset > 0.2) failures.push(`hierarchy or diamond offset: ${q.hierarchyViolations} > ${hierarchyMinimum}, ${q.diamondOffset}`);
   if (q.spokeEdgeViolations || q.spokeLabelViolations) failures.push(`attribute clearance: spoke/edge ${q.spokeEdgeClearance.toFixed(1)}px, oval/label ${q.spokeLabelClearance.toFixed(1)}px`);
-  const hard = { overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts };
+  const hard = { diagonalEnds: q.diagonalEnds, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts };
   for (const [name, value] of Object.entries(hard)) if (value) failures.push(`${name}: ${value}`);
   if ((input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failures.push(`shape: aspect ${q.aspect}, meanEdgeRatio ${q.meanEdgeRatio}`);
   if (input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 2 || q.diamondOffset > 0.15 || q.axisAligned < 0.6 || q.routeDetourMax > 1.6 || q.routeDetourMean > 1.2 || q.endBendsMax > 2 || elapsed >= 2000)) failures.push("university acceptance");
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
       const svg = renderSvg(diagram);
       writeFileSync(join(directory, `${name}.svg`), svg);
       if (engine === DEFAULT_ENGINE && (base === "university-curriculum" || base === "hub-company" || base === "library")) writeFileSync(join("out", `${base}.png`), svgToPng(svg, 1));
-      rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
+      rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, diagonalEnds: q.diagonalEnds, zRoutes: q.zRoutes, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
         hierarchyViolations: q.hierarchyViolations, hierarchyMinimum, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
         aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), longEdgeMax: Number(q.longEdgeMax.toFixed(3)), longEdgeMean: Number(q.longEdgeMean.toFixed(3)), spokeEdgeClearance: Number.isFinite(q.spokeEdgeClearance) ? Number(q.spokeEdgeClearance.toFixed(1)) : "-", spokeLabelClearance: Number.isFinite(q.spokeLabelClearance) ? Number(q.spokeLabelClearance.toFixed(1)) : "-", density: Number(q.density.toFixed(4)),
         emptyAreaRatio: Number(q.emptyAreaRatio.toFixed(4)), plainSegmentRatio: Number(q.plainSegmentRatio.toFixed(3)), attributeSpokeMax: Number(q.attributeSpokeMax.toFixed(3)), routeDetourMax: Number(q.routeDetourMax.toFixed(3)), routeDetourMean: Number(q.routeDetourMean.toFixed(3)), endBendsMax: q.endBendsMax, endBendsMean: Number(q.endBendsMean.toFixed(3)),

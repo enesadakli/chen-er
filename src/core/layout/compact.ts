@@ -19,9 +19,9 @@ function readableEnds(result: LayoutResult): boolean {
  * related distance 0.1, aspect overflow 6, and density earns 4. Mean ratio
  * overflow above 3.5 costs 1; longest ratio overflow above 7 costs 4. */
 export function layoutScore(q: QualityReport): number {
-  if (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.labelLoose || q.pinDrift || q.attributeEdgeBends || q.edgeOverlap || q.tinySegments || q.endPortCrowding || q.diamondVertexViolations || q.doubleEdgeArtifacts) return Infinity;
+  if (q.diagonalEnds || q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.labelLoose || q.pinDrift || q.attributeEdgeBends || q.edgeOverlap || q.tinySegments || q.endPortCrowding || q.diamondVertexViolations || q.doubleEdgeArtifacts) return Infinity;
   const aspectPenalty = Math.max(0, 0.6 - q.aspect, q.aspect - 1.8);
-  return q.edgeCrossings * 2 + q.hierarchyViolations * 12 + q.diamondOffset * 10 + q.proximityInversions * 3 + (1 - q.axisAligned) * 2
+  return q.zRoutes * 0.75 + q.edgeCrossings * 2 + q.hierarchyViolations * 12 + q.diamondOffset * 10 + q.proximityInversions * 3 + (1 - q.axisAligned) * 2
     + q.centralityOffset * 0.5 + q.gridMisalignment * 0.25 + q.attributeInwardRatio * 0.25 + q.relatedDistance * 0.1
     + q.meanEdgeRatio + Math.max(0, q.longestEdgeRatio - 7) * 4 + Math.max(0, q.meanEdgeRatio - 3.5) + aspectPenalty * 6 - q.density * 4;
 }

@@ -53,6 +53,10 @@ function endpointSides(p: Point, box: Box): number[] {
 }
 
 export interface EdgeQuality {
+  /** End edges containing any non-axis-parallel segment; hard target zero. */
+  diagonalEnds: number;
+  /** Orthogonal end edges with exactly two bends and parallel outer segments. */
+  zRoutes: number;
   attributeSpokeMax: number;
   /** Unoccupied shape area / canvas area; diamonds and ellipses use their actual area. */
   emptyAreaRatio: number;
@@ -117,6 +121,14 @@ export function tinyRouteSegments(edge: DEdge): number {
       && Math.min(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) < MIN_ROUTE_SEGMENT - EPS)).length;
 }
 
+export function isZRoute(points: Point[]): boolean {
+  if (!orthogonalPath(points)) return false;
+  const lines = segments(points).filter(([a, b]) => distance(a, b) > EPS);
+  const directions = lines.map(([a, b]) => Math.abs(a.x - b.x) <= EPS ? "vertical" : "horizontal")
+    .filter((direction, i, all) => i === 0 || direction !== all[i - 1]);
+  return directions.length === 3 && directions[0] === directions[2];
+}
+
 export function edgeQuality(diagram: Diagram): EdgeQuality {
   const byId = new Map(diagram.nodes.map((n) => [n.id, n]));
   let edgeOverlap = 0, tinySegments = 0, endPortCrowding = 0, diamondVertexViolations = 0, doubleEdgeArtifacts = 0;
@@ -158,7 +170,9 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
   const longestSegment = Math.max(0, ...diagram.edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points).map(([a, b]) => distance(a, b))));
   const occupied = diagram.nodes.reduce((sum, n) => sum + n.box.w * n.box.h * (n.kind === "relationship" ? 0.5 : n.kind === "attribute" ? Math.PI / 4 : 1), 0)
     + diagram.labels.reduce((sum, l) => sum + l.box.w * l.box.h, 0);
-  return { emptyAreaRatio: diagram.width * diagram.height > 0 ? Math.max(0, 1 - occupied / (diagram.width * diagram.height)) : 0,
+  return { diagonalEnds: diagram.edges.filter((e) => e.kind === "end" && segments(e.points).some(([a, b]) => Math.abs(a.x - b.x) > EPS && Math.abs(a.y - b.y) > EPS)).length,
+    zRoutes: diagram.edges.filter((e) => e.kind === "end" && isZRoute(e.points)).length,
+    emptyAreaRatio: diagram.width * diagram.height > 0 ? Math.max(0, 1 - occupied / (diagram.width * diagram.height)) : 0,
     plainSegmentRatio: median > EPS ? longestSegment / median : 0, attributeSpokeMax: Math.max(0, ...spokes), routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
     routeDetourMean: routes.reduce((sum, r) => sum + r.routeDetour, 0) / (routes.length || 1),
     endBendsMax: Math.max(0, ...routes.map((r) => r.endBends)),
