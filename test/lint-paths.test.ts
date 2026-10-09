@@ -59,11 +59,10 @@ describe("redundant functional paths", () => {
     expect(direct?.message).toContain("path requires");
   });
 
-  it("detects paths longer than two hops", () => {
+  it("ignores alternatives longer than two hops", () => {
     const findings = check({ DIRECT: binary("A", "D"), FIRST: binary("A", "B"),
       SECOND: binary("B", "C"), THIRD: binary("C", "D") });
-    expect(findings).toHaveLength(1);
-    expect(findings[0]?.message).toContain("A → FIRST → B → SECOND → C → THIRD → D");
+    expect(findings.filter((d) => d.path === "relationships.DIRECT.ends.0.card")).toEqual([]);
   });
 
   it("takes a parallel first hop when it leads to a longer alternate path", () => {

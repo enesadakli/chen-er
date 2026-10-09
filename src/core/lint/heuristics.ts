@@ -63,9 +63,15 @@ function alternativePath(direct: Hop, adjacency: ReadonlyMap<string, readonly Ho
   return undefined;
 }
 
+/**
+ * Longer chains (SECTION → COURSE → DEPT → INSTRUCTOR) usually carry a different fact than the direct
+ * relationship, so only two-hop alternatives are reported.
+ */
+const MAX_PATH_HOPS = 2;
+
 const redundantFunctionalPath: Rule = {
   id: "redundant-functional-path", severity: "heuristic",
-  description: "A direct to-one relationship and another to-one path may duplicate a fact or contradict participation.",
+  description: "A direct to-one relationship and a two-hop to-one path may duplicate a fact or contradict participation.",
   check(model) {
     const entities = new Set(model.entities.map((entity) => entity.name));
     const hops: Hop[] = model.relationships.flatMap((rel) => {
@@ -80,8 +86,9 @@ const redundantFunctionalPath: Rule = {
     const adjacency = new Map<string, Hop[]>();
     hops.forEach((hop) => adjacency.set(hop.from, [...(adjacency.get(hop.from) ?? []), hop]));
     return hops.flatMap((direct) => {
-      const totalPath = alternativePath(direct, adjacency, true);
-      const path = totalPath ?? alternativePath(direct, adjacency, false);
+      const near = (p: Hop[] | undefined) => (p && p.length <= MAX_PATH_HOPS ? p : undefined);
+      const totalPath = near(alternativePath(direct, adjacency, true));
+      const path = totalPath ?? near(alternativePath(direct, adjacency, false));
       if (!path) return [];
       const route = [direct.from, ...path.map((hop) => `${hop.rel.name} → ${hop.to}`)].join(" → ");
       const contradiction = direct.end.min === 0 && totalPath !== undefined;
