@@ -7,3 +7,5 @@ export * from "./style.js";
 export { interMetrics, type TextMetrics } from "./text/metrics.js";
 export { renderSvg } from "./render/svg.js";
 export { layout } from "./layout/index.js";
+export { lint, RULES, LINT_DISCLAIMER, type LintOptions, type RuleInfo } from "./lint/index.js";
+export { assessQuality, type QualityReport, type QualityIssue } from "./quality.js";
