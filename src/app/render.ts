@@ -1,10 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
 import type { Diagram, LayoutOptions, Point } from "../core/geometry.js";
-import { layout } from "../core/layout/index.js";
+import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
 import { parseModel, type NModel } from "../core/normalize.js";
 import { renderSvg } from "../core/render/svg.js";
 import { lint, type LintOptions } from "../core/lint/index.js";
@@ -28,6 +28,8 @@ export interface RenderOutput {
   diagram?: Diagram;
   svg?: string;
   diagnostics: Diagnostic[];
+  /** Plain-words remarks for the CLI (stderr), e.g. which engine the layout file chose. */
+  notes?: string[];
 }
 
 export function readPins(modelPath: string): { options: LayoutOptions; diagnostics: Diagnostic[] } {
@@ -56,11 +58,72 @@ export async function renderText(text: string, options: LayoutOptions = {}): Pro
   };
 }
 
-export async function renderFile(modelPath: string, options: LayoutOptions = {}): Promise<RenderOutput> {
-  const pins = readPins(modelPath);
-  const out = await renderText(readFileSync(modelPath, "utf8"), { ...pins.options, ...options });
-  out.diagnostics.unshift(...pins.diagnostics);
+export interface RenderFileFlags {
+  /** Ignore the layout file entirely: no pins, no soft positions, no stored engine. */
+  noPins?: boolean;
+  /** CLI only: add the engine note and the stale-pin comparison (costs one extra layout when pins exist). */
+  advise?: boolean;
+}
+
+export async function renderFile(modelPath: string, options: LayoutOptions = {}, flags: RenderFileFlags = {}): Promise<RenderOutput> {
+  const saved = flags.noPins ? { options: {} as LayoutOptions, diagnostics: [] as Diagnostic[] } : readPins(modelPath);
+  const engine = options.engine ?? saved.options.engine;
+  const merged: LayoutOptions = { ...saved.options, ...options, ...(engine ? { engine } : {}) };
+  const out = await renderText(readFileSync(modelPath, "utf8"), merged);
+  out.diagnostics.unshift(...saved.diagnostics);
+  if (flags.advise) {
+    const note = engineNote(modelPath, options.engine, saved.options.engine);
+    if (note) out.notes = [note];
+    const pinned = activePins(out.diagram, merged.pins);
+    if (out.model && out.diagram && !hasErrors(out.diagnostics) && Object.keys(pinned).length) {
+      const warning = await pinsDegradeDiagnostic(out.model, out.diagram, pinned, options.engine);
+      if (warning) out.diagnostics.push(warning);
+    }
+  }
   return out;
+}
+
+/** Say so when the layout file, not the caller, picked a non-default engine. */
+function engineNote(modelPath: string, requested: LayoutOptions["engine"], stored: LayoutOptions["engine"]): string | undefined {
+  if (requested || !stored || stored === DEFAULT_ENGINE) return undefined;
+  return `using engine '${stored}' from ${basename(layoutPathFor(modelPath))} (default is '${DEFAULT_ENGINE}'); pass --engine to override`;
+}
+
+/** Pins that name a node of the diagram; the others cannot affect the drawing. */
+function activePins(diagram: Diagram | undefined, pins: Record<string, Point> = {}): Record<string, Point> {
+  const ids = new Set(diagram?.nodes.map((n) => n.id));
+  return Object.fromEntries(Object.entries(pins).filter(([id]) => ids.has(id)));
+}
+
+const HARD_METRICS = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
+
+/**
+ * Lay the model out once without pins or positions and compare. Returns a diagnostic when the
+ * pinned drawing is clearly worse: area over 1.5x, at least 3 more edge crossings, or any hard metric worse.
+ * `engine` is the explicit engine, if any, so the baseline matches what `--no-pins` would produce.
+ */
+export async function pinsDegradeDiagnostic(
+  model: NModel, pinned: Diagram, pins: Record<string, Point>, engine?: LayoutOptions["engine"],
+): Promise<Diagnostic | undefined> {
+  const baseline = (await layout(model, engine ? { engine } : {})).diagram;
+  const withPins = assessQuality(pinned, pins, model);
+  const without = assessQuality(baseline, {}, model);
+  const areaRatio = (pinned.width * pinned.height) / Math.max(1, baseline.width * baseline.height);
+  const worse = HARD_METRICS.filter((m) => withPins[m] > without[m]);
+  const moreCrossings = withPins.edgeCrossings - without.edgeCrossings;
+  if (areaRatio <= 1.5 && moreCrossings < 3 && !worse.length) return undefined;
+  const size = (d: Diagram) => `${Math.round(d.width)}x${Math.round(d.height)} px`;
+  const details = [
+    `size ${size(pinned)} with pins vs ${size(baseline)} without`,
+    `edge crossings ${withPins.edgeCrossings} vs ${without.edgeCrossings}`,
+    ...worse.map((m) => `${m} ${withPins[m]} vs ${without[m]}`),
+  ];
+  return {
+    rule: "pins-degrade-layout",
+    severity: "heuristic",
+    message: `The saved pins make this layout clearly worse than an unpinned one (${details.join("; ")}).`,
+    hint: "run with --no-pins to compare, or use Reset pins in `chen serve`",
+  };
 }
 
 /** SVG → PNG with the bundled fonts, so the PNG matches the measured text. */

@@ -105,4 +105,16 @@ describe("CLI commands and app services", () => {
     expect(spawnSync(process.execPath, [...args, "render", model, "--engine", "invalid"]).status).toBe(2);
     expect(spawnSync(process.execPath, [...args, "lint"]).status).toBe(2);
   });
+
+  it("documents --no-pins and parses it as a flag that leaves the layout file alone", () => {
+    const args = ["--import", "tsx", "src/cli/index.ts"];
+    const help = execFileSync(process.execPath, [...args, "render", "--help"], { encoding: "utf8" });
+    expect(help).toContain("--no-pins");
+    expect(help).toContain("ignore the layout file entirely");
+    writeFileSync(layoutPathFor(model), "broken");
+    const run = spawnSync(process.execPath, [...args, "render", model, "--no-pins", "--json"], { encoding: "utf8" });
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout).outputs).toEqual([join(dir, "sample.svg")]);
+    expect(readFileSync(layoutPathFor(model), "utf8")).toBe("broken");
+  });
 });

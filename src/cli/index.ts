@@ -25,6 +25,7 @@ program.command("render")
   .option("--report", "print the quality report")
   .option("--json", "print one JSON object")
   .option("--fresh", "ignore saved positions and lay out from scratch (pins still apply)")
+  .option("--no-pins", "ignore the layout file entirely: no pins, saved positions or stored engine (the file is not modified)")
   .action(async (model: string, options: RenderCommandOptions) => print(await renderCommand(model, options)));
 
 program.command("lint")

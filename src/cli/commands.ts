@@ -20,6 +20,8 @@ export interface RenderCommandOptions {
   json?: boolean;
   /** Ignore saved soft positions and lay the diagram out from scratch (pins still apply). */
   fresh?: boolean;
+  /** `--no-pins` sets this to false: ignore the layout file entirely (pins, positions and engine). */
+  pins?: boolean;
 }
 
 export interface LintCommandOptions {
@@ -46,19 +48,24 @@ export async function renderCommand(modelPath: string, options: RenderCommandOpt
     }
     const scale = options.scale ?? 2;
     if (!Number.isFinite(scale) || scale <= 0) throw new Error("Scale must be a positive finite number.");
-    const result = await renderFile(modelPath, { ...(options.engine ? { engine: options.engine } : {}), ...(options.fresh ? { positions: {} } : {}) });
+    const noPins = options.pins === false;
+    const result = await renderFile(
+      modelPath,
+      { ...(options.engine ? { engine: options.engine } : {}), ...(options.fresh ? { positions: {} } : {}) },
+      { noPins, advise: true },
+    );
     const outputs = result.svg
       ? writeRenderOutputs(result.svg, options.out ?? modelPath.replace(/(\.er)?\.ya?ml$/i, "") + ".svg", options.png, scale)
       : [];
     const report = options.report && result.diagram
-      ? quality(result.diagram, readPins(modelPath).options.pins)
+      ? quality(result.diagram, noPins ? {} : readPins(modelPath).options.pins)
       : undefined;
     return {
       exitCode: hasErrors(result.diagnostics) ? 1 : 0,
       stdout: options.json
         ? JSON.stringify({ outputs, diagnostics: result.diagnostics, ...(report ? { quality: report } : {}) })
         : [...outputs, ...(report ? [JSON.stringify(report, null, 2)] : [])].join("\n"),
-      stderr: options.json ? "" : formatDiagnostics(result.diagnostics),
+      stderr: [...(result.notes ?? []), ...(options.json ? [] : [formatDiagnostics(result.diagnostics)])].filter(Boolean).join("\n"),
     };
   } catch (error) {
     return failure(error);
