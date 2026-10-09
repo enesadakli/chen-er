@@ -1,5 +1,6 @@
 import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
+import { clearanceQuality, type ClearanceQuality } from "./layout/semantic-clearance.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
 import { labelAmbiguityReasons, labelGeometry, labelLooseReasons } from "./layout/label-geometry.js";
 import { center, type Diagram, type Point } from "./geometry.js";
@@ -11,7 +12,7 @@ export interface QualityIssue {
   message: string;
 }
 
-export interface QualityReport extends SemanticQuality, EdgeQuality {
+export interface QualityReport extends SemanticQuality, EdgeQuality, ClearanceQuality {
   implemented: boolean;
   overlaps: number;
   shapeCrossings: number;
@@ -30,6 +31,10 @@ export interface QualityReport extends SemanticQuality, EdgeQuality {
   /** Node bounding-box area divided by canvas area. */
   density: number;
   longestEdgeRatio: number;
+  /** Longest end edge drawn length / median entity width. */
+  longEdgeMax: number;
+  /** Mean end edge drawn length / median entity width. */
+  longEdgeMean: number;
   issues: QualityIssue[];
 }
 
@@ -89,9 +94,10 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { ...edgeQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { ...edgeQuality(diagram), ...clearanceQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,
+    longEdgeMax: median > 0 ? Math.max(0, ...lengths) / median : 0, longEdgeMean: median > 0 ? meanEdgeLength / median : 0,
     density: area > 0 ? nodes.reduce((sum, n) => sum + n.box.w * n.box.h, 0) / area : 0, issues };
 }
