@@ -50,10 +50,12 @@ program.command("serve").description("open a live local diagram viewer")
   .option("--port <number>", "local HTTP port", Number, 5178)
   .option("--open", "open the viewer in your browser")
   .addOption(new Option("--engine <name>", "layout engine").choices(["layered", "stress", "simple"]))
+  .addOption(new Option("--agent <name>", "enable the agent panel with a local coding agent CLI").choices(["claude", "codex"]))
+  .option("--agent-cwd <dir>", "agent working directory (default: the model's directory)")
   .action(async (model: string, options: import("./commands.js").ServeCommandOptions) => {
     const { serveCommand } = await import("./commands.js");
     const viewer = await serveCommand(model, options);
-    console.log(viewer.url);
+    console.log(viewer.pageUrl);
     const stop = () => { void viewer.close().catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 2;

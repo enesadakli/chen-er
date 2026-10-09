@@ -124,9 +124,24 @@ export interface ServeCommandOptions {
   port?: number;
   open?: boolean;
   engine?: LayoutOptions["engine"];
+  /** `claude` enables the agent panel; `codex` is reserved. */
+  agent?: string;
+  agentCwd?: string;
+}
+
+/** Maps CLI flags to the server's agent options; throws a usage message for unsupported combinations. */
+export function agentOptions(options: Pick<ServeCommandOptions, "agent" | "agentCwd">): { kind: "claude"; cwd?: string } | undefined {
+  if (options.agent === undefined) {
+    if (options.agentCwd !== undefined) throw new Error("--agent-cwd requires --agent claude.");
+    return undefined;
+  }
+  if (options.agent === "codex") throw new Error("--agent codex is not supported yet. Use --agent claude.");
+  if (options.agent !== "claude") throw new Error(`Unknown agent: ${options.agent}. Use --agent claude.`);
+  return { kind: "claude", ...(options.agentCwd !== undefined ? { cwd: options.agentCwd } : {}) };
 }
 
 export async function serveCommand(modelPath: string, options: ServeCommandOptions = {}) {
+  const agent = agentOptions(options);
   const { serve } = await import("../app/serve.js");
-  return serve(modelPath, options);
+  return serve(modelPath, { port: options.port, open: options.open, engine: options.engine, ...(agent ? { agent } : {}) });
 }

@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync, watch, writeFileSync
 import { dirname, extname, join, resolve, sep, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
 import type { Diagram, LayoutOptions, Point } from "../core/geometry.js";
 import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
@@ -13,6 +14,8 @@ import { diagramPositions, layoutPathFor, lintText, quality, readPins, svgToPng,
 import { diagnosticTarget } from "./targets.js";
 import { fileBytes, GuardError, replaceBytes, revision } from "./file-guard.js";
 import { selectionMetadata, type SelectionMetadata } from "../viewer/selection.js";
+import { AgentError, createAgent, parseTurnRequest, type AgentController, type AgentKind, type Turn } from "./agent.js";
+import { lintCommandFor } from "./agent-prompt.js";
 
 export interface ViewerDiagnostic extends Diagnostic { target?: string }
 export interface ViewerState {
@@ -31,7 +34,18 @@ export interface ViewerState {
   history: { canUndo: boolean; canRedo: boolean };
   selection: SelectionMetadata;
 }
-export interface ServeOptions { port?: number; open?: boolean; engine?: LayoutOptions["engine"] }
+export interface AgentOptions {
+  kind: AgentKind;
+  /** Agent working directory (default: the model's directory). */
+  cwd?: string;
+  /** Executable (default: env CHEN_AGENT_BIN, then "claude"). */
+  bin?: string;
+  /** Command prefix the agent runs as `<lintCommand> <model>` (default: derived from how this process started). */
+  lintCommand?: string;
+  /** Delay between SIGTERM and SIGKILL on cancel (default 3000 ms). */
+  killAfterMs?: number;
+}
+export interface ServeOptions { port?: number; open?: boolean; engine?: LayoutOptions["engine"]; agent?: AgentOptions }
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 let viewerBuild: Promise<void> | undefined;
 
@@ -89,6 +103,8 @@ export async function serve(model: string, options: ServeOptions = {}) {
   readFileSync(modelPath, "utf8");
   const pinsPath = layoutPathFor(modelPath);
   if (pinsPath === modelPath) throw new Error("Model and layout paths must differ.");
+  const agentCwd = options.agent ? resolve(options.agent.cwd ?? dirname(modelPath)) : undefined;
+  if (agentCwd && (!existsSync(agentCwd) || !lstatSync(agentCwd).isDirectory())) throw new Error(`Agent working directory not found: ${agentCwd}`);
   const viewer = await ensureViewer();
   const clients = new Set<ServerResponse>();
   let requestedEngine = options.engine;
@@ -103,6 +119,8 @@ export async function serve(model: string, options: ServeOptions = {}) {
   };
   /** Text of our last write to the layout file; the watcher ignores events that only see it. */
   let lastWrite: string | undefined;
+  /** While an agent turn runs the server does not auto-save positions, so any layout change is a deliberate write. */
+  let agentRunning = (): boolean => false;
   type Snapshot = { model: Buffer | null; layout: Buffer | null; engine: typeof requestedEngine };
   // History holds layout-file bytes and the engine only; the model file is never part of it.
   type LayoutSnap = Pick<Snapshot, "layout" | "engine">;
@@ -177,7 +195,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
         diagram = result.diagram;
         svg = renderSvg(diagram);
         all = [...all, ...result.diagnostics];
-        if (savePositions && !saved.diagnostics.length && same(snapshot(), inputs)) {
+        if (savePositions && !agentRunning() && !saved.diagnostics.length && same(snapshot(), inputs)) {
           try { writeLayout({ positions: diagramPositions(diagram) }, inputs); }
           catch (error) { all.push({ rule: "layout-file", severity: "warning", message: `Positions not saved: ${(error as Error).message}` }); }
         }
@@ -227,11 +245,56 @@ export async function serve(model: string, options: ServeOptions = {}) {
     const parsed = LayoutFile.parse({ version: 1, pins, ...(engine ? { engine } : {}) });
     writeLayout({ pins: parsed.pins, ...(parsed.engine ? { engine: parsed.engine } : {}) });
   }
+  const token = options.agent ? randomBytes(32).toString("base64url") : undefined;
+  const agent: AgentController | undefined = options.agent && agentCwd ? createAgent({
+    kind: options.agent.kind,
+    cwd: agentCwd,
+    modelPath,
+    layoutPath: pinsPath,
+    bin: options.agent.bin ?? process.env.CHEN_AGENT_BIN ?? "claude",
+    lintCommand: options.agent.lintCommand ?? lintCommandFor(process.argv[1], root),
+    killAfterMs: options.agent.killAfterMs,
+    emit: (turn: Turn) => { for (const client of clients) client.write(`event: agent-turn\ndata: ${JSON.stringify(turn)}\n\n`); },
+    writeModel: (expected, next) => serial(async () => { replaceBytes(modelPath, expected, next); }),
+    writeLayout: (expected, next) => serial(async () => { guardLayoutPath(); replaceBytes(pinsPath, expected, next); }),
+    isServerLayout: (bytes) => bytes !== null && lastWrite !== undefined && bytes.toString("utf8") === lastWrite,
+    afterTurn: (modelChanged) => { if (modelChanged && !closed) void serial(() => refresh()).catch(() => undefined); },
+  }) : undefined;
+  if (agent) agentRunning = () => agent.info().running !== null;
+  const tokenMatches = (value: string | string[] | undefined): boolean => {
+    if (!token || typeof value !== "string") return false;
+    const a = Buffer.from(value), b = Buffer.from(token);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
+  async function agentRoute(req: IncomingMessage, res: ServerResponse, path: string, trusted: boolean): Promise<void> {
+    // 403 without detail: do not reveal which check failed.
+    if (!trusted) throw new HttpError(403, "Forbidden.");
+    if (!agent) throw new HttpError(404, "Unknown route.");
+    if (!tokenMatches(req.headers["x-chen-token"])) throw new HttpError(403, "Forbidden.");
+    if (req.method === "GET" && path === "/api/agent") return json(res, 200, agent.info());
+    if (req.method === "POST" && path === "/api/agent/turns") {
+      const turnId = agent.start(parseTurnRequest(await body(req)));
+      return json(res, 202, { turnId });
+    }
+    const match = /^\/api\/agent\/turns\/([\w-]{1,64})\/(cancel|undo)$/.exec(path);
+    if (req.method === "POST" && match) {
+      req.resume();
+      return json(res, 200, match[2] === "cancel" ? await agent.cancel(match[1]!) : await agent.undo(match[1]!));
+    }
+    throw new HttpError(404, "Unknown route.");
+  }
   const server = createServer((req, res) => {
     void (async () => {
       const address = server.address();
       const actualPort = typeof address === "object" && address ? address.port : port;
       const origin = `http://127.0.0.1:${actualPort}`;
+      const hostOk = req.headers.host === `127.0.0.1:${actualPort}` || req.headers.host === `localhost:${actualPort}`;
+      const originOk = !req.headers.origin || req.headers.origin === origin || req.headers.origin === `http://localhost:${actualPort}`;
+      const rawPath = (req.url ?? "/").split("?")[0]!;
+      if (rawPath === "/api/agent" || rawPath.startsWith("/api/agent/")) {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        return agentRoute(req, res, rawPath, hostOk && originOk);
+      }
       if (req.headers.host !== `127.0.0.1:${actualPort}` && req.headers.host !== `localhost:${actualPort}`) {
         throw new HttpError(403, "Invalid host.");
       }
@@ -346,7 +409,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
       res.writeHead(200, { "Content-Type": types[extname(file)] ?? "application/octet-stream" });
       res.end(readFileSync(file));
     })().catch((error: unknown) => {
-      if (!res.headersSent) json(res, error instanceof HttpError || error instanceof GuardError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
+      if (!res.headersSent) json(res, error instanceof HttpError || error instanceof GuardError || error instanceof AgentError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
       else res.end();
     });
   });
@@ -367,13 +430,16 @@ export async function serve(model: string, options: ServeOptions = {}) {
   } catch (error) { watcher.close(); clearInterval(heartbeat); throw error; }
   const address = server.address();
   const url = `http://127.0.0.1:${typeof address === "object" && address ? address.port : port}`;
+  // With the agent panel, the page reads the one-time token from `t` and removes it from the address bar.
+  const pageUrl = token ? `${url}/?t=${token}` : url;
   if (options.open) {
-    const child = spawn(process.platform === "darwin" ? "open" : "xdg-open", [url], { stdio: "ignore" });
-    child.on("error", (error) => console.error(`Open ${url} manually: ${error.message}`));
+    const child = spawn(process.platform === "darwin" ? "open" : "xdg-open", [pageUrl], { stdio: "ignore" });
+    child.on("error", (error) => console.error(`Open ${pageUrl} manually: ${error.message}`));
     child.unref();
   }
-  return { server, url, async close() {
+  return { server, url, pageUrl, token, async close() {
     closed = true;
+    await agent?.close();
     watcher.close(); clearTimeout(debounce); clearInterval(heartbeat);
     await queue;
     for (const client of clients) client.end();

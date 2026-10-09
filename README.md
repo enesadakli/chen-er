@@ -106,6 +106,12 @@ Click an entity or relationship to open its actions. Selection emphasizes all en
 
 **Undo / Redo** (Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z outside text fields) restore the layout file for the last 50 layout changes in this server session: pins, reset, engine changes and relayout. External model or layout edits clear that history. Writes compare the layout file's byte revision and recheck the disk before each atomic replacement; this is not a filesystem lock shared with external editors, so a write in the final check/rename interval can still race. On conflict, the viewer preserves the external file and clears history. Exports omit selection and action controls.
 
+### Agent panel
+
+`chen serve model.er.yaml --agent claude [--agent-cwd <dir>]` adds an **Agent** tab where you ask for model changes in plain language. Each request runs your installed, logged-in Claude Code CLI headless (`claude -p ... --output-format stream-json --verbose --permission-mode acceptEdits --add-dir <model dir>`), with `--agent-cwd` as its working directory (default: the model's directory); later requests continue the same session with `--resume`. No API key is involved. The agent edits the YAML and the diagram refreshes through the usual live reload; the server never lets it change the layout file. One request runs at a time and can be cancelled. **Undo** restores the model bytes from before the most recent model-changing request, only while the file is still exactly as that request left it.
+
+With `--agent`, the printed URL carries a one-time token (`http://127.0.0.1:<port>/?t=<token>`); `--open` opens that URL. Agent API calls must send that token in `X-Chen-Token`. Without `--agent`, the agent API does not exist. `--agent codex` is reserved and currently rejected. History lives in memory until the server stops. Contract: [docs/agent-panel.md](docs/agent-panel.md).
+
 ## Install and quick start
 
 Use Node.js 24. To use the packed package in another project (verified with a clean install of the tarball; the registry release is pending):
