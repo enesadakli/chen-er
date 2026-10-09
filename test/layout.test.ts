@@ -46,7 +46,7 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
         expect(q.aspect).toBeLessThanOrEqual(1.8);
         expect(q.longestEdgeRatio).toBeLessThanOrEqual(7);
         expect(Math.max(first.diagram.width, first.diagram.height)).toBeLessThanOrEqual(2800);
-        expect(q.edgeCrossings).toBeLessThanOrEqual(4);
+        expect(q.edgeCrossings).toBeLessThanOrEqual(2);
       }
     }
     if (!Object.keys(pins).length) expect(q.issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);

@@ -18,7 +18,7 @@ describe("semantic default layout", () => {
     expect(q.hierarchyViolations).toBe(0);
     expect(q.diamondOffset).toBeLessThanOrEqual(0.15);
     expect(q.axisAligned).toBeGreaterThanOrEqual(0.6);
-    expect(q.edgeCrossings).toBeLessThanOrEqual(4);
+    expect(q.edgeCrossings).toBeLessThanOrEqual(2);
     expect(q.aspect).toBeGreaterThanOrEqual(0.6);
     expect(q.aspect).toBeLessThanOrEqual(1.8);
     expect(q.meanEdgeRatio).toBeLessThanOrEqual(3.5);

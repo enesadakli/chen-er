@@ -53,6 +53,10 @@ function endpointSides(p: Point, box: Box): number[] {
 }
 
 export interface EdgeQuality {
+  routeDetourMax: number;
+  routeDetourMean: number;
+  endBendsMax: number;
+  endBendsMean: number;
   /** Number of attribute/part edges with more than one nonzero segment. */
   attributeEdgeBends: number;
   /** Number of edge pairs (including an edge with itself) sharing rendered segment length. */
@@ -65,6 +69,39 @@ export interface EdgeQuality {
   diamondVertexViolations: number;
   /** Double edges with reversals, self-overlap, or intersecting parallel copies. */
   doubleEdgeArtifacts: number;
+}
+
+/** Exact L1 separation of a diamond and a rectangle, including sloping borders. */
+export function nearestBorderDistance(diamond: DNode, entity: DNode): number {
+  const c = center(diamond.box), b = entity.box;
+  const vertices = [{ x: c.x, y: diamond.box.y }, { x: diamond.box.x + diamond.box.w, y: c.y },
+    { x: c.x, y: diamond.box.y + diamond.box.h }, { x: diamond.box.x, y: c.y }];
+  const candidates = [...vertices];
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i]!, d = vertices[(i + 1) % vertices.length]!;
+    for (const [axis, values] of [["x", [b.x, b.x + b.w]], ["y", [b.y, b.y + b.h]]] as const) {
+      for (const value of values) {
+        const t = (value - a[axis]) / (d[axis] - a[axis]);
+        if (t >= 0 && t <= 1) candidates.push({ x: a.x + (d.x - a.x) * t, y: a.y + (d.y - a.y) * t });
+      }
+    }
+  }
+  return Math.min(...candidates.map((p) => Math.max(b.x - p.x, 0, p.x - b.x - b.w) + Math.max(b.y - p.y, 0, p.y - b.y - b.h)));
+}
+
+export function endRouteMetrics(diagram: Diagram): { id: string; routeDetour: number; endBends: number }[] {
+  const nodes = new Map(diagram.nodes.map((n) => [n.id, n]));
+  return diagram.edges.filter((e) => e.kind === "end").map((e) => {
+    const lines = segments(e.points).filter(([a, b]) => distance(a, b) > EPS);
+    const length = lines.reduce((sum, [a, b]) => sum + distance(a, b), 0);
+    const from = nodes.get(e.from), to = nodes.get(e.to);
+    const separation = from && to ? nearestBorderDistance(from, to) : 0;
+    const bends = lines.slice(1).filter(([b, c], i) => {
+      const [a] = lines[i]!;
+      return Math.abs((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)) > EPS;
+    }).length;
+    return { id: e.id, routeDetour: separation > EPS ? length / separation : length > EPS ? Infinity : 1, endBends: bends };
+  });
 }
 
 export function edgeQuality(diagram: Diagram): EdgeQuality {
@@ -102,6 +139,11 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
       if (reverses(e.points) || selfOverlap || intersecting) doubleEdgeArtifacts++;
     }
   }
-  return { attributeEdgeBends: diagram.edges.filter((e) => e.kind !== "end" && segments(e.points).filter(([a, b]) => distance(a, b) > EPS).length > 1).length,
+  const routes = endRouteMetrics(diagram);
+  return { routeDetourMax: Math.max(0, ...routes.map((r) => r.routeDetour)),
+    routeDetourMean: routes.reduce((sum, r) => sum + r.routeDetour, 0) / (routes.length || 1),
+    endBendsMax: Math.max(0, ...routes.map((r) => r.endBends)),
+    endBendsMean: routes.reduce((sum, r) => sum + r.endBends, 0) / (routes.length || 1),
+    attributeEdgeBends: diagram.edges.filter((e) => e.kind !== "end" && segments(e.points).filter(([a, b]) => distance(a, b) > EPS).length > 1).length,
     edgeOverlap, tinySegments, endPortCrowding, diamondVertexViolations, doubleEdgeArtifacts };
 }

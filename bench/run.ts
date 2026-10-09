@@ -29,15 +29,20 @@ for (const input of inputs) {
     const { diagram } = await layout(model, { engine, pins });
     const elapsed = performance.now() - start;
     const q = assessQuality(diagram, pins, model);
-    const modified: NModel = { ...model, entities: model.entities.map((e, i) => i ? e : { ...e, attrs: [...e.attrs, {
-      id: `A:${e.name}.__bench_extra`, name: "__bench_extra", label: "Extra", owner: e.name, ownerKind: "entity", parts: [], multivalued: false, derived: false, key: false, partial: false, path: "bench.extra",
-    }] }) };
-    const next = (await layout(modified, { engine, pins })).diagram;
-    const displacement = diagram.nodes.filter((n) => n.kind === "entity").map((n) => {
-      const c = center(n.box), other = center(next.nodes.find((m) => m.id === n.id)!.box);
-      return Math.hypot(c.x - other.x, c.y - other.y);
-    });
-    const stability = displacement.reduce((sum, n) => sum + n, 0) / (displacement.length || 1);
+    const displacement: number[] = [];
+    for (const entity of model.entities) {
+      const modified: NModel = { ...model, entities: model.entities.map((e) => e !== entity ? e : { ...e, attrs: [...e.attrs, {
+        id: `A:${e.name}.Extra`, name: "Extra", label: "Extra", owner: e.name, ownerKind: "entity", parts: [], multivalued: false, derived: false, key: false, partial: false, path: "bench.extra",
+      }] }) };
+      const next = (await layout(modified, { engine, pins })).diagram;
+      displacement.push(...diagram.nodes.filter((n) => n.kind === "entity").map((n) => {
+        const c = center(n.box), other = center(next.nodes.find((m) => m.id === n.id)!.box);
+        return Math.hypot(c.x - other.x, c.y - other.y);
+      }));
+    }
+    displacement.sort((a, b) => a - b);
+    const stabilityMax = Math.max(0, ...displacement);
+    const stabilityMedian = displacement.length ? (displacement[Math.floor(displacement.length / 2)]! + displacement[Math.floor((displacement.length - 1) / 2)]!) / 2 : 0;
     const directory = join("out/bench", engine);
     mkdirSync(directory, { recursive: true });
     const base = basename(input, ".er.yaml");
@@ -49,11 +54,13 @@ for (const input of inputs) {
     rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
       hierarchyViolations: q.hierarchyViolations, hierarchyMinimum, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
       aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), density: Number(q.density.toFixed(4)),
-      ms: Number(elapsed.toFixed(1)), "stability(px)": Number(stability.toFixed(1)) });
+      routeDetourMax: Number(q.routeDetourMax.toFixed(3)), routeDetourMean: Number(q.routeDetourMean.toFixed(3)), endBendsMax: q.endBendsMax, endBendsMean: Number(q.endBendsMean.toFixed(3)),
+      ms: Number(elapsed.toFixed(1)), stabilityMax: Number(stabilityMax.toFixed(1)), stabilityMedian: Number(stabilityMedian.toFixed(1)) });
+    if (engine === DEFAULT_ENGINE && (stabilityMax > 60 || stabilityMedian > 20)) failed = true;
     if (engine === DEFAULT_ENGINE && (q.hierarchyViolations > hierarchyMinimum || q.diamondOffset > 0.2)) failed = true;
     if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift || q.attributeEdgeBends || q.edgeOverlap || q.tinySegments || q.endPortCrowding || q.diamondVertexViolations || q.doubleEdgeArtifacts)) failed = true;
     if (engine === DEFAULT_ENGINE && (input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failed = true;
-    if (engine === DEFAULT_ENGINE && input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 4 || q.diamondOffset > 0.15 || q.axisAligned < 0.6)) failed = true;
+    if (engine === DEFAULT_ENGINE && input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 2 || q.diamondOffset > 0.15 || q.axisAligned < 0.6 || q.routeDetourMax > 1.6 || q.routeDetourMean > 1.2 || q.endBendsMax > 2 || elapsed >= 2000)) failed = true;
   }
 }
 console.table(rows);

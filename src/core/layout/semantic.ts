@@ -1,8 +1,8 @@
-import { boxAround, center, intersects, type DNode, type Point } from "../geometry.js";
-import type { NModel } from "../normalize.js";
+import { anchor, boxAround, center, intersects, type Box, type DNode, type Point } from "../geometry.js";
+import { flattenAttrs, type NModel } from "../normalize.js";
 import type { Cluster } from "./clusters.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
-import { distance, segmentIntersection } from "./shapes.js";
+import { distance, segmentIntersection, segmentThrough } from "./shapes.js";
 
 export interface SemanticPlacement { columns: Map<string, number>; ranks: Map<string, number>; score: number }
 
@@ -63,6 +63,14 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
     }
     variants.push({ columns, ranks, score });
   }
+  // Symmetric binary models follow declaration order, keeping the first owner on the left.
+  if (ids.length === 2 && !hierarchy.pairs.length) for (const placement of variants) {
+    const first = model.entities[0]!.id, last = model.entities[1]!.id;
+    if (placement.columns.get(first)! > placement.columns.get(last)!) {
+      const max = Math.max(...placement.columns.values());
+      for (const [id, column] of placement.columns) placement.columns.set(id, max - column);
+    }
+  }
   const unique = new Map<string, SemanticPlacement>();
   for (const v of variants.sort((a, b) => a.score - b.score)) {
     const max = Math.max(0, ...v.columns.values()), min = Math.min(0, ...v.columns.values());
@@ -86,7 +94,7 @@ function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<s
     diamonds.push({ id: r.id, p, ends });
     for (const end of ends) {
       const q = point(end);
-      score += distance(p, q) * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
+      score += distance(p, q) ** 2 * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
       paths.push({ from: r.id, to: `E:${end}`, a: p, b: q });
     }
   }
@@ -97,7 +105,7 @@ function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<s
   }
   for (const d of diamonds) {
     for (const e of entities) if (distance(d.p, e) < 0.35) score += 40;
-    for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.ends.join(";") !== other.ends.join(";")) score += 25;
+    for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.ends.join(";") !== other.ends.join(";")) score += 10;
   }
   const cx = entities.reduce((s, e) => s + e.x, 0) / (entities.length || 1);
   const cy = entities.reduce((s, e) => s + e.y, 0) / (entities.length || 1);
@@ -108,10 +116,22 @@ function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<s
   return score;
 }
 
-export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 460): void {
+export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = []): void {
   const byId = new Map(clusters.map((c) => [c.node.id, c]));
+  const rankSpacing = new Set(placement.columns.values()).size === 1 ? Math.min(spacing, 280) : spacing;
   for (const c of clusters.filter((c) => c.node.kind === "entity" && !c.node.pinned)) {
-    c.node.box = boxAround({ x: 350 + placement.columns.get(c.node.id)! * spacing, y: 350 + placement.ranks.get(c.node.id)! * spacing }, c.node.box.w, c.node.box.h);
+    c.node.box = boxAround({ x: 350 + placement.columns.get(c.node.id)! * spacing, y: 350 + placement.ranks.get(c.node.id)! * rankSpacing }, c.node.box.w, c.node.box.h);
+  }
+  const pinnedEntities = clusters.filter((c) => c.node.kind === "entity" && c.node.pinned);
+  if (pinnedEntities.length) {
+    const dx = pinnedEntities.reduce((sum, c) => sum + center(c.node.box).x - 350 - placement.columns.get(c.node.id)! * spacing, 0) / pinnedEntities.length;
+    const dy = pinnedEntities.reduce((sum, c) => sum + center(c.node.box).y - 350 - placement.ranks.get(c.node.id)! * rankSpacing, 0) / pinnedEntities.length;
+    for (const c of clusters.filter((c) => c.node.kind === "entity" && !c.node.pinned)) {
+      c.node.box.x += dx;
+      c.node.box.y += dy;
+      const point = center(c.node.box);
+      if (pinnedEntities.length > 1) c.node.box = boxAround({ x: Math.max(350, point.x), y: Math.max(400, point.y) }, c.node.box.w, c.node.box.h);
+    }
   }
   const placed = clusters.filter((c) => c.node.kind === "entity" || c.node.pinned);
   for (const r of [...model.relationships].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -129,7 +149,7 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     const origin = { x: midpoint.x - dy / norm * lane, y: midpoint.y + dx / norm * lane };
     const offsets = [0, 32, -32, 64, -64, 96, -96, 128, -128, 160, -160, 224, -224, 288, -288];
     const positions = offsets.flatMap((offset) => [0, 48, -48, 96, -96].map((along) => ({ x: origin.x - dy / norm * offset + dx / norm * along, y: origin.y + dx / norm * offset + dy / norm * along }))).sort((a, b) => distance(a, origin) - distance(b, origin));
-    const position = positions.find((p) => !placed.some((other) => intersects(boxAround(p, c.node.box.w, c.node.box.h), other.node.box, 18))) ?? origin;
+    const position = positions.find((p) => !reserved.some((box) => intersects(boxAround(p, c.node.box.w, c.node.box.h), box, 18)) && !placed.some((other) => intersects(boxAround(p, c.node.box.w, c.node.box.h), other.node.box, 18))) ?? origin;
     c.node.box = boxAround(position, c.node.box.w, c.node.box.h);
     placed.push(c);
   }
@@ -143,6 +163,10 @@ export function placeSemanticRecursive(model: NModel, nodes: DNode[]): void {
     if (!entity || !diamond || diamond.pinned) continue;
     const p = center(entity.box);
     const candidates = [0, -180, 180, -260, 260].flatMap((x) => [-1, 1].flatMap((sign) => [280, 340, 400].map((gap) => ({ x: p.x + x, y: p.y + sign * gap }))));
+    const neighbours = model.relationships.filter((other) => other !== r && other.ends.some((end) => `E:${end.entity}` === entity.id))
+      .map((other) => center(nodes.find((n) => n.id === other.id)!.box));
+    const score = (point: Point) => neighbours.filter((other) => (other.y - p.y) * (point.y - p.y) > 0).length * 10000 + distance(point, p);
+    candidates.sort((a, b) => score(a) - score(b));
     const chosen = candidates.find((point) => !nodes.some((n) => n !== entity && n !== diamond && intersects(boxAround(point, diamond.box.w, diamond.box.h), n.box, 30)));
     if (chosen) diamond.box = boxAround(chosen, diamond.box.w, diamond.box.h);
   }
@@ -161,5 +185,26 @@ export function recenterPinnedDiamonds(clusters: Cluster[], model: NModel): void
     const points = ids.map((id) => byId.get(id)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => center(n.box));
     if (!points.length) continue;
     diamond.box = boxAround({ x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length }, diamond.box.w, diamond.box.h);
+  }
+}
+
+/** Pinned ovals cannot move, so reserve their straight spokes before routing ends. */
+export function clearPinnedSpokes(model: NModel, nodes: DNode[]): void {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const spokes = [...model.entities, ...model.relationships].flatMap((owner) => flattenAttrs(owner.attrs).flatMap((attr) => {
+    const oval = byId.get(attr.id), parent = byId.get(attr.parent ?? owner.id);
+    return oval?.pinned && parent ? [[anchor(parent, center(oval.box)), anchor(oval, center(parent.box))] as [Point, Point]] : [];
+  }));
+  for (const diamond of nodes.filter((n) => n.kind === "relationship" && !n.pinned)) {
+    if (!spokes.some(([a, b]) => segmentThrough(a, b, diamond))) continue;
+    const p = center(diamond.box);
+    const candidates = [48, 96, 144, 192].flatMap((gap) => [{ x: p.x - gap, y: p.y }, { x: p.x + gap, y: p.y }, { x: p.x, y: p.y - gap }, { x: p.x, y: p.y + gap }]);
+    for (const point of candidates) {
+      const candidate = { ...diamond, box: boxAround(point, diamond.box.w, diamond.box.h) };
+      if (nodes.some((n) => n !== diamond && intersects(candidate.box, n.box, 18))) continue;
+      if (spokes.some(([a, b]) => segmentThrough(a, b, candidate))) continue;
+      diamond.box = candidate.box;
+      break;
+    }
   }
 }

@@ -25,6 +25,17 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   const paths: Point[][] = [];
   for (const tip of tips) {
     const a = { x: tip.x, y: tip.y }, start = { x: a.x + tip.nx * 24, y: a.y + tip.ny * 24 };
+    paths.push([a, { x: b.x, y: a.y }, b], [a, { x: a.x, y: b.y }, b]);
+    if (tip.nx && port.normal.x) {
+      const xs = [start.x, goal.x, ...foreign.filter((n) => n.box.y < Math.max(a.y, b.y) + 16 && n.box.y + n.box.h > Math.min(a.y, b.y) - 16)
+        .flatMap((n) => [n.box.x - 16, n.box.x + n.box.w + 16])];
+      for (const x of xs) if (x >= Math.min(a.x, b.x) - 96 && x <= Math.max(a.x, b.x) + 96) paths.push([a, { x, y: a.y }, { x, y: b.y }, b]);
+    }
+    if (tip.ny && port.normal.y) {
+      const ys = [start.y, goal.y, ...foreign.filter((n) => n.box.x < Math.max(a.x, b.x) + 16 && n.box.x + n.box.w > Math.min(a.x, b.x) - 16)
+        .flatMap((n) => [n.box.y - 16, n.box.y + n.box.h + 16])];
+      for (const y of ys) if (y >= Math.min(a.y, b.y) - 96 && y <= Math.max(a.y, b.y) + 96) paths.push([a, { x: a.x, y }, { x: b.x, y }, b]);
+    }
     paths.push([a, start, { x: goal.x, y: start.y }, goal, b], [a, start, { x: start.x, y: goal.y }, goal, b]);
     const xs = [c.x, b.x, (start.x + goal.x) / 2], ys = [c.y, b.y, (start.y + goal.y) / 2];
     for (const x of xs) paths.push([a, start, { x, y: start.y }, { x, y: goal.y }, goal, b]);
@@ -33,6 +44,10 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   let best: Point[] | undefined, score = Infinity;
   for (const path of paths) {
     const ps = simplify(path), candidate = { ...edge, points: ps }, copies = visibleEdgePaths(candidate), lines = copies.flatMap(segments);
+    const first = ps[0]!, second = ps[1], last = ps.at(-1)!, before = ps.at(-2);
+    const tip = tips.find((p) => distance(p, first) < 1e-6);
+    if (!tip || !second || !before || (second.x - first.x) * tip.nx + (second.y - first.y) * tip.ny <= 1e-6
+      || (before.x - last.x) * port.normal.x + (before.y - last.y) * port.normal.y <= 1e-6) continue;
     if (reverses(ps) || [ps, ...copies].some((ps) => segments(ps).some(([a, b]) => distance(a, b) < MIN_ROUTE_SEGMENT - 1e-6))) continue;
     if (prior.some((other) => edgesOverlap(candidate, other))) continue;
     if (lines.some(([a, b]) => nodes.some((n) => segmentThrough(a, b, n)))) continue;
@@ -43,7 +58,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
       if (hit === "overlap") crossings += 8;
       else if (hit && ![ps[0]!, ps.at(-1)!].some((p) => distance(p, hit) < 1e-7)) crossings++;
     }
-    const value = segments(ps).reduce((s, [a, b]) => s + distance(a, b), 0) + crossings * 160 + ps.length * 8;
+    const value = segments(ps).reduce((s, [a, b]) => s + distance(a, b), 0) + crossings * 160 + ps.length * 8 + Math.max(0, ps.length - 4) * 1000;
     if (value < score) { score = value; best = ps; }
   }
   return best;
