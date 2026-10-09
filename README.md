@@ -1,200 +1,153 @@
 # chen-er
 
-chen-er turns a YAML conceptual database model into a Chen ER diagram. People
-and agents describe entities, attributes and relationships; the layout engine
-places the shapes and the renderer draws them. Participation uses `(min,max)`
-labels beside each entity, describing **that entity's participation** at that end.
+chen-er turns YAML database models into Chen entity–relationship diagrams, checks structural and semantic rules, and exports SVG and PNG. Entities, candidate keys, weak entities, relationship attributes, recursive roles and n-ary relationships stay explicit in the source. Use the CLI, a local viewer or MCP tools to revise the model and inspect the result. `(min,max)` labels describe the participation of the entity at that end.
 
-The goal is a reviewable model and diagram, rather than a drawing whose meaning
-is hidden in manually positioned shapes. Candidate keys, weak entities,
-composite attributes, recursive relationships and n-ary relationships remain
-explicit in the source.
+![Company projects: weak tasks, sponsorship, contributions and employee mentoring](docs/company-project.png)
 
-![Library ER diagram in Chen notation](docs/library.png)
+[SVG](docs/company-project.svg) · [YAML source](examples/company-project.er.yaml)
 
-[Open the vector version](docs/library.svg). Source: [library.er.yaml](examples/library.er.yaml).
-
-## Install and quick start
-
-Use Node.js 24. From a source checkout:
+Try it from a checkout with dependencies installed (Node.js 24):
 
 ```sh
-npm install
-npx tsx src/cli/index.ts render examples/library.er.yaml -o docs/library.svg --png
+npx tsx src/cli/index.ts render examples/company-project.er.yaml -o docs/company-project.svg --png
 ```
 
-For ongoing development, `npm run chen -- render model.er.yaml --png` runs the
-same source entry point. A built installation exposes `chen` through
-`bin/chen.js`; build the TypeScript first with `npm run build`.
+## Write YAML → get a diagram
 
-The render command writes an SVG and, with `--png`, a PNG using bundled Inter
-fonts. Keep the YAML alongside the output so changes can be reviewed and rendered
-again. Do not use a clean lint result as proof that a conceptual model is correct.
+This ternary relationship records a host, topic and room together. The snippet omits the source's explanatory notes.
 
-**Status:** v0.1. Rendering, layout (`layered` by default; `stress` and `simple`
-available), lint, the CLI, the MCP tools and the live viewer (`chen serve`) work.
-EER specializations are reserved in the schema and are not drawn in version 1.
-
-## Model reference
-
-The authoritative format is [schema/er.schema.json](schema/er.schema.json).
-MCP `get_schema` returns the schema from the same Zod model definition.
-
-```yaml
-version: 1
-title: Library
+<table>
+<tr><th>YAML</th><th>Rendered diagram</th></tr>
+<tr><td><pre lang="yaml">version: 1
+title: Workshop bookings
 entities:
-  BOOK: {attrs: [ISBN, Title], keys: [[ISBN]]}
-  COPY: {weak: true, attrs: [CopyNo], partialKey: [CopyNo]}
+  HOST: {attrs: [HostId], keys: [[HostId]]}
+  TOPIC: {attrs: [TopicId], keys: [[TopicId]]}
+  ROOM: {attrs: [RoomId], keys: [[RoomId]]}
 relationships:
-  COPY_OF:
-    identifies: COPY
+  BOOKS:
     ends:
-      - {entity: BOOK, card: "0..N"}
-      - {entity: COPY, card: "1..1"}
-notes:
-  - A copy exists only as a copy of a book.
+      - {entity: HOST, card: "0..N"}
+      - {entity: TOPIC, card: "0..N"}
+      - {entity: ROOM, card: "0..N"}
+    attrs: [StartsAt]</pre></td><td><img src="docs/ternary.png" alt="BOOKS diamond connects HOST, TOPIC and ROOM; StartsAt belongs to BOOKS" width="480"></td></tr>
+</table>
+
+[Full source](examples/ternary.er.yaml) · [SVG](docs/ternary.svg) · [Library example](examples/library.er.yaml)
+
+## Lint before rendering
+
+An identifying relationship is required for a weak entity. Run the checked-in, intentionally invalid [lint example](docs/lint-example.er.yaml):
+
+```sh
+npx tsx src/cli/index.ts lint docs/lint-example.er.yaml
 ```
 
-- `entities` maps names to `attrs`, `keys`, optional `label`, `note`, `weak` and
-  `partialKey`. `keys: [[A], [B]]` means two candidate keys; `[[A, B]]` means one
-  composite key.
-- Attributes are names or objects with `name`, optional `label`, `parts`,
-  `multivalued` and `derived`. Composite `parts` contain at least two attributes.
-- `relationships` maps names to `ends`, optional `attrs`, `label`, `note` and
-  `identifies`. Each end has `entity` and `card: "min..max"`; `N` means unbounded.
-  Use distinct `id` and `role` for recursive ends. Three or more ends share one
-  n-ary diamond.
-- `(0,max)` is partial participation; a minimum of at least one is total
-  participation. Keep M:N relationship attributes on the relationship.
-- A weak entity needs its owner, an identifying relationship, total participation
-  and a partial key. Record domain assumptions in `notes`.
+Actual CLI output (exit code 1):
 
-Sibling `model.er.layout.json` files supply optional layout engine selection and
-pins. Coordinates are node centers in pixels:
-
-```json
-{"version":1,"engine":"layered","pins":{"E:BOOK":{"x":240,"y":160}}}
+```text
+error:4:11 [weak-without-identifying] Weak entity TASK has no identifying relationship.
+  hint: Add a relationship connecting TASK to its owner and set identifies to TASK.
+0 errors does not mean the model is right; it means nothing obviously wrong was found.
 ```
 
-Stable ids are `E:<Entity>`, `R:<Relationship>` and
-`A:<Owner>.<attr>[.<part>]`. See the [agent skill](skills/er-diagram/SKILL.md)
-for a larger example including recursive and n-ary relationships.
+Diagnostics include source positions, rule ids, severity and repair hints. `error` findings block model rendering; `course`, `heuristic` and `info` findings ask for review. A clean lint result does not establish domain correctness.
 
-## CLI reference
+## Agents: skill and MCP
 
-Use `chen` for a built installation, or `npx tsx src/cli/index.ts` from source.
-`chen <command> --help` lists every option.
+The repository [er-diagram skill](skills/er-diagram/SKILL.md) describes the loop: write YAML, lint, fix, render, inspect the PNG, then revise the model or layout pins. Add that directory to your client's skill search path.
 
-| Command | Purpose |
-| --- | --- |
-| `chen render model.er.yaml -o diagram.svg --png` | Write SVG and optional PNG; read sibling layout pins. `--engine layered\|stress\|simple` selects layout. |
-| `chen render model.er.yaml --png --report` | Render and print the layout quality report (overlaps, crossings, compactness). |
-| `chen lint model.er.yaml` | Print parsing and semantic diagnostics with the correctness disclaimer. |
-| `chen schema` | Export the model's JSON Schema. |
-| `chen init` | Create a starter model. |
-| `chen rules` | List rule ids, severities and descriptions. |
-| `chen serve model.er.yaml` | Open the live viewer: reloads on save, drag to pin nodes, findings in the margin, export SVG/PNG. |
-
-The existing render command exits with `0` on success, `1` for model errors and
-`2` for usage or I/O failures.
-
-## MCP setup
-
-Start the stdio server directly:
+Start the stdio MCP server from the checkout:
 
 ```sh
 npx tsx src/mcp/server.ts
 ```
 
-Add it to Claude Code using an absolute checkout path:
-
-```sh
-claude mcp add chen-er -- npx tsx /path/to/chen-er/src/mcp/server.ts
-```
-
-A generic MCP client configuration:
+For a client configuration, replace the checkout path and launch the client from an environment where `tsx` resolves:
 
 ```json
 {
   "mcpServers": {
     "chen-er": {
       "command": "npx",
-      "args": ["tsx", "/path/to/chen-er/src/mcp/server.ts"]
+      "args": ["tsx", "/absolute/path/to/chen-er/src/mcp/server.ts"]
     }
   }
 }
 ```
 
-Run the client in an environment where `npx` can resolve the checkout's installed
-`tsx`, or configure its working directory to the checkout. Relative model and
-output paths resolve against the server's working directory.
-
-| Tool | Input and result |
+| Tool | Behavior |
 | --- | --- |
-| `get_schema` | No arguments. JSON Schema draft-2020-12, annotated example, notation cheat sheet, available rules and disclaimer. |
-| `lint_er` | Exactly one of `model` (YAML text) or `path`; optional `disable` rule ids. Returns JSON `{diagnostics, disclaimer}`. |
-| `render_er` | Exactly one of `model` or `path`; optional `engine`, `out` (SVG path), `scale` (positive PNG zoom, default 2). Returns one JSON text item and one `image/png` base64 item on success. |
+| `get_schema` | Returns JSON Schema, a YAML example, notation guidance, lint rules and the correctness disclaimer. |
+| `lint_er` | Takes exactly one of `model` (YAML text) or `path`; optional `disable` rule ids. Returns diagnostics and the disclaimer. |
+| `render_er` | Takes exactly one of `model` or `path`; optional `engine`, `out` and positive PNG `scale` (default 2). Returns a PNG image plus diagnostics, severity counts and written paths. |
 
-`render_er` reads pins with file input. With `out`, it replaces that SVG and its
-sibling PNG; without it, no files are written. Its JSON contains `diagnostics`,
-severity counts in `summary`, `writtenPaths` and the disclaimer. Invalid models
-return diagnostics with `isError: true` and no image. Validation or I/O failures
-also return MCP tool errors. Inspect the image before deciding the model is done.
+File input loads sibling layout settings. Relative paths resolve against the server's working directory. `render_er` with `out` replaces the SVG and its sibling PNG; without `out`, it writes no files. Invalid models return a tool error and no image.
 
-## Agent skill install
+## Local viewer
 
-Install the repository skill into Claude's skill directory:
+`chen serve` serves the viewer on loopback at `http://127.0.0.1:5178` by default. From source:
 
 ```sh
-mkdir -p ~/.claude/skills
-ln -s /path/to/chen-er/skills/er-diagram ~/.claude/skills/er-diagram
+npx tsx src/cli/index.ts serve examples/company-project.er.yaml
 ```
 
-For Codex or Gemini, put the same skill directory in that client's configured
-skill search path. The skill teaches the loop: write YAML → lint → fix → render
-with PNG/report → open the image → revise the model or pins → repeat. MCP tools
-provide the same workflow when the CLI is unavailable.
+Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `company-project.er.layout.json`; previous positions keep subsequent layouts stable. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
 
-## Lint rules overview
+## Install and quick start
 
-Severities distinguish broken rules (`error`), teaching conventions (`course`),
-suspicions that require judgment (`heuristic`) and guidance (`info`). Course and
-heuristic findings are not proof of a wrong model. `chen rules` prints the
-current inventory with descriptions.
+Use Node.js 24. Install the checkout's dependencies with `npm ci`, then the one-command render above runs without a build. This README documents source and built-checkout usage; npm publication is pending the [packaging checklist](docs/npm-readiness.md).
 
-| Severity | Rule ids |
+To use the built CLI:
+
+```sh
+npm run build
+node bin/chen.js render examples/ternary.er.yaml -o docs/ternary.svg --png
+```
+
+The package declares the executable name `chen`. In the following commands, use `node bin/chen.js` in a built checkout, or `npx tsx src/cli/index.ts` from source:
+
+| Command | Result |
 | --- | --- |
-| error | `unknown-entity`, `unknown-key-attribute`, `duplicate-attribute`, `invalid-cardinality`, `duplicate-end-id`, `recursive-missing-role`, `identifies-not-an-end`, `identifies-not-weak`, `weak-without-identifying`, `weak-end-not-total`, `identification-cycle`, `unsupported-eer` |
-| course | `weak-without-partial-key`, `entity-without-key`, `generic-relationship-name` |
-| heuristic | `parallel-relationships`, `redundant-functional-path`, `attribute-names-entity` |
-| info | `movable-relationship-attribute` |
+| `chen init model.er.yaml` | Create a starter model; refuses to overwrite unless `--force` is supplied. |
+| `chen lint model.er.yaml` | Check parsing and model rules; `--json` returns machine-readable diagnostics. |
+| `chen render model.er.yaml --png --report` | Write SVG/PNG and print overlap, crossing and compactness measurements. |
+| `chen render model.er.yaml --engine stress --fresh` | Choose another engine and ignore saved positions; pins still apply. |
+| `chen serve model.er.yaml` | Start the local viewer. |
+| `chen schema` | Print JSON Schema. |
+| `chen rules` | List rule ids, severities and descriptions. |
 
-Parsing also reports YAML syntax and structural schema errors. The disclaimer
-accompanies every MCP lint/render result: **0 errors does not mean the model is
-right; it means nothing obviously wrong was found.**
+CLI exit codes: 0 success, 1 model errors, 2 usage or I/O failure. Rendering writes beside the model unless `-o` supplies an output path. PNG uses bundled Inter fonts at 2× scale by default; `--scale` changes raster scale.
 
-## Architecture
+## Model reference and architecture
 
-- `src/core/`: browser-safe schema, normalization, lint, text metrics, layout and
-  SVG rendering. Pipeline: `parseModel` → `lint` → `layout` → `renderSvg`.
-- `src/app/`: shared render services, model/pin file reads and SVG-to-PNG conversion.
-- `src/cli/`: command-line adapters for those services.
-- `src/mcp/`: dependency-injected tool handlers and stdio server wiring; the server
-  adapter reads lint inputs and writes requested render outputs.
-- `src/viewer/`: the browser viewer served by `chen serve`, built with Vite on the shared core.
+See the [model reference](docs/model-reference.md) for keys, attributes, cardinalities, weak entities, recursive roles and layout files. The structural contract is [schema/er.schema.json](schema/er.schema.json).
 
-Geometry uses pixels with a top-left origin and y increasing downward. Boxes
-store their top-left corner; pins store centers. Layout computes final node,
-edge and label positions. Edges terminate on shape outlines via `anchor`; the
-renderer does not compute positions. Bundled Inter metrics and shared style
-constants keep shape sizes and drawing consistent.
+The shared pipeline is `parseModel → lint → layout → renderSvg`; the application layer handles files and PNG conversion. `src/core` is browser-safe and shared by CLI, MCP and viewer. Layout produces final geometry; the SVG renderer draws it without placing shapes. Fonts and text metrics are bundled.
 
-Run `npx tsc --noEmit` and `npx vitest run` to check types and tests. MCP integration
-tests use the SDK client and linked in-memory transports, including image output
-and file/pin handling.
+The default engine is `layered`. Its pipeline evaluates semantic placements first and falls back to layered/stress candidates when its quality targets are not met. `stress` also uses this candidate pipeline; `simple` is a separate engine. Pins store node centers in pixels and override automatic placement.
+
+Regenerate all top-level public example images with the current engine:
+
+```sh
+npx tsx scripts/gen-docs.ts
+```
+
+The generator writes `docs/<name>.svg` and `.png`, ignores saved soft positions, respects explicit pins, and stops on errors. It does not recurse into directories.
+
+Development checks:
+
+```sh
+npx tsc --noEmit
+npx vitest run
+```
+
+## Status and roadmap
+
+Version 0.1.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, three engine choices, saved pins/positions, the local viewer and three MCP tools. Automatic layout still needs visual review, especially for crossings and dense models. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn.
+
+Next work: complete npm metadata and publication checks, improve layout quality on larger models, and design EER rendering. These are planned areas, not supported features or release dates.
 
 ## License
 
-Code: [MIT](LICENSE). Bundled Inter fonts: SIL Open Font License 1.1; see
-[assets/fonts/OFL.txt](assets/fonts/OFL.txt).
+Code: [MIT](LICENSE). Bundled Inter fonts: [SIL Open Font License 1.1](assets/fonts/OFL.txt).

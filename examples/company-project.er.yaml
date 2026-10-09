@@ -1,0 +1,40 @@
+version: 1
+title: Company projects
+entities:
+  COMPANY:
+    attrs: [CompanyId, Name]
+    keys: [[CompanyId]]
+  PROJECT:
+    attrs: [ProjectId, Title]
+    keys: [[ProjectId]]
+  EMPLOYEE:
+    attrs: [EmployeeId, Name]
+    keys: [[EmployeeId]]
+  TASK:
+    weak: true
+    attrs: [TaskNo, Summary]
+    partialKey: [TaskNo]
+relationships:
+  SPONSORS:
+    ends:
+      - {entity: COMPANY, card: "0..N"}
+      - {entity: PROJECT, card: "1..1"}
+  CONTAINS:
+    identifies: TASK
+    ends:
+      - {entity: PROJECT, card: "0..N"}
+      - {entity: TASK, card: "1..1"}
+  CONTRIBUTES:
+    ends:
+      - {entity: EMPLOYEE, card: "0..N"}
+      - {entity: PROJECT, card: "0..N"}
+    attrs: [HoursPerWeek]
+  MENTORS:
+    ends:
+      - {id: mentor, entity: EMPLOYEE, role: mentor, card: "0..N"}
+      - {id: mentee, entity: EMPLOYEE, role: mentee, card: "0..1"}
+notes:
+  - Each project has one sponsor; a company may sponsor many projects.
+  - Task numbers are unique within a project, not across projects.
+  - HoursPerWeek describes an employee's current contribution to a project.
+  - An employee may mentor many colleagues and have at most one mentor.
