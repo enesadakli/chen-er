@@ -1,0 +1,165 @@
+import { boxAround, center, intersects, type DNode, type Point } from "../geometry.js";
+import type { NModel } from "../normalize.js";
+import type { Cluster } from "./clusters.js";
+import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
+import { distance, segmentIntersection } from "./shapes.js";
+
+export interface SemanticPlacement { columns: Map<string, number>; ranks: Map<string, number>; score: number }
+
+/** Longest-path ranks, followed by weighted barycentric row sweeps and grid refinement. */
+export function semanticPlacements(model: NModel): SemanticPlacement[] {
+  const ids = model.entities.map((e) => e.id).sort();
+  const relations = modelRelations(model);
+  const hierarchy = hierarchyDag(ids, hierarchyPairs(relations));
+  const neighbours = new Map(ids.map((id) => [id, [] as string[]]));
+  for (const r of relations) for (const a of r.ends) for (const b of r.ends) if (a.entity !== b.entity) neighbours.get(a.entity)?.push(b.entity);
+  const constrained = new Set(hierarchy.pairs.flatMap((p) => [p.parent, p.child]));
+  const variants: SemanticPlacement[] = [];
+  for (let variant = 0; variant < 6; variant++) {
+    const ranks = new Map(hierarchy.ranks);
+    // An unconstrained entity belongs beside its neighbours, not in an arbitrary root row.
+    for (const id of ids.filter((id) => !constrained.has(id))) {
+      const nearby = neighbours.get(id)!.map((n) => ranks.get(n)!).sort((a, b) => a - b);
+      if (nearby.length) ranks.set(id, Math.max(0, nearby[Math.floor((nearby.length - 1) / 2)]! + (variant % 3) - 1));
+    }
+    const rows = [...new Set(ranks.values())].sort((a, b) => a - b).map((rank) => ids.filter((id) => ranks.get(id) === rank));
+    const width = Math.max(2, ...rows.map((row) => row.length));
+    const columns = new Map<string, number>();
+    for (const row of rows) row.forEach((id, i) => columns.set(id, variant < 3 ? i : width - 1 - i));
+    for (let sweep = 0; sweep < 6; sweep++) for (const row of sweep % 2 ? [...rows].reverse() : rows) {
+      const barycenter = (id: string) => {
+        const ns = neighbours.get(id)!;
+        return ns.length ? ns.reduce((s, n) => s + columns.get(n)!, 0) / ns.length : columns.get(id)!;
+      };
+      row.sort((a, b) => barycenter(a) - barycenter(b) || a.localeCompare(b));
+      const slots = row.map((id) => columns.get(id)!).sort((a, b) => a - b);
+      row.forEach((id, i) => columns.set(id, slots[i]!));
+    }
+    const evaluate = () => skeletonScore(model, columns, ranks);
+    let score = evaluate();
+    for (let pass = 0; pass < 8; pass++) {
+      let improved = false;
+      for (const row of rows) for (const id of row) {
+        const old = columns.get(id)!;
+        let best = score, destination = old;
+        for (let col = 0; col < width; col++) {
+          const occupant = row.find((other) => other !== id && columns.get(other) === col);
+          columns.set(id, col);
+          if (occupant) columns.set(occupant, old);
+          const value = evaluate();
+          if (value < best - 1e-7) { best = value; destination = col; }
+          columns.set(id, old);
+          if (occupant) columns.set(occupant, col);
+        }
+        if (destination !== old) {
+          const occupant = row.find((other) => other !== id && columns.get(other) === destination);
+          columns.set(id, destination);
+          if (occupant) columns.set(occupant, old);
+          score = best;
+          improved = true;
+        }
+      }
+      if (!improved) break;
+    }
+    variants.push({ columns, ranks, score });
+  }
+  const unique = new Map<string, SemanticPlacement>();
+  for (const v of variants.sort((a, b) => a.score - b.score)) {
+    const max = Math.max(0, ...v.columns.values()), min = Math.min(0, ...v.columns.values());
+    const key = [ids.map((id) => `${v.columns.get(id)! - min},${v.ranks.get(id)}`).join(";"), ids.map((id) => `${max - v.columns.get(id)!},${v.ranks.get(id)}`).join(";")].sort()[0]!;
+    if (!unique.has(key)) unique.set(key, v);
+  }
+  return [...unique.values()];
+}
+
+function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<string, number>): number {
+  const point = (name: string) => ({ x: columns.get(`E:${name}`) ?? 0, y: ranks.get(`E:${name}`) ?? 0 });
+  const entities = model.entities.map((e) => ({ id: e.id, ...point(e.name) }));
+  const paths: { from: string; to: string; a: Point; b: Point }[] = [];
+  const diamonds: { id: string; p: Point; ends: string[] }[] = [];
+  let score = 0;
+  for (const r of model.relationships) {
+    const ends = [...new Set(r.ends.map((e) => e.entity))];
+    if (ends.length < 2) continue;
+    const points = ends.map(point);
+    const p = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
+    diamonds.push({ id: r.id, p, ends });
+    for (const end of ends) {
+      const q = point(end);
+      score += distance(p, q) * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
+      paths.push({ from: r.id, to: `E:${end}`, a: p, b: q });
+    }
+  }
+  for (let i = 0; i < paths.length; i++) for (const b of paths.slice(i + 1)) {
+    const a = paths[i]!;
+    if (a.from === b.from || a.to === b.to) continue;
+    if (segmentIntersection(a.a, a.b, b.a, b.b)) score += 6;
+  }
+  for (const d of diamonds) {
+    for (const e of entities) if (distance(d.p, e) < 0.35) score += 40;
+    for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.ends.join(";") !== other.ends.join(";")) score += 25;
+  }
+  const cx = entities.reduce((s, e) => s + e.x, 0) / (entities.length || 1);
+  const cy = entities.reduce((s, e) => s + e.y, 0) / (entities.length || 1);
+  for (const e of entities) {
+    const degree = model.relationships.filter((r) => r.ends.some((end) => `E:${end.entity}` === e.id)).length;
+    score += degree * distance(e, { x: cx, y: cy }) * 0.15;
+  }
+  return score;
+}
+
+export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 460): void {
+  const byId = new Map(clusters.map((c) => [c.node.id, c]));
+  for (const c of clusters.filter((c) => c.node.kind === "entity" && !c.node.pinned)) {
+    c.node.box = boxAround({ x: 350 + placement.columns.get(c.node.id)! * spacing, y: 350 + placement.ranks.get(c.node.id)! * spacing }, c.node.box.w, c.node.box.h);
+  }
+  const placed = clusters.filter((c) => c.node.kind === "entity" || c.node.pinned);
+  for (const r of [...model.relationships].sort((a, b) => a.id.localeCompare(b.id))) {
+    const c = byId.get(r.id)!;
+    if (c.node.pinned) continue;
+    const ends = [...new Set(r.ends.map((e) => `E:${e.entity}`))].map((id) => byId.get(id)).filter((c): c is Cluster => !!c).map((c) => center(c.node.box));
+    if (!ends.length) continue;
+    const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: ends.reduce((s, p) => s + p.y, 0) / ends.length };
+    const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
+    const norm = Math.hypot(dx, dy) || 1;
+    // Parallel relationships use a small perpendicular lane around their shared midpoint.
+    const repeated = model.relationships.filter((other) => other.ends.map((e) => e.entity).sort().join(";") === r.ends.map((e) => e.entity).sort().join(";")).sort((a, b) => a.id.localeCompare(b.id));
+    const gap = (Math.abs(dy) * c.node.box.w + Math.abs(dx) * c.node.box.h) / norm + 20;
+    const lane = (repeated.indexOf(r) - (repeated.length - 1) / 2) * gap;
+    const origin = { x: midpoint.x - dy / norm * lane, y: midpoint.y + dx / norm * lane };
+    const offsets = [0, 32, -32, 64, -64, 96, -96, 128, -128, 160, -160, 224, -224, 288, -288];
+    const positions = offsets.flatMap((offset) => [0, 48, -48, 96, -96].map((along) => ({ x: origin.x - dy / norm * offset + dx / norm * along, y: origin.y + dx / norm * offset + dy / norm * along }))).sort((a, b) => distance(a, origin) - distance(b, origin));
+    const position = positions.find((p) => !placed.some((other) => intersects(boxAround(p, c.node.box.w, c.node.box.h), other.node.box, 18))) ?? origin;
+    c.node.box = boxAround(position, c.node.box.w, c.node.box.h);
+    placed.push(c);
+  }
+}
+
+/** Recursive ends need a side corridor rather than an entity centroid. */
+export function placeSemanticRecursive(model: NModel, nodes: DNode[]): void {
+  for (const r of model.relationships) {
+    if (!r.ends.every((e) => e.entity === r.ends[0]!.entity)) continue;
+    const entity = nodes.find((n) => n.id === `E:${r.ends[0]!.entity}`), diamond = nodes.find((n) => n.id === r.id);
+    if (!entity || !diamond || diamond.pinned) continue;
+    const p = center(entity.box);
+    const candidates = [0, -180, 180, -260, 260].flatMap((x) => [-1, 1].flatMap((sign) => [280, 340, 400].map((gap) => ({ x: p.x + x, y: p.y + sign * gap }))));
+    const chosen = candidates.find((point) => !nodes.some((n) => n !== entity && n !== diamond && intersects(boxAround(point, diamond.box.w, diamond.box.h), n.box, 30)));
+    if (chosen) diamond.box = boxAround(chosen, diamond.box.w, diamond.box.h);
+  }
+}
+
+/** Rescaling around absolute entity pins must recompute free diamond centroids. */
+export function recenterPinnedDiamonds(clusters: Cluster[], model: NModel): void {
+  const byId = new Map(clusters.map((c) => [c.node.id, c.node]));
+  for (const r of model.relationships) {
+    const diamond = byId.get(r.id)!;
+    if (diamond.pinned) continue;
+    const ids = [...new Set(r.ends.map((e) => `E:${e.entity}`))];
+    if (ids.length < 2) continue;
+    const parallel = model.relationships.filter((other) => other.ends.map((e) => e.entity).sort().join(";") === r.ends.map((e) => e.entity).sort().join(";")).length;
+    if (parallel > 1) continue;
+    const points = ids.map((id) => byId.get(id)).filter((n): n is NonNullable<typeof n> => !!n).map((n) => center(n.box));
+    if (!points.length) continue;
+    diamond.box = boxAround({ x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length }, diamond.box.w, diamond.box.h);
+  }
+}

@@ -1,3 +1,5 @@
+import type { NModel } from "./normalize.js";
+import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
 import { labelAmbiguityReasons } from "./layout/label-geometry.js";
 import { center, type Diagram, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
@@ -8,7 +10,7 @@ export interface QualityIssue {
   message: string;
 }
 
-export interface QualityReport {
+export interface QualityReport extends SemanticQuality {
   implemented: boolean;
   overlaps: number;
   shapeCrossings: number;
@@ -28,7 +30,7 @@ export interface QualityReport {
   issues: QualityIssue[];
 }
 
-export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}): QualityReport {
+export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}, model?: NModel): QualityReport {
   const issues: QualityIssue[] = [];
   const add = (kind: QualityIssue["kind"], ids: string[]) => issues.push({ kind, ids, message: `${kind}: ${ids.join(", ")}` });
   const { nodes, edges, labels } = diagram;
@@ -81,7 +83,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,

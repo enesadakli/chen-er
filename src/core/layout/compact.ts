@@ -1,5 +1,6 @@
 import { boxAround, center, intersects, type LayoutResult, type Point } from "../geometry.js";
 import { assessQuality, type QualityReport } from "../quality.js";
+import type { NModel } from "../normalize.js";
 import type { Cluster } from "./clusters.js";
 import { distance, segments } from "./shapes.js";
 
@@ -12,16 +13,20 @@ function readableEnds(result: LayoutResult): boolean {
   });
 }
 
-/** A crossing costs two entity widths of mean edge length. Aspect outside the
- * page-friendly interval costs six widths; density rewards using the page.
- * Hard violations are never traded for a better soft score. */
+/** Hard violations reject a candidate. Semantic weights: hierarchy 12, midpoint
+ * offset 10, proximity inversions 3, off-axis ends 2; degree centrality 0.5,
+ * grid isolation and inward fans 0.25 each. Crossings cost 2, mean edge ratio 1,
+ * related distance 0.1, aspect overflow 6, and density earns 4. Mean ratio
+ * overflow above 3.5 costs 1; longest ratio overflow above 7 costs 4. */
 export function layoutScore(q: QualityReport): number {
   if (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift) return Infinity;
   const aspectPenalty = Math.max(0, 0.6 - q.aspect, q.aspect - 1.8);
-  return q.edgeCrossings * 2 + q.meanEdgeRatio + aspectPenalty * 6 - q.density * 4;
+  return q.edgeCrossings * 2 + q.hierarchyViolations * 12 + q.diamondOffset * 10 + q.proximityInversions * 3 + (1 - q.axisAligned) * 2
+    + q.centralityOffset * 0.5 + q.gridMisalignment * 0.25 + q.attributeInwardRatio * 0.25 + q.relatedDistance * 0.1
+    + q.meanEdgeRatio + Math.max(0, q.longestEdgeRatio - 7) * 4 + Math.max(0, q.meanEdgeRatio - 3.5) + aspectPenalty * 6 - q.density * 4;
 }
 
-export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>): LayoutResult[] {
+export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model?: NModel): LayoutResult[] {
   const results = [build(clusters)];
   if (!clusters.some((c) => !c.node.pinned)) return results;
   const centers = clusters.map((c) => center(c.node.box));
@@ -37,7 +42,7 @@ export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) =>
     const result = build(cs);
     const readable = readableEnds(result);
     if (readable) results.push(result);
-    if (readable && Number.isFinite(layoutScore(assessQuality(result.diagram, pins)))) high = factor;
+    if (readable && Number.isFinite(layoutScore(assessQuality(result.diagram, pins, model)))) high = factor;
     else low = factor;
   }
   for (const [sx, sy] of [[0.75, 1], [1, 0.75], [0.65, 1.25], [1.25, 0.65]]) {
@@ -47,9 +52,9 @@ export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) =>
   return results;
 }
 
-export function compactLocally(initial: LayoutResult, clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>): LayoutResult {
+export function compactLocally(initial: LayoutResult, clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model?: NModel): LayoutResult {
   let best = initial;
-  let score = layoutScore(assessQuality(best.diagram, pins));
+  let score = layoutScore(assessQuality(best.diagram, pins, model));
   if (!Number.isFinite(score)) return best;
   const neighbours = new Map(clusters.map((c) => [c.node.id, new Set<string>()]));
   for (const e of initial.diagram.edges.filter((e) => e.kind === "end")) {
@@ -78,7 +83,7 @@ export function compactLocally(initial: LayoutResult, clusters: Cluster[], build
     own.node.box = boxAround({ x: p.x + dx * step, y: p.y + dy * step }, own.node.box.w, own.node.box.h);
     const next = build(cs);
     if (!readableEnds(next)) continue;
-    const value = layoutScore(assessQuality(next.diagram, pins));
+    const value = layoutScore(assessQuality(next.diagram, pins, model));
     if (value < score) { best = next; score = value; }
   }
   return best;
