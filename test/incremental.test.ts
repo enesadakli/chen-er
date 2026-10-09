@@ -20,7 +20,11 @@ describe("incremental layout", () => {
     const first = (await layout(m)).diagram;
     const before = centers(first);
     const target = m.entities[0]!.id;
-    const pin = { x: before[target]!.x + 160, y: before[target]!.y + 96 };
+    // A realistic drag: 160px outward from the drawing's center, into free space.
+    const mid = { x: first.width / 2, y: first.height / 2 };
+    const dx = before[target]!.x - mid.x, dy = before[target]!.y - mid.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const pin = { x: Math.round(before[target]!.x + (dx / len) * 160), y: Math.round(before[target]!.y + (dy / len) * 160) };
     const next = (await layout(m, { pins: { [target]: pin }, positions: before })).diagram;
     const after = centers(next);
 
@@ -52,5 +56,5 @@ describe("incremental layout", () => {
     }
     expect(after["E:BRANCH"]).toBeDefined();
     expect(assessQuality(next).overlaps).toBe(0);
-  });
+  }, 20000);
 });

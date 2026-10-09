@@ -44,6 +44,10 @@ export async function incrementalLayout(
     if (p) fixed[id] = p;
   }
 
+  // New shapes (no soft position, no pin) go to the nearest free spot next to their neighbours, so the
+  // engine never has to search with everything else fixed (that search is slow and moves nothing useful).
+  placeNewShapes(model, sizes, fixed, moved);
+
   // Push unpinned shapes out of the way of moved ones; whatever gets pushed counts as moved too.
   for (let round = 0, changed = true; changed && round < MAX_ROUNDS; round++) {
     changed = false;
@@ -86,6 +90,62 @@ export async function incrementalLayout(
   for (const n of result.diagram.nodes) n.pinned = !!pins[n.id];
   result.diagnostics = result.diagnostics.filter((d) => d.rule !== "pin-conflict" || mentionsRealPin(d.message, pins));
   return result;
+}
+
+function placeNewShapes(
+  model: NModel,
+  sizes: Map<string, { w: number; h: number }>,
+  fixed: Record<string, Point>,
+  moved: Set<string>,
+): void {
+  const neighbours = new Map<string, Set<string>>();
+  const link = (a: string, b: string) => {
+    if (!neighbours.has(a)) neighbours.set(a, new Set());
+    neighbours.get(a)!.add(b);
+  };
+  for (const r of model.relationships) {
+    for (const end of r.ends) {
+      link(r.id, `E:${end.entity}`);
+      link(`E:${end.entity}`, r.id);
+    }
+  }
+  const halo = (id: string) => {
+    const s = sizes.get(id)!;
+    const hasAttrs = [...sizes.keys()].some((k) => k.startsWith(`A:${id.slice(2)}.`));
+    const pad = hasAttrs ? ATTRIBUTE_HALO : CLEARANCE;
+    return { w: s.w + 2 * pad, h: s.h + 2 * pad };
+  };
+  const free = (id: string, c: Point) => {
+    const h = halo(id);
+    const box = boxAround(c, h.w, h.h);
+    return Object.entries(fixed).every(([other, p]) => {
+      if (other.startsWith("A:")) return true;
+      const o = halo(other);
+      return !intersects(box, boxAround(p, o.w - 2 * CLEARANCE, o.h - 2 * CLEARANCE));
+    });
+  };
+  const pending = [...model.entities.map((e) => e.id), ...model.relationships.map((r) => r.id)].filter((id) => !fixed[id]);
+  for (const id of pending) {
+    const known = [...(neighbours.get(id) ?? [])].map((n) => fixed[n]).filter((p): p is Point => !!p);
+    const all = Object.values(fixed);
+    const start: Point = known.length
+      ? { x: known.reduce((a, p) => a + p.x, 0) / known.length, y: known.reduce((a, p) => a + p.y, 0) / known.length }
+      : all.length
+        ? { x: Math.max(...all.map((p) => p.x)) + 2 * ATTRIBUTE_HALO, y: all.reduce((a, p) => a + p.y, 0) / all.length }
+        : { x: 0, y: 0 };
+    let spot: Point | undefined;
+    for (let r = 0; r <= 2400 && !spot; r += 48) {
+      const steps = r === 0 ? 1 : Math.max(8, Math.round(r / 24));
+      for (let i = 0; i < steps && !spot; i++) {
+        const a = (i / steps) * 2 * Math.PI;
+        const c = { x: Math.round((start.x + Math.cos(a) * r) / 8) * 8, y: Math.round((start.y + Math.sin(a) * r) / 8) * 8 };
+        if (free(id, c)) spot = c;
+      }
+    }
+    if (!spot) continue;
+    fixed[id] = spot;
+    moved.add(id);
+  }
 }
 
 function shapeSizes(model: NModel, m: TextMetrics): Map<string, { w: number; h: number }> {
