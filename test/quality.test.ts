@@ -9,7 +9,7 @@ const diagram = (nodes: DNode[] = [], edges: DEdge[] = [], labels: DLabel[] = []
 
 describe("exact diagram quality", () => {
   it("implements the contract and accepts empty diagrams", () => {
-    expect(assessQuality(diagram())).toEqual({ implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
+    expect(assessQuality(diagram())).toEqual({ implemented: true, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, edgeCrossings: 0, pinDrift: 0, aspect: 1, edgeLength: 0, meanEdgeLength: 0, meanEdgeRatio: 0, longestEdgeRatio: 0, density: 0, issues: [] });
   });
   it("measures end polylines once and normalizes by the median entity width", () => {
     const ns = [node("a", 0, 0, "entity", 40, 20), node("b", 100, 100, "entity", 60, 20), node("r", 200, 200, "relationship", 200, 30)];
@@ -116,5 +116,43 @@ describe("exact diagram quality", () => {
     const d = diagram([node("n", -1, 20)], [edge("e", [{ x: 20, y: 20 }, { x: 700, y: 100 }, { x: 40, y: 40 }])], [label("l", 590, 20)]);
     expect(assessQuality(d).issues.filter((i) => i.kind === "out-of-canvas").map((i) => i.ids)).toEqual([["n"], ["l"], ["e"]]);
     expect(assessQuality(diagram([node("n", 0, 0)], [edge("e", [{ x: 0, y: 0 }, { x: 600, y: 600 }])], [label("l", 570, 582)])).issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);
+  });
+});
+
+describe("end label ambiguity", () => {
+  const own = edge("e", [{ x: 100, y: 100 }, { x: 300, y: 100 }]);
+  it.each(["cardinality", "role"] as const)("detects a %s more than 14px from its entity-end segment", (kind) => {
+    const q = assessQuality(diagram([], [own], [{ ...label("l", 250, 115), kind }]));
+    expect(q.labelAmbiguity).toBe(1);
+    expect(q.issues.find((i) => i.kind === "label-ambiguity")?.message).toContain("14px");
+  });
+  it("detects a closer foreign end without a collision", () => {
+    const other = edge("other", [{ x: 100, y: 135 }, { x: 300, y: 135 }]);
+    const q = assessQuality(diagram([], [own, other], [label("l", 250, 110)]));
+    expect(q.labelCollisions).toBe(0);
+    expect(q.labelAmbiguity).toBe(1);
+    expect(q.issues.find((i) => i.kind === "label-ambiguity")?.message).toContain("closer");
+  });
+  it("detects labels beyond 60px along the end", () => {
+    const q = assessQuality(diagram([], [own], [label("l", 200, 106)]));
+    expect(q.labelAmbiguity).toBe(1);
+    expect(q.issues.find((i) => i.kind === "label-ambiguity")?.message).toContain("60px");
+  });
+  it("accepts exact distance limits and ignores foreign attribute edges", () => {
+    const other = { ...edge("attr", [{ x: 100, y: 134 }, { x: 300, y: 134 }]), kind: "attribute" as const };
+    expect(assessQuality(diagram([], [own, other], [label("l", 225, 114)])).labelAmbiguity).toBe(0);
+  });
+  it("uses only the entity-end segment, even beside an earlier bend", () => {
+    const bent = { ...own, points: [{ x: 100, y: 20 }, { x: 300, y: 20 }, { x: 300, y: 100 }] };
+    expect(assessQuality(diagram([], [bent], [label("l", 200, 26)])).labelAmbiguity).toBe(1);
+  });
+  it("counts a label once when multiple ambiguity conditions fail", () => {
+    expect(assessQuality(diagram([], [own], [label("l", 100, 150)])).labelAmbiguity).toBe(1);
+  });
+  it("compares the rendered lines of double ends", () => {
+    const other = edge("other", [{ x: 100, y: 131 }, { x: 300, y: 131 }]);
+    expect(assessQuality(diagram([], [own, { ...other, double: true }], [label("l", 250, 106)])).labelAmbiguity).toBe(1);
+    const closer = edge("other", [{ x: 100, y: 129 }, { x: 300, y: 129 }]);
+    expect(assessQuality(diagram([], [{ ...own, double: true }, closer], [label("l", 250, 106)])).labelAmbiguity).toBe(0);
   });
 });

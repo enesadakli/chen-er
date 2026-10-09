@@ -1,4 +1,5 @@
 import { anchor, center, type Box, type DEdge, type DNode, type Point } from "../geometry.js";
+import type { EndPort } from "./anchors.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 const expand = (b: Box, gap: number): Box => ({ x: b.x - gap, y: b.y - gap, w: b.w + gap * 2, h: b.h + gap * 2 });
@@ -112,16 +113,20 @@ function ports(node: DNode, toward: Point, obstacles: DNode[], angleOffset: numb
   return out;
 }
 
-export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 0, reserved: Box[] = []): Point[] {
+interface RouteOptions { endPort?: EndPort; forceBend?: boolean; reservedAnchors?: Point[] }
+
+export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 0, reserved: Box[] = [], options: RouteOptions = {}): Point[] {
+  const { endPort, forceBend = false, reservedAnchors = [] } = options;
   const from = nodes.find((n) => n.id === edge.from)!, to = nodes.find((n) => n.id === edge.to)!;
-  const a = anchor(from, center(to.box)), b = anchor(to, center(from.box));
+  const b = endPort?.anchor ?? anchor(to, center(from.box)), a = anchor(from, b);
   const foreign = nodes.filter((n) => n.id !== from.id && n.id !== to.id);
   const direct = drawnPaths({ ...edge, points: [a, b] });
   // Recursive ends need separate ports even when their centerlines are clear.
-  if (!offset && foreign.every((n) => direct.every((ps) => segments(ps).every(([p, q]) => !segmentThrough(p, q, n)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
+  const freeAnchor = (p: Point) => reservedAnchors.every((other) => distance(p, other) >= 14);
+  if (!forceBend && freeAnchor(a) && (!offset || endPort) && (!endPort || (a.x - b.x) * endPort.normal.x + (a.y - b.y) * endPort.normal.y > 0) && foreign.every((n) => direct.every((ps) => segments(ps).every(([p, q]) => !segmentThrough(p, q, n)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
   const obstacles = [...nodes.map((n) => expand(n.box, 10)), ...reserved.map((r) => expand(r, 5))];
-  const starts = ports(from, center(to.box), nodes, offset);
-  const goals = ports(to, center(from.box), nodes, -offset);
+  const starts = ports(from, center(to.box), nodes, offset).filter((p) => freeAnchor(p.anchor));
+  const goals = endPort ? [{ anchor: b, escape: { x: b.x + endPort.normal.x * 90, y: b.y + endPort.normal.y * 90 } }] : ports(to, center(from.box), nodes, -offset);
   for (const start of starts) for (const goal of goals) {
     if (reserved.some((r) => segmentThrough(start.anchor, start.escape, boxShape(expand(r, 4))) || segmentThrough(goal.anchor, goal.escape, boxShape(expand(r, 4))))) continue;
     const path = orthogonal(start.escape, goal.escape, obstacles, prior);

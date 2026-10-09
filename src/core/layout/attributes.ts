@@ -2,17 +2,16 @@ import { anchor, boxAround, center, intersects, type DEdge, type DNode, type Poi
 import type { NAttribute } from "../normalize.js";
 import { attributeSize } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
+import type { EndPort } from "./anchors.js";
+import { distance, segments } from "./shapes.js";
 import type { Cluster } from "./clusters.js";
 import { boxShape, segmentIntersection, segmentThrough } from "./shapes.js";
 
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
-export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics): void {
+export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map()): void {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const skeleton = edges.filter((e) => e.kind === "end").map((e) => {
-    const from = byId.get(e.from)!, to = byId.get(e.to)!;
-    return { a: anchor(from, center(to.box)), b: anchor(to, center(from.box)) };
-  });
+  const skeleton = edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points).map(([a, b]) => ({ a, b })));
   for (const c of clusters) {
     const oc = center(c.node.box);
     const used = edges.filter((e) => e.from === c.node.id || e.to === c.node.id).map((e) => {
@@ -37,6 +36,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
         const box = boxAround(p, size.w, size.h);
         if (nodes.some((n) => intersects(box, n.box, 14))) continue;
         const start = anchor(parent, p), end = anchor({ kind: "attribute", box }, pc);
+        if ([...endPorts.entries()].some(([id, port]) => edges.find((e) => e.id === id)?.to === parent.id && distance(start, port.anchor) < 14)) continue;
         if (nodes.some((n) => n.id !== parent.id && segmentThrough(start, end, boxShape(n.box)))) continue;
         if (skeleton.some((s) => segmentThrough(s.a, s.b, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(start, end, s.a, s.b))) continue;
         if (edges.filter((e) => e.kind !== "end").some((e) => {

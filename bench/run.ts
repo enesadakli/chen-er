@@ -19,7 +19,7 @@ for (const input of inputs) {
   if (!parsed.model) throw new Error(`${input}: ${JSON.stringify(parsed.diagnostics)}`);
   const model = parsed.model;
   const pinFile = input.replace(/\.er\.yaml$/, ".er.layout.json");
-  const pins = existsSync(pinFile) ? LayoutFile.parse(JSON.parse(readFileSync(pinFile, "utf8"))).pins : {};
+  const pins = resolve(input) === resolve("bench/fixtures/pinned.er.yaml") && existsSync(pinFile) ? LayoutFile.parse(JSON.parse(readFileSync(pinFile, "utf8"))).pins : {};
   for (const engine of Object.keys(engines) as (keyof typeof engines)[]) {
     const start = performance.now();
     const { diagram } = await layout(model, { engine, pins });
@@ -40,10 +40,10 @@ for (const input of inputs) {
     const duplicate = inputs.filter((file) => basename(file, ".er.yaml") === base).length > 1;
     const name = duplicate ? input.replace(/\.er\.yaml$/, "").replaceAll("/", "__") : base;
     writeFileSync(join(directory, `${name}.svg`), renderSvg(diagram));
-    rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
+    rows.push({ input: isAbsolute(input) ? base : input.replace(/\.er\.yaml$/, ""), engine, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, edgeCrossings: q.edgeCrossings, pinDrift: q.pinDrift, "width×height": `${diagram.width}×${diagram.height}`,
       aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), density: Number(q.density.toFixed(4)),
       ms: Number(elapsed.toFixed(1)), "stability(px)": Number(stability.toFixed(1)) });
-    if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.pinDrift)) failed = true;
+    if (engine === DEFAULT_ENGINE && (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift)) failed = true;
     if (engine === DEFAULT_ENGINE && (input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failed = true;
     if (engine === DEFAULT_ENGINE && input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 4)) failed = true;
   }

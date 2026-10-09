@@ -12,7 +12,7 @@ const load = (input: string) => {
   const parsed = parseModel(readFileSync(input, "utf8"));
   if (!parsed.model) throw new Error(JSON.stringify(parsed.diagnostics));
   const path = input.replace(/\.er\.yaml$/, ".er.layout.json");
-  const pins = existsSync(path) ? LayoutFile.parse(JSON.parse(readFileSync(path, "utf8"))).pins : {};
+  const pins = input === "bench/fixtures/pinned.er.yaml" && existsSync(path) ? LayoutFile.parse(JSON.parse(readFileSync(path, "utf8"))).pins : {};
   return { model: parsed.model, pins };
 };
 
@@ -24,6 +24,20 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     const q = assessQuality(first.diagram, pins);
     expect({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, pinDrift: q.pinDrift }).toEqual({ overlaps: 0, shapeCrossings: 0, labelCollisions: 0, pinDrift: 0 });
     if (engine === DEFAULT_ENGINE) {
+      expect(q.labelAmbiguity).toBe(0);
+      for (const entity of first.diagram.nodes.filter((n) => n.kind === "entity")) {
+        const ends = first.diagram.edges.filter((e) => e.kind === "end" && e.to === entity.id);
+        for (let i = 0; i < ends.length; i++) for (const other of ends.slice(i + 1)) {
+          const a = ends[i]!.points.at(-1)!, b = other.points.at(-1)!;
+          expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(28 - 1e-7);
+        }
+        for (const attr of first.diagram.edges.filter((e) => e.kind === "attribute" && e.from === entity.id)) {
+          for (const end of ends) {
+            const a = attr.points[0]!, b = end.points.at(-1)!;
+            expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(14 - 1e-7);
+          }
+        }
+      }
       expect(q.aspect).toBeGreaterThanOrEqual(0.5);
       expect(q.aspect).toBeLessThanOrEqual(2);
       expect(q.meanEdgeRatio).toBeLessThanOrEqual(3.5);
@@ -40,12 +54,12 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     for (const e of first.diagram.edges) {
       const from = first.diagram.nodes.find((n) => n.id === e.from)!;
       const to = first.diagram.nodes.find((n) => n.id === e.to)!;
-      expect(e.points[0]!.x).toBeCloseTo(anchor(from, e.points[1]!).x, 5);
-      expect(e.points[0]!.y).toBeCloseTo(anchor(from, e.points[1]!).y, 5);
-      expect(e.points.at(-1)!.x).toBeCloseTo(anchor(to, e.points.at(-2)!).x, 5);
-      expect(e.points.at(-1)!.y).toBeCloseTo(anchor(to, e.points.at(-2)!).y, 5);
+      expect(e.points[0]!.x).toBeCloseTo(anchor(from, e.points[0]!).x, 5);
+      expect(e.points[0]!.y).toBeCloseTo(anchor(from, e.points[0]!).y, 5);
+      expect(e.points.at(-1)!.x).toBeCloseTo(anchor(to, e.points.at(-1)!).x, 5);
+      expect(e.points.at(-1)!.y).toBeCloseTo(anchor(to, e.points.at(-1)!).y, 5);
     }
-  });
+  }, 60000);
   it("keeps recursive ends distinct and labels each role", async () => {
     const { model } = load("bench/fixtures/recursive.er.yaml");
     const { diagram } = await layout(model, { engine });

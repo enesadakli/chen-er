@@ -1,8 +1,9 @@
+import { labelAmbiguityReasons } from "./layout/label-geometry.js";
 import { center, type Diagram, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
-  kind: "overlap" | "shape-crossing" | "label-collision" | "edge-crossing" | "pin-drift" | "out-of-canvas";
+  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "edge-crossing" | "pin-drift" | "out-of-canvas";
   ids: string[];
   message: string;
 }
@@ -12,6 +13,7 @@ export interface QualityReport {
   overlaps: number;
   shapeCrossings: number;
   labelCollisions: number;
+  labelAmbiguity: number;
   edgeCrossings: number;
   pinDrift: number;
   aspect: number;
@@ -42,6 +44,11 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   }
   for (let i = 0; i < labels.length; i++) {
     const l = labels[i]!, shape = boxShape(l.box);
+    const own = edges.find((e) => e.id === l.edge && e.kind === "end");
+    if (own) {
+      const reasons = labelAmbiguityReasons(l.box, own, edges);
+      if (reasons.length) issues.push({ kind: "label-ambiguity", ids: [l.id, own.id], message: `label-ambiguity: ${l.id}: ${reasons.join("; ")}` });
+    }
     for (const n of nodes) if (shapesOverlap(shape, n)) add("label-collision", [l.id, n.id]);
     for (const other of labels.slice(i + 1)) if (shapesOverlap(shape, boxShape(other.box))) add("label-collision", [l.id, other.id]);
     for (const e of edges) if (e.id !== l.edge && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, shape))) add("label-collision", [l.id, e.id]);
@@ -74,7 +81,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,

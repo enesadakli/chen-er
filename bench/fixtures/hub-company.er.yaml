@@ -1,0 +1,73 @@
+version: 1
+title: Company conceptual model
+entities:
+  DEPARTMENT:
+    label: Department
+    attrs:
+      - Name
+      - Number
+      - {name: Locations, multivalued: true}
+      - ManagerStartDate
+    keys: [[Name], [Number]]
+  PROJECT:
+    label: Project
+    attrs: [Name, Number, Location]
+    keys: [[Name], [Number]]
+  EMPLOYEE:
+    label: Employee
+    attrs:
+      - SSN
+      - {name: Name, parts: [First, MiddleInitial, Last]}
+      - Address
+      - Salary
+      - Sex
+      - BirthDate
+    keys: [[SSN]]
+  DEPENDENT:
+    label: Dependent
+    weak: true
+    attrs: [FirstName, Sex, BirthDate, Relationship]
+    partialKey: [FirstName]
+relationships:
+  WORKS_FOR:
+    label: Works for
+    ends:
+      - {entity: EMPLOYEE, card: "1..1"}
+      - {entity: DEPARTMENT, card: "1..N"}
+  MANAGES:
+    label: Manages
+    note: Management responsibility differs from department membership recorded by WORKS_FOR.
+    ends:
+      - {entity: EMPLOYEE, card: "0..N"}
+      - {entity: DEPARTMENT, card: "1..1"}
+  CONTROLS:
+    label: Controls
+    ends:
+      - {entity: DEPARTMENT, card: "0..N"}
+      - {entity: PROJECT, card: "1..1"}
+  WORKS_ON:
+    label: Works on
+    ends:
+      - {entity: EMPLOYEE, card: "0..N"}
+      - {entity: PROJECT, card: "1..N"}
+    attrs: [HoursPerWeek]
+  SUPERVISES:
+    label: Supervises
+    ends:
+      - {id: supervisor, entity: EMPLOYEE, role: supervisor, card: "0..N"}
+      - {id: subordinate, entity: EMPLOYEE, role: report, card: "0..1"}
+  DEPENDENT_OF:
+    label: Dependent of
+    identifies: DEPENDENT
+    ends:
+      - {entity: EMPLOYEE, card: "0..N"}
+      - {entity: DEPENDENT, card: "1..1"}
+notes:
+  - ManagerStartDate belongs to the department's current management assignment; exactly one manager makes it a single-valued department attribute.
+  - WORKS_FOR records employee membership; MANAGES records management responsibility. Both relationships are required and do not duplicate a fact.
+  - The model covers one company; Company is the scope, not a separately identified entity.
+  - Each department has several distinct locations (at least two); version 1 multivalued attributes cannot encode a minimum count.
+  - A dependent's first name is assumed unique within its employee's dependents; its full identifier is employee SSN plus FirstName.
+  - No upper bound on departments managed by an employee was specified, so MANAGES uses employee participation 0..N.
+  - Managers need not work for the department they manage; no such constraint was specified.
+  - A direct supervisor is another employee, excluding self-supervision; this inequality is a domain constraint not encoded by cardinality.

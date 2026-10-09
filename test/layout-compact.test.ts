@@ -7,7 +7,7 @@ import { assessQuality } from "../src/core/quality.js";
 const empty: Diagram = { width: 600, height: 600, nodes: [], edges: [], labels: [], notes: [], meta: { engine: "test" } };
 
 describe("compact candidate selection", () => {
-  it.each(["overlaps", "shapeCrossings", "labelCollisions", "pinDrift"] as const)("rejects %s even with an otherwise better score", (metric) => {
+  it.each(["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "pinDrift"] as const)("rejects %s even with an otherwise better score", (metric) => {
     const q = { ...assessQuality(empty), density: 0.9, meanEdgeRatio: 0.1, [metric]: 1 };
     expect(layoutScore(q)).toBe(Infinity);
   });

@@ -16,7 +16,7 @@ function readableEnds(result: LayoutResult): boolean {
  * page-friendly interval costs six widths; density rewards using the page.
  * Hard violations are never traded for a better soft score. */
 export function layoutScore(q: QualityReport): number {
-  if (q.overlaps || q.shapeCrossings || q.labelCollisions || q.pinDrift) return Infinity;
+  if (q.overlaps || q.shapeCrossings || q.labelCollisions || q.labelAmbiguity || q.pinDrift) return Infinity;
   const aspectPenalty = Math.max(0, 0.6 - q.aspect, q.aspect - 1.8);
   return q.edgeCrossings * 2 + q.meanEdgeRatio + aspectPenalty * 6 - q.density * 4;
 }
@@ -65,7 +65,7 @@ export function compactLocally(initial: LayoutResult, clusters: Cluster[], build
     return { cluster: c, length };
   }).sort((a, b) => b.length - a.length || a.cluster.node.id.localeCompare(b.cluster.node.id));
   // Bound work independently of model size. Every accepted move rebuilds the
-  // attributes, routes and labels and retains all four hard guarantees.
+  // attributes, routes and labels and retains all five hard guarantees.
   for (const { cluster } of ranked.slice(0, 8)) {
     const cs = clusters.map((c) => ({ ...c, node: { ...c.node, box: { ...best.diagram.nodes.find((n) => n.id === c.node.id)!.box } } }));
     const own = cs.find((c) => c.node.id === cluster.node.id)!;
