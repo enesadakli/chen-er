@@ -94,7 +94,7 @@ Use `chen` for a built installation, or `npx tsx src/cli/index.ts` from source.
 | `chen schema` | Export the model's JSON Schema. |
 | `chen init` | Create a starter model. |
 | `chen rules` | List rule ids, severities and descriptions. |
-| `chen serve model.er.yaml` | Open the local viewer once the viewer lane is integrated. |
+| `chen serve model.er.yaml` | Open the live viewer: reloads on save, drag to pin nodes, findings in the margin, export SVG/PNG. |
 
 The existing render command exits with `0` on success, `1` for model errors and
 `2` for usage or I/O failures.
@@ -182,7 +182,7 @@ right; it means nothing obviously wrong was found.**
 - `src/cli/`: command-line adapters for those services.
 - `src/mcp/`: dependency-injected tool handlers and stdio server wiring; the server
   adapter reads lint inputs and writes requested render outputs.
-- `src/viewer/`: the viewer lane's browser interface to the shared core.
+- `src/viewer/`: the browser viewer served by `chen serve`, built with Vite on the shared core.
 
 Geometry uses pixels with a top-left origin and y increasing downward. Boxes
 store their top-left corner; pins store centers. Layout computes final node,
