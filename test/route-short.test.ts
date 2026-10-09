@@ -7,6 +7,10 @@ import { semanticRoute } from "../src/core/layout/semantic-route.js";
 import { flattenAttrs, parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 
+const privateModel = "examples/private/university-curriculum.er.yaml";
+// A missing private model must show up as a named skip, never as a silent pass.
+const privateTitle = (title: string) => existsSync(privateModel) ? `university: ${title}` : `university (private model absent): ${title}`;
+
 const diamond: DNode = { id: "R", kind: "relationship", label: "R", box: boxAround({ x: 100, y: 100 }, 100, 40), double: false };
 const entity: DNode = { id: "E", kind: "entity", label: "E", box: boxAround({ x: 200, y: 200 }, 100, 40), double: false };
 const edge: DEdge = { id: "end", kind: "end", from: "R", to: "E", points: [], double: false };
@@ -37,7 +41,7 @@ describe("end route metrics", () => {
   });
 });
 
-it.skipIf(!existsSync("examples/private/university-curriculum.er.yaml"))("keeps university routes short with at most two bends and two crossings", async () => {
+it.skipIf(!existsSync(privateModel))(privateTitle("keeps routes short with at most two bends and two crossings"), async () => {
   const model = parseModel(readFileSync("examples/private/university-curriculum.er.yaml", "utf8")).model!;
   const { diagram: d } = await layout(model);
   const q = assessQuality(d, {}, model);
