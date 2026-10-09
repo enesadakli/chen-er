@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "description": "Agent-first Chen ER diagrams: write the model in YAML, get a laid-out diagram and course-aware lint.",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bench": "tsx bench/run.ts",
     "gen:metrics": "tsx scripts/gen-metrics.ts",
     "gen:schema": "tsx scripts/gen-schema.ts",
     "chen": "tsx src/cli/index.ts",
-    "mcp": "tsx src/mcp/server.ts"
+    "mcp": "tsx src/mcp/server.ts",
+    "build:viewer": "vite build",
+    "serve": "tsx src/cli/index.ts serve"
   },
   "keywords": [
     "er-diagram",
