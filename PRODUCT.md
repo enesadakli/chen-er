@@ -33,8 +33,8 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
 
 - `chen serve model.er.yaml` opens a local viewer; used both as a side window next to an agent's terminal
   (glance, live reload, occasional drag) and full screen when polishing a diagram for submission (drag, export).
-- The YAML is edited only by the agent or a text editor; the viewer is read-only for the model and writes only
-  the pins file (`model.er.layout.json`).
+- The agent or a text editor handles general YAML edits. The viewer can add a simple attribute to a selected
+  entity or relationship, and writes pins and accepted positions to `model.er.layout.json`.
 - Output goes into lecture notes (Obsidian), homework PDFs and printed reports.
 
 ## Capabilities and Constraints
@@ -42,7 +42,7 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
 - Core runs in Node and the browser (TypeScript, ESM); CLI, MCP server and viewer share it.
 - Stack: TypeScript + Vite, vanilla TS for the viewer, no UI framework (user decision).
 - Text is measured against the bundled Inter font so layout, SVG and PNG agree.
-- Model edits happen outside the viewer (confirmed: no in-browser YAML editor in v1).
+- General model edits happen outside the viewer. A compact attribute form is the first approved in-viewer model edit; there is no in-browser YAML editor.
 
 ## Brand Commitments
 
@@ -57,7 +57,7 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
 
 ## Product Principles
 
-1. The model file is the source of truth; the viewer never changes meaning, only positions.
+1. The model file is the source of truth; viewer attribute saves validate the same contract and preserve YAML comments. External edits retain priority through revision checks and conflict recovery.
 2. Show the reasoning: diagnostics, notes and assumptions stay next to the diagram, not hidden.
 3. The exported figure must be submittable without touch-up.
 4. Every finding points to an exact element and YAML line.

@@ -1,0 +1,177 @@
+import { describe, expect, it } from "vitest";
+import { placeMenu } from "../src/viewer/menu-position.js";
+
+describe("placeMenu", () => {
+  it("places menu above when requested height fits above with gap and padding", () => {
+    const result = placeMenu(
+      { x: 200, y: 200, w: 100, h: 50 },
+      { w: 120, h: 60 },
+      { w: 800, h: 600 },
+      8,
+      8
+    );
+    expect(result.placement).toBe("above");
+    expect(result.y).toBe(132);
+    expect(result.x).toBe(190);
+  });
+
+  it("places menu below when requested height does not fit above", () => {
+    const result = placeMenu(
+      { x: 200, y: 50, w: 100, h: 50 },
+      { w: 120, h: 60 },
+      { w: 800, h: 600 },
+      8,
+      8
+    );
+    expect(result.placement).toBe("below");
+    expect(result.y).toBe(108);
+    expect(result.x).toBe(190);
+  });
+
+  it("clamps x to left viewport padding when anchor is near the left boundary", () => {
+    const result = placeMenu(
+      { x: 2, y: 300, w: 40, h: 30 },
+      { w: 100, h: 40 },
+      { w: 500, h: 500 },
+      8,
+      8
+    );
+    expect(result.x).toBe(8);
+  });
+
+  it("clamps x to right viewport padding when anchor is near the right boundary", () => {
+    const result = placeMenu(
+      { x: 480, y: 300, w: 40, h: 30 },
+      { w: 100, h: 40 },
+      { w: 500, h: 500 },
+      8,
+      8
+    );
+    expect(result.x).toBe(392);
+  });
+
+  it("constrains huge menu to padded viewport bounds without negative coordinates", () => {
+    const result = placeMenu(
+      { x: 300, y: 300, w: 100, h: 50 },
+      { w: 5000, h: 4000 },
+      { w: 800, h: 600 },
+      8,
+      8
+    );
+    expect(result.maxWidth).toBe(784);
+    expect(result.maxHeight).toBe(584);
+    expect(result.placement).toBe("below");
+    expect(result.x).toBe(8);
+    expect(result.y).toBe(8);
+
+    const effectiveW = Math.min(5000, result.maxWidth);
+    const effectiveH = Math.min(4000, result.maxHeight);
+    expect(result.x).toBeGreaterThanOrEqual(0);
+    expect(result.y).toBeGreaterThanOrEqual(0);
+    expect(result.x + effectiveW).toBeLessThanOrEqual(800);
+    expect(result.y + effectiveH).toBeLessThanOrEqual(600);
+  });
+
+  it("handles tiny viewports smaller than twice padding without negative values", () => {
+    const result = placeMenu(
+      { x: 2, y: 2, w: 4, h: 4 },
+      { w: 50, h: 50 },
+      { w: 10, h: 10 },
+      8,
+      8
+    );
+    expect(result.maxWidth).toBe(0);
+    expect(result.maxHeight).toBe(0);
+    expect(result.x).toBeGreaterThanOrEqual(0);
+    expect(result.y).toBeGreaterThanOrEqual(0);
+    expect(result.x + Math.min(50, result.maxWidth)).toBeLessThanOrEqual(10);
+    expect(result.y + Math.min(50, result.maxHeight)).toBeLessThanOrEqual(10);
+  });
+
+  it("handles zero and sub-padding viewports gracefully", () => {
+    const zeroResult = placeMenu(
+      { x: 0, y: 0, w: 0, h: 0 },
+      { w: 20, h: 20 },
+      { w: 0, h: 0 },
+      8,
+      8
+    );
+    expect(zeroResult.maxWidth).toBe(0);
+    expect(zeroResult.maxHeight).toBe(0);
+    expect(zeroResult.x).toBe(0);
+    expect(zeroResult.y).toBe(0);
+
+    const subPaddingResult = placeMenu(
+      { x: 1, y: 1, w: 2, h: 2 },
+      { w: 20, h: 20 },
+      { w: 5, h: 5 },
+      8,
+      8
+    );
+    expect(subPaddingResult.maxWidth).toBe(0);
+    expect(subPaddingResult.maxHeight).toBe(0);
+    expect(subPaddingResult.x).toBeGreaterThanOrEqual(0);
+    expect(subPaddingResult.y).toBeGreaterThanOrEqual(0);
+    expect(subPaddingResult.x).toBeLessThanOrEqual(5);
+    expect(subPaddingResult.y).toBeLessThanOrEqual(5);
+  });
+
+  it("centers horizontally on anchor across different zoom-transformed screen positions", () => {
+    const zoom1Anchor = { x: 60, y: 130, w: 80, h: 40 };
+    const menu = { w: 60, h: 30 };
+    const viewport = { w: 1000, h: 800 };
+
+    const result1 = placeMenu(zoom1Anchor, menu, viewport);
+    expect(result1.x).toBe(70);
+    expect(result1.x + menu.w / 2).toBe(zoom1Anchor.x + zoom1Anchor.w / 2);
+
+    const zoom2Anchor = { x: 140, y: 205, w: 120, h: 60 };
+    const result2 = placeMenu(zoom2Anchor, menu, viewport);
+    expect(result2.x).toBe(170);
+    expect(result2.x + menu.w / 2).toBe(zoom2Anchor.x + zoom2Anchor.w / 2);
+  });
+
+  it("guarantees no offscreen rect under effective width and height across diverse layouts", () => {
+    const anchors = [
+      { x: -50, y: -50, w: 40, h: 40 },
+      { x: 0, y: 0, w: 10, h: 10 },
+      { x: 200, y: 15, w: 80, h: 40 },
+      { x: 300, y: 400, w: 120, h: 60 },
+      { x: 950, y: 750, w: 100, h: 80 },
+      { x: 1200, y: 900, w: 50, h: 50 },
+    ];
+
+    const menus = [
+      { w: 0, h: 0 },
+      { w: 40, h: 20 },
+      { w: 160, h: 80 },
+      { w: 800, h: 600 },
+      { w: 3000, h: 2000 },
+    ];
+
+    const viewports = [
+      { w: 0, h: 0 },
+      { w: 6, h: 6 },
+      { w: 16, h: 16 },
+      { w: 100, h: 100 },
+      { w: 1024, h: 768 },
+    ];
+
+    for (const vp of viewports) {
+      for (const anc of anchors) {
+        for (const m of menus) {
+          const res = placeMenu(anc, m, vp);
+          const effW = Math.max(0, Math.min(m.w, res.maxWidth));
+          const effH = Math.max(0, Math.min(m.h, res.maxHeight));
+
+          expect(res.x).toBeGreaterThanOrEqual(0);
+          expect(res.y).toBeGreaterThanOrEqual(0);
+          expect(res.maxWidth).toBeGreaterThanOrEqual(0);
+          expect(res.maxHeight).toBeGreaterThanOrEqual(0);
+          expect(res.x + effW).toBeLessThanOrEqual(vp.w);
+          expect(res.y + effH).toBeLessThanOrEqual(vp.h);
+        }
+      }
+    }
+  });
+});

@@ -1,0 +1,29 @@
+# Original UX test fixture for relationship focus testing.
+version: 1
+entities:
+  MEMBER:
+    attrs:
+      - MemberId
+    keys:
+      - [MemberId]
+  CLUB:
+    attrs:
+      - ClubId
+    keys:
+      - [ClubId]
+  ARCHIVE:
+    attrs:
+      - ArchiveId
+    keys:
+      - [ArchiveId]
+relationships:
+  JOINS:
+    ends:
+      - id: member
+        entity: MEMBER
+        card: 0..N
+      - id: club
+        entity: CLUB
+        card: 1..N
+    attrs:
+      - Since

@@ -1,0 +1,37 @@
+# Original UX test fixture for relationship focus testing.
+version: 1
+entities:
+  HOST:
+    attrs:
+      - HostId
+    keys:
+      - [HostId]
+  TOPIC:
+    attrs:
+      - TopicId
+    keys:
+      - [TopicId]
+  ROOM:
+    attrs:
+      - RoomId
+    keys:
+      - [RoomId]
+  SUPPLIER:
+    attrs:
+      - SupplierId
+    keys:
+      - [SupplierId]
+relationships:
+  BOOKS:
+    ends:
+      - id: host
+        entity: HOST
+        card: 0..N
+      - id: topic
+        entity: TOPIC
+        card: 0..N
+      - id: room
+        entity: ROOM
+        card: 0..N
+    attrs:
+      - StartsAt

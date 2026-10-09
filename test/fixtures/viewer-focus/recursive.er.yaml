@@ -1,0 +1,26 @@
+# Original UX test fixture for relationship focus testing.
+version: 1
+entities:
+  EMPLOYEE:
+    attrs:
+      - EmpId
+    keys:
+      - [EmpId]
+  ROOM:
+    attrs:
+      - RoomId
+    keys:
+      - [RoomId]
+relationships:
+  SUPERVISION:
+    ends:
+      - id: supervisor
+        entity: EMPLOYEE
+        role: supervisor
+        card: 0..N
+      - id: report
+        entity: EMPLOYEE
+        role: report
+        card: 0..1
+    attrs:
+      - Since

@@ -1,6 +1,7 @@
 import type { ViewerState } from "../app/serve.js";
 import { center, type Box, type Point } from "../core/geometry.js";
 import { glyphs, snap, targetBox, type Finding } from "./logic.js";
+import { selectionNeighborhood } from "./selection.js";
 
 const ns = "http://www.w3.org/2000/svg";
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>) {
@@ -19,7 +20,13 @@ export class NotebookCanvas {
   private selectedFinding?: number;
   private hoverFinding?: number;
   private space = false;
-  private drag?: { pointer: number; start: Point; offset: Point; id?: string; group?: SVGGElement; center?: Point; next?: Point };
+  private actionsOpen = false;
+  private addedAttribute?: string;
+  private addedTimer?: ReturnType<typeof setTimeout>;
+  private savingDrag = false;
+  private writing = false;
+  setWriting(value: boolean) { this.writing = value; }
+  private drag?: { pointer: number; start: Point; offset: Point; id?: string; group?: SVGGElement; center?: Point; next?: Point; moved?: boolean };
   private touches = new Map<number, Point>();
   private pinch?: { distance: number; scale: number; diagram: Point };
   private pending?: { state: ViewerState; list: Finding[] };
@@ -28,12 +35,13 @@ export class NotebookCanvas {
   private figure = document.querySelector<HTMLDivElement>("#figure")!;
   private overlay = document.querySelector<SVGSVGElement>("#overlay")!;
   constructor(private canvas: HTMLElement, private selectFinding: (number: number) => void,
-    private hover: (number?: number) => void, private pin: (id: string, point: Point | null) => Promise<void>) {
+    private hover: (number?: number) => void, private pin: (id: string, point: Point | null) => Promise<void>,
+    private actions: (id?: string, anchor?: Box, dragging?: boolean) => void = () => {}) {
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
     canvas.addEventListener("pointercancel", (e) => this.up(e, true));
-    canvas.addEventListener("wheel", (e) => { e.preventDefault(); this.zoom(Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .002)), this.local(e)); }, { passive: false });
+    canvas.addEventListener("wheel", (e) => { if (e.target instanceof Element && e.target.closest(".node-actions, .zoom-controls")) return; e.preventDefault(); this.zoom(Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .002)), this.local(e)); }, { passive: false });
     canvas.addEventListener("keydown", (e) => this.key(e));
     window.addEventListener("keydown", (e) => { if (e.code === "Space" && !this.editable(e.target)) this.space = true; });
     window.addEventListener("keyup", (e) => { if (e.code === "Space") this.space = false; });
@@ -48,6 +56,7 @@ export class NotebookCanvas {
   private transform() {
     this.sheet.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.scale})`;
     document.querySelector<HTMLOutputElement>("#zoom")!.value = `${Math.round(this.scale * 100)}%`;
+    if (this.actionsOpen) this.actionPosition();
   }
   zoom(factor: number, around = { x: this.canvas.clientWidth / 2, y: this.canvas.clientHeight / 2 }) {
     const point = this.diagramPoint(around);
@@ -67,7 +76,8 @@ export class NotebookCanvas {
     this.transform();
   }
   show(state: ViewerState, list: Finding[]) {
-    if (this.drag) { this.pending = { state, list }; return; }
+    if (this.drag || this.savingDrag) { this.pending = { state, list }; return; }
+    if (state.computing) { this.state = state; return; }
     const active = document.activeElement;
     const focusId = active instanceof SVGGElement && this.figure.contains(active) ? active.dataset.id : undefined;
     const previousMark = active instanceof SVGGElement && this.overlay.contains(active)
@@ -108,7 +118,7 @@ export class NotebookCanvas {
         const group = this.group(node.id);
         group?.setAttribute("tabindex", "0");
         group?.setAttribute("role", "button");
-        group?.setAttribute("aria-label", `${node.kind} ${node.label}${state.pins[node.id] ? ', pinned' : ''}. Arrow keys move; Delete unpins.`);
+        group?.setAttribute("aria-label", `${node.kind} ${node.label}${state.pins[node.id] ? ', pinned' : ''}. ${node.kind !== "attribute" ? "Enter opens actions; " : ""}arrow keys move; Delete unpins.`);
         group?.addEventListener("focus", () => { this.selected = node.id; this.drawOverlay(); });
         group?.addEventListener("pointerenter", () => {
           this.hovered = node.id;
@@ -118,6 +128,9 @@ export class NotebookCanvas {
         group?.addEventListener("pointerleave", () => { this.hovered = undefined; this.hover(); this.drawOverlay(); });
       }
     }
+    if (this.selected && !state.diagram?.nodes.some((n) => n.id === this.selected)) {
+      this.selected = undefined; this.actionsOpen = false; this.actions();
+    }
     this.figure.classList.toggle("stale", !state.svg);
     const placeholder = document.querySelector<HTMLElement>("#placeholder")!;
     placeholder.hidden = !!state.svg;
@@ -126,6 +139,7 @@ export class NotebookCanvas {
     if (focusId) this.group(focusId)?.focus({ preventScroll: true });
     if (focusMark) this.overlay.querySelector<SVGGElement>(`[data-finding="${focusMark}"]`)?.focus({ preventScroll: true });
     if (first && state.svg) this.fit();
+    if (this.actionsOpen) this.actionPosition();
   }
   highlight(number?: number, selected = false, focus = false) {
     if (selected) this.selectedFinding = number; else this.hoverFinding = number;
@@ -134,7 +148,21 @@ export class NotebookCanvas {
     if (focus && finding) this.fit(targetBox(this.good?.diagram ?? null, finding.target));
     this.drawOverlay();
   }
-  clear() { this.selected = undefined; this.selectedFinding = undefined; this.hovered = undefined; this.hoverFinding = undefined; this.drawOverlay(); }
+  clear() { this.actionsOpen = false; this.actions(); this.selected = undefined; this.selectedFinding = undefined; this.hovered = undefined; this.hoverFinding = undefined; this.drawOverlay(); }
+  closeActions() { this.actionsOpen = false; this.actions(); }
+  revealAddedAttribute(id: string) {
+    this.closeActions(); this.addedAttribute = id; clearTimeout(this.addedTimer); this.drawOverlay();
+    this.addedTimer = setTimeout(() => { this.addedAttribute = undefined; this.drawOverlay(); }, 3000);
+  }
+  focusSelection() {
+    if (this.good?.diagram && this.selected) this.fit(selectionNeighborhood(this.good.diagram, this.selected).box);
+  }
+  private actionPosition() {
+    const box = targetBox(this.good?.diagram ?? null, this.selected);
+    if (!box || !this.selected || !/^[ER]:/.test(this.selected)) { this.actions(); return; }
+    this.actions(this.selected, { x: box.x * this.scale + this.offset.x, y: box.y * this.scale + this.offset.y, w: box.w * this.scale, h: box.h * this.scale });
+  }
+  private openActions() { this.actionsOpen = true; this.actionPosition(); }
   private group(id: string): SVGGElement | undefined {
     const groups = [...this.figure.querySelectorAll<SVGGElement>("svg:last-child g[data-id]")];
     return groups.find((g) => g.dataset.id === id);
@@ -143,6 +171,13 @@ export class NotebookCanvas {
     if (rebuild) this.overlay.replaceChildren();
     const diagram = this.good?.diagram;
     if (!diagram) return;
+    const neighborhood = this.selected && /^[ER]:/.test(this.selected) ? selectionNeighborhood(diagram, this.selected) : undefined;
+    const activeIds = new Set([...(neighborhood?.nodeIds ?? []), ...(neighborhood?.edgeIds ?? []), ...(neighborhood?.labelIds ?? [])]);
+    for (const group of this.figure.querySelectorAll<SVGGElement>("svg:last-child g[data-id]")) {
+      const isElement = group.classList.contains("er-entity") || group.classList.contains("er-relationship") || group.classList.contains("er-attribute") || group.classList.contains("er-edge") || diagram.labels.some((l) => l.id === group.dataset.id);
+      group.classList.toggle("unrelated", !!neighborhood && isElement && !activeIds.has(group.dataset.id ?? ""));
+      group.classList.toggle("connected", !!neighborhood && group.classList.contains("er-edge") && activeIds.has(group.dataset.id ?? ""));
+    }
     if (rebuild) {
     const defs = svg("defs", {});
     const minor = svg("pattern", { id: "minor-grid", width: 8, height: 8, patternUnits: "userSpaceOnUse" });
@@ -154,13 +189,13 @@ export class NotebookCanvas {
     this.overlay.querySelector(".halos")?.remove();
     const halos = svg("g", { class: "halos" });
     this.overlay.append(halos);
-    for (const id of new Set([this.selected, this.hovered,
+    for (const id of new Set([this.selected, this.hovered, this.addedAttribute,
       this.list.find((f) => f.number === this.selectedFinding)?.target,
       this.list.find((f) => f.number === this.hoverFinding)?.target])) {
       const box = targetBox(diagram, id);
       if (!box) continue;
       const node = diagram.nodes.find((n) => n.id === id);
-      const attrs = { fill: "none", stroke: "var(--graphite)", "stroke-opacity": .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) };
+      const attrs = { fill: "none", stroke: "var(--graphite)", "stroke-opacity": id === this.addedAttribute ? .75 : .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) };
       if (node?.kind === "attribute") halos.append(svg("ellipse", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, rx: box.w / 2 + 6, ry: box.h / 2 + 6, ...attrs }));
       else if (node?.kind === "relationship") halos.append(svg("polygon", { points: `${box.x + box.w / 2},${box.y - 6} ${box.x + box.w + 6},${box.y + box.h / 2} ${box.x + box.w / 2},${box.y + box.h + 6} ${box.x - 6},${box.y + box.h / 2}`, ...attrs }));
       else halos.append(svg("rect", { x: box.x - 6, y: box.y - 6, width: box.w + 12, height: box.h + 12, ...attrs }));
@@ -189,7 +224,8 @@ export class NotebookCanvas {
     }
   }
   private down(e: PointerEvent) {
-    if (e.button !== 0 || (e.target instanceof Element && e.target.closest(".zoom-controls, .mark"))) return;
+    if (e.button !== 0 || (e.target instanceof Element && e.target.closest(".zoom-controls, .mark, .node-actions"))) return;
+    if (this.writing || this.savingDrag || this.state?.computing) return;
     const point = this.local(e); this.touches.set(e.pointerId, point);
     this.canvas.setPointerCapture(e.pointerId);
     if (this.touches.size === 2) {
@@ -203,6 +239,7 @@ export class NotebookCanvas {
     const id = !this.space ? group?.dataset.id : undefined;
     const node = this.good?.diagram?.nodes.find((n) => n.id === id);
     if (id && e.altKey && this.state?.pins[id]) { void this.pin(id, null); this.touches.delete(e.pointerId); return; }
+    this.actionsOpen = false; this.actions(undefined, undefined, true);
     this.selected = id;
     this.drag = { pointer: e.pointerId, start: point, offset: { ...this.offset }, ...(node && group ? { id, group, center: center(node.box) } : {}) };
     if (group && id) group.focus(); else this.canvas.focus();
@@ -219,6 +256,9 @@ export class NotebookCanvas {
     }
     const drag = this.drag;
     if (!drag || drag.pointer !== e.pointerId) return;
+    if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) <= 4) return;
+    drag.moved = true;
+    this.actionsOpen = false; this.actions(undefined, undefined, true);
     if (drag.center && drag.group) {
       drag.next = snap({ x: drag.center.x + (p.x - drag.start.x) / this.scale, y: drag.center.y + (p.y - drag.start.y) / this.scale }, e.altKey);
       drag.group.setAttribute("transform", `translate(${drag.next.x - drag.center.x},${drag.next.y - drag.center.y})`);
@@ -231,19 +271,31 @@ export class NotebookCanvas {
     const drag = this.drag;
     if (drag?.pointer === e.pointerId) {
       this.drag = undefined;
-      if (!cancel && drag.id && drag.next) {
-        void this.pin(drag.id, drag.next).finally(() => drag.group?.removeAttribute("transform"));
-      } else drag.group?.removeAttribute("transform");
+      if (!cancel && drag.id && drag.next && drag.moved) {
+        this.savingDrag = true;
+        void this.pin(drag.id, drag.next).finally(() => {
+          this.savingDrag = false;
+          drag.group?.removeAttribute("transform");
+          this.flushPending();
+        });
+      } else {
+        drag.group?.removeAttribute("transform");
+        if (!cancel && drag.id && !drag.moved) this.openActions();
+      }
     }
-    if (!this.drag && this.pending) { const pending = this.pending; this.pending = undefined; this.show(pending.state, pending.list); }
+    this.flushPending();
   }
+  private flushPending() {
+    if (!this.drag && !this.savingDrag && this.pending) { const pending = this.pending; this.pending = undefined; this.show(pending.state, pending.list); }
+  }
+
   private key(e: KeyboardEvent) {
+    if (this.writing || this.savingDrag || this.state?.computing) return;
     if (e.ctrlKey || e.metaKey) return;
-    if (e.target instanceof Element && e.target.closest("button, .mark")) return;
+    if (e.target instanceof Element && e.target.closest("button, .mark, .node-actions")) return;
     const node = this.good?.diagram?.nodes.find((n) => n.id === this.selected);
     if (e.key === "Enter" && node) {
-      const finding = this.list.find((f) => f.target === node.id);
-      if (finding) { e.preventDefault(); this.selectFinding(finding.number); }
+      if (node.kind !== "attribute") { e.preventDefault(); this.openActions(); document.querySelector<HTMLButtonElement>("#node-focus")?.focus(); }
     } else if (e.key.startsWith("Arrow")) {
       e.preventDefault();
       const dx = e.key === "ArrowLeft" ? -8 : e.key === "ArrowRight" ? 8 : 0;

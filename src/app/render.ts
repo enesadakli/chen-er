@@ -168,15 +168,20 @@ export function writeLayoutFile(modelPath: string, patch: LayoutFilePatch): stri
   const path = layoutPathFor(modelPath);
   let current: { pins: Record<string, Point>; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> } = { pins: {} };
   if (existsSync(path)) current = LayoutFile.parse(JSON.parse(readFileSync(path, "utf8")));
+  const text = formatLayoutFile(current, patch);
+  writeFileSync(path, text);
+  return text;
+}
+
+/** Shared formatting for direct app writes and the viewer's atomic replacement. */
+export function formatLayoutFile(current: { pins: Record<string, Point>; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> }, patch: LayoutFilePatch): string {
   const pins = patch.pins ?? current.pins;
   const engine = patch.engine ?? current.engine;
   const positions = patch.positions === null ? undefined : (patch.positions ?? current.positions);
   const sorted = (r: Record<string, Point>) =>
     Object.fromEntries(Object.keys(r).sort().map((id) => [id, { x: round(r[id]!.x), y: round(r[id]!.y) }]));
   const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sorted(pins), ...(positions ? { positions: sorted(positions) } : {}) });
-  const text = JSON.stringify(file, null, 2) + "\n";
-  writeFileSync(path, text);
-  return text;
+  return JSON.stringify(file, null, 2) + "\n";
 }
 
 const round = (v: number) => Math.round(v * 10) / 10;

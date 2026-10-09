@@ -3,6 +3,8 @@ import type { ViewerState } from "../app/serve.js";
 import { NotebookCanvas } from "./canvas.js";
 import { Notes } from "./notes.js";
 import { findings, type Finding } from "./logic.js";
+import type { Box } from "../core/geometry.js";
+import { placeMenu } from "./menu-position.js";
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let state: ViewerState | undefined;
@@ -10,6 +12,60 @@ let list: Finding[] = [];
 let selected: number | undefined;
 let connected = false;
 let pendingWrites = 0;
+let ownerId: string | undefined;
+let anchor: Box | undefined;
+let draftOwner: string | undefined;
+type Draft = { name: string; label: string; multivalued: boolean; derived: boolean; revision: string };
+const drafts = new Map<string, Draft>();
+const actions = element("node-actions"), form = element<HTMLFormElement>("attribute-form");
+function positionActions() {
+  if (actions.hidden || !anchor) return;
+  const viewport = element("canvas");
+  // Measure the unconstrained content once, then constrain it to the visible canvas.
+  actions.style.maxHeight = ""; actions.style.maxWidth = `${Math.max(0, viewport.clientWidth - 16)}px`;
+  const placement = placeMenu(anchor, { w: actions.offsetWidth, h: actions.offsetHeight }, { w: viewport.clientWidth, h: viewport.clientHeight });
+  actions.style.left = `${placement.x}px`; actions.style.top = `${placement.y}px`;
+  actions.style.maxWidth = `${placement.maxWidth}px`; actions.style.maxHeight = `${placement.maxHeight}px`;
+}
+function readDraft(): Draft {
+  return { name: element<HTMLInputElement>("attribute-name").value, label: element<HTMLInputElement>("attribute-label").value,
+    multivalued: element<HTMLInputElement>("attribute-multivalued").checked, derived: element<HTMLInputElement>("attribute-derived").checked,
+    revision: draftOwner ? drafts.get(draftOwner)?.revision ?? state?.modelRevision ?? "" : state?.modelRevision ?? "" };
+}
+function keepDraft() { if (draftOwner) drafts.set(draftOwner, readDraft()); }
+function draftState() {
+  if (!draftOwner || form.hidden || !state) return;
+  const exists = state.selection.owners.some((o) => o.id === draftOwner);
+  const stale = drafts.get(draftOwner)?.revision !== state.modelRevision;
+  element<HTMLButtonElement>("attribute-save").disabled = !exists || pendingWrites > 0 || state.computing;
+  element<HTMLButtonElement>("attribute-rebase").hidden = !exists || !stale;
+  if (!exists) element("attribute-message").textContent = "This owner was deleted. Your draft is kept; select another owner or cancel.";
+  else if (stale) element("attribute-message").textContent = "The model changed. Your draft is kept. Review the diagram, then use the current model to save.";
+  else {
+    const message = element("attribute-message");
+    if (message.textContent?.startsWith("This owner was deleted.") || message.textContent?.startsWith("The model changed.") || message.textContent?.startsWith("Conflict:")) {
+      message.textContent = "Draft ready to save against the current model.";
+    }
+  }
+  positionActions();
+}
+function nodeActions(id?: string, box?: Box, dragging = false) {
+  if (dragging) { actions.hidden = true; return; }
+  if (!id) { if (draftOwner && !form.hidden) { actions.hidden = false; draftState(); } else actions.hidden = true; return; }
+  if (draftOwner && id !== draftOwner) { keepDraft(); form.hidden = true; draftOwner = undefined; }
+  ownerId = id; anchor = box;
+  element("node-name").textContent = state?.selection.owners.find((o) => o.id === id)?.label ?? id.slice(2);
+  element("node-toolbar").hidden = !form.hidden;
+  actions.hidden = false; positionActions();
+}
+function historyControls() {
+  const busy = pendingWrites > 0 || !!state?.computing;
+  for (const id of ["reset", "reset-mobile", "relayout", "relayout-mobile", "add-attribute", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
+  element<HTMLSelectElement>("engine").disabled = busy;
+  element<HTMLButtonElement>("undo").disabled = busy || !state?.history.canUndo;
+  element<HTMLButtonElement>("redo").disabled = busy || !state?.history.canRedo;
+  draftState();
+}
 function status(text: string) { element("status").textContent = text; }
 function choose(number: number) {
   selected = number; notes.select(number); canvas.highlight(number, true, true);
@@ -18,7 +74,7 @@ function hover(number?: number) { notes.highlight(number); canvas.highlight(numb
 const notes = new Notes(element("findings"), choose, hover);
 const canvas = new NotebookCanvas(element("canvas"), choose, hover, async (id, point) => {
   await write(point ? "/api/pins" : `/api/pins/${encodeURIComponent(id)}`, point ? "POST" : "DELETE", point ? { pins: { [id]: point } } : undefined);
-});
+}, nodeActions);
 function apply(next: ViewerState) {
   // A POST response may arrive after a newer event from the same write.
   if (state && next.updatedAt <= state.updatedAt) return;
@@ -34,40 +90,49 @@ function apply(next: ViewerState) {
   element("quality").title = q?.implemented ? `${q.shapeCrossings} shape crossings, ${q.labelCollisions} label collisions, ${q.pinDrift} pin drift` : "The layout quality checker is not implemented yet.";
   notes.show(list, next.yaml, selected);
   canvas.show(next, list); if (selected !== undefined || previous) canvas.highlight(selected, true);
-  status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
+  if (next.computing) status("Computing layout…");
+  else if (!pendingWrites) status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
+  historyControls();
   const chip = element("status"); chip.classList.remove("updated"); void chip.offsetWidth; chip.classList.add("updated");
   for (const link of document.querySelectorAll<HTMLAnchorElement>(".menu a")) {
     link.setAttribute("aria-disabled", String(!next.svg));
   }
 }
-async function write(path: string, method: string, value?: unknown) {
+async function write(path: string, method: string, value?: unknown): Promise<boolean> {
+  if (pendingWrites || state?.computing) return false;
   pendingWrites++;
-  element<HTMLButtonElement>("reset").disabled = true;
-  element<HTMLButtonElement>("relayout").disabled = true;
-  element<HTMLButtonElement>("relayout-mobile").disabled = true;
-  element<HTMLButtonElement>("reset-mobile").disabled = true;
-  element<HTMLSelectElement>("engine").disabled = true;
+  canvas.setWriting(true); historyControls(); status("Saving…");
+  const payload = path === "/api/model/attributes" ? value : { ...(value && typeof value === "object" ? value : {}),
+    expectedRevision: state?.modelRevision, expectedLayoutRevision: state?.layoutRevision };
   try {
-    const res = await fetch(path, { method, ...(value ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) } : {}) });
-    if (!res.ok) { const error = await res.json() as { error: string }; throw new Error(error.error); }
-    apply(await res.json() as ViewerState);
-  } catch (error) { status(`Write failed: ${(error as Error).message}`); element("status").title = (error as Error).message; }
-  finally {
-    pendingWrites--;
-    element<HTMLButtonElement>("reset").disabled = pendingWrites > 0;
-    element<HTMLButtonElement>("relayout").disabled = pendingWrites > 0;
-    element<HTMLButtonElement>("relayout-mobile").disabled = pendingWrites > 0;
-    element<HTMLButtonElement>("reset-mobile").disabled = pendingWrites > 0;
-    element<HTMLSelectElement>("engine").disabled = pendingWrites > 0;
+    const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const error = await res.json() as { error: string };
+      if (res.status === 409) {
+        const latest = await fetch("/api/state"); if (latest.ok) apply(await latest.json() as ViewerState);
+        throw new Error(`Conflict: ${error.error}`);
+      }
+      throw new Error(error.error);
+    }
+    apply(await res.json() as ViewerState); status("Saved"); element("status").title = "";
+    return true;
+  } catch (error) {
+    const message = (error as Error).message;
+    status(message.startsWith("Conflict:") ? "Conflict — review changes" : "Save failed"); element("status").title = message;
+    if (!form.hidden) element("attribute-message").textContent = message;
+    return false;
+  } finally {
+    pendingWrites--; canvas.setWriting(false); historyControls();
     if (state) element<HTMLSelectElement>("engine").value = state.engine;
   }
 }
+
 let events: EventSource | undefined;
 let retry: ReturnType<typeof setTimeout> | undefined;
 let delay = 1000;
 function connect() {
   events = new EventSource("/api/events");
-  events.onopen = () => { connected = true; delay = 1000; if (state) status(`updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
+  events.onopen = () => { connected = true; delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
   events.addEventListener("state", (event) => {
     try { apply(JSON.parse((event as MessageEvent<string>).data) as ViewerState); }
     catch { status("Invalid update. Reconnecting…"); events?.close(); retry = setTimeout(connect, delay); }
@@ -97,7 +162,14 @@ element("theme").addEventListener("click", () => {
 });
 for (const link of document.querySelectorAll<HTMLAnchorElement>(".menu a")) link.addEventListener("click", (e) => { if (!state?.svg) { e.preventDefault(); status("Fix model errors before exporting."); } });
 window.addEventListener("keydown", (e) => {
-  if (e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest("select, input, textarea"))) return;
+  const editing = e.target instanceof Element && !!e.target.closest("select, input, textarea, [contenteditable=true]");
+  if (!editing && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "z") {
+    e.preventDefault(); const direction = e.shiftKey ? "redo" : "undo";
+    if (state?.history[direction === "undo" ? "canUndo" : "canRedo"]) void write(`/api/history/${direction}`, "POST");
+    return;
+  }
+  if (e.key === "Escape") { keepDraft(); form.hidden = true; draftOwner = undefined; actions.hidden = true; }
+  if (e.ctrlKey || e.metaKey || e.altKey || editing) return;
   if (e.key === "Escape") { selected = undefined; notes.select(); canvas.clear(); document.querySelector<HTMLDetailsElement>(".actions")!.open = false; return; }
   if (e.target instanceof Element && e.target.closest("button, a, summary") && [" ", "Enter"].includes(e.key)) return;
   switch (e.key.toLowerCase()) {
@@ -127,3 +199,32 @@ drawer.addEventListener("pointercancel", () => { drawerStart = undefined; });
 drawer.addEventListener("keydown", (e) => {
   if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); drawerHeight(element("notes").clientHeight + (e.key === "ArrowUp" ? 24 : -24)); }
 });
+
+for (const direction of ["undo", "redo"]) element(direction).addEventListener("click", () => { void write(`/api/history/${direction}`, "POST"); });
+element("node-focus").addEventListener("click", () => canvas.focusSelection());
+element("close-actions").addEventListener("click", () => { keepDraft(); actions.hidden = true; canvas.closeActions(); });
+element("add-attribute").addEventListener("click", () => {
+  if (!ownerId || !state) return;
+  keepDraft(); draftOwner = ownerId;
+  const draft = drafts.get(ownerId) ?? { name: "", label: "", multivalued: false, derived: false, revision: state.modelRevision };
+  drafts.set(ownerId, draft);
+  element<HTMLInputElement>("attribute-name").value = draft.name; element<HTMLInputElement>("attribute-label").value = draft.label;
+  element<HTMLInputElement>("attribute-multivalued").checked = draft.multivalued; element<HTMLInputElement>("attribute-derived").checked = draft.derived;
+  element("attribute-heading").textContent = `Add attribute to ${state.selection.owners.find((o) => o.id === ownerId)?.label ?? ownerId.slice(2)}`;
+  element("attribute-message").textContent = ""; form.hidden = false; element("node-toolbar").hidden = true;
+  draftState(); element<HTMLInputElement>("attribute-name").focus();
+});
+form.addEventListener("input", keepDraft);
+element("attribute-rebase").addEventListener("click", () => {
+  keepDraft(); if (draftOwner && state) { const draft = drafts.get(draftOwner)!; draft.revision = state.modelRevision; }
+  element("attribute-message").textContent = "Draft ready to save against the current model."; draftState();
+});
+element("attribute-cancel").addEventListener("click", () => { keepDraft(); form.hidden = true; draftOwner = undefined; element("node-toolbar").hidden = false; positionActions(); });
+form.addEventListener("submit", async (event) => {
+  event.preventDefault(); if (!draftOwner || !state || pendingWrites) return;
+  keepDraft(); const id = draftOwner, draft = drafts.get(id)!;
+  const success = await write("/api/model/attributes", "POST", { expectedRevision: draft.revision, ownerId: id,
+    attribute: { name: draft.name.trim(), ...(draft.label ? { label: draft.label } : {}), ...(draft.multivalued ? { multivalued: true } : {}), ...(draft.derived ? { derived: true } : {}) } });
+  if (success) { drafts.delete(id); draftOwner = undefined; form.hidden = true; element("node-toolbar").hidden = false; canvas.revealAddedAttribute(`A:${id.slice(2)}.${draft.name.trim()}`); status(`Saved ${draft.name.trim()}`); }
+});
+new ResizeObserver(positionActions).observe(element("canvas"));

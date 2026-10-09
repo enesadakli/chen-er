@@ -102,6 +102,11 @@ npx tsx src/cli/index.ts serve examples/company-project.er.yaml
 
 Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `company-project.er.layout.json`; previous positions keep subsequent layouts stable. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
 
+Click an entity or relationship to open its actions. Selection emphasizes all ends and labels of connected relationships; **Focus** fits that neighborhood without changing the layout. **Add attribute** saves a name, optional label, and multivalued/derived flags into the YAML, preserving comments and existing fields. The form keeps your draft when another editor changes the file; review the current model and explicitly choose **Use current model** before retrying. Other model edits still belong in your text editor.
+
+**Undo / Redo** (Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z outside text fields) restore exact YAML and layout bytes for the last 50 viewer edits in this server session, including pins, reset, engine changes and relayout. External model or layout edits clear that history. Writes compare byte revisions and recheck the disk before each atomic file replacement; this is not a filesystem lock shared with external editors. A write in the final check/rename interval can still race, and a two-file history restore can partially complete before a conflict is detected. On conflict, the viewer preserves the external file and clears history. Exports omit selection and action controls.
+
+
 ## Install and quick start
 
 Use Node.js 24. To use the packed package in another project (verified with a clean install of the tarball; the registry release is pending):
