@@ -6,12 +6,15 @@ import { semanticPlacements } from "../src/core/layout/semantic.js";
 import { parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 
+const privateModel = "examples/private/university-curriculum.er.yaml";
+// A missing private model must show up as a named skip, never as a silent pass.
+const privateTitle = (title: string) => existsSync(privateModel) ? `university: ${title}` : `university (private model absent): ${title}`;
 const load = (path: string) => parseModel(readFileSync(path, "utf8")).model!;
 const hard = (q: ReturnType<typeof assessQuality>) => ({ overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts });
 const clear = { overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0, pinDrift: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0 };
 
 describe("semantic default layout", () => {
-  it.skipIf(!existsSync("examples/private/university-curriculum.er.yaml"))("satisfies the university hierarchy, midpoint, axis, crossing and compactness acceptance", async () => {
+  it.skipIf(!existsSync(privateModel))(privateTitle("satisfies the hierarchy, midpoint, axis, crossing and compactness acceptance"), async () => {
     const m = load("examples/private/university-curriculum.er.yaml"), first = await layout(m), q = assessQuality(first.diagram, {}, m);
     expect(hard(q)).toEqual(clear);
     for (const id of ["edge:A:DEPT.DOffice", "edge:A:STUDENT.Addr"]) expect(first.diagram.edges.find((e) => e.id === id)!.points).toHaveLength(2);

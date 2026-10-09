@@ -1,0 +1,109 @@
+version: 1
+title: Hospital operations
+entities:
+  HOSPITAL:
+    label: Hospital Campus
+    attrs: [HospitalId, Name, City]
+    keys: [[HospitalId]]
+  WARD:
+    label: Care Ward
+    attrs: [WardCode, Name, Specialty]
+    keys: [[WardCode]]
+  ROOM:
+    label: Patient Room
+    attrs: [RoomNo, Floor]
+    keys: [[RoomNo]]
+  BED:
+    label: Hospital Bed
+    attrs: [BedNo, Kind]
+    keys: [[BedNo]]
+  STAFF:
+    label: Staff Member
+    attrs:
+      - StaffId
+      - {name: Name, parts: [First, Last]}
+      - Role
+      - {name: Qualifications, multivalued: true}
+    keys: [[StaffId]]
+  PATIENT:
+    label: Registered Patient
+    attrs:
+      - PatientId
+      - {name: Name, parts: [First, Last]}
+      - BirthDate
+      - Allergy
+    keys: [[PatientId]]
+  ADMISSION:
+    label: Admission Record
+    weak: true
+    attrs: [AdmittedOn, DischargedOn, Reason]
+    partialKey: [AdmittedOn]
+  SHIFT:
+    label: Duty Shift
+    attrs: [ShiftId, Day, StartTime]
+    keys: [[ShiftId]]
+relationships:
+  HAS_WARD:
+    label: Has ward
+    ends:
+      - {entity: HOSPITAL, card: "1..N"}
+      - {entity: WARD, card: "1..1"}
+  HAS_ROOM:
+    label: Has room
+    ends:
+      - {entity: WARD, card: "1..N"}
+      - {entity: ROOM, card: "1..1"}
+  HAS_BED:
+    label: Has bed
+    ends:
+      - {entity: ROOM, card: "1..N"}
+      - {entity: BED, card: "1..1"}
+  ASSIGNED_TO:
+    label: Assigned to
+    ends:
+      - {entity: STAFF, card: "1..1"}
+      - {entity: WARD, card: "0..N"}
+  SUPERVISES:
+    label: Supervises
+    ends:
+      - {id: supervisor, entity: STAFF, role: supervisor, card: "0..N"}
+      - {id: trainee, entity: STAFF, role: trainee, card: "0..1"}
+  TREATS:
+    label: Treats
+    ends:
+      - {entity: STAFF, card: "0..N"}
+      - {entity: PATIENT, card: "0..N"}
+    attrs: [StartDate]
+  ADMISSION_OF:
+    label: Admission of
+    identifies: ADMISSION
+    ends:
+      - {entity: PATIENT, card: "0..N"}
+      - {entity: ADMISSION, card: "1..1"}
+  OCCUPIES:
+    label: Occupies
+    ends:
+      - {entity: BED, card: "0..1"}
+      - {entity: ADMISSION, card: "0..1"}
+  ATTENDS:
+    label: Attends
+    ends:
+      - {entity: STAFF, card: "0..N"}
+      - {entity: ADMISSION, card: "1..1"}
+  DISCHARGES:
+    label: Discharges
+    note: The discharging clinician can differ from the attending one recorded by ATTENDS.
+    ends:
+      - {entity: STAFF, card: "0..N"}
+      - {entity: ADMISSION, card: "0..1"}
+  ROSTERS:
+    label: Rosters
+    ends:
+      - {entity: STAFF, card: "0..N"}
+      - {entity: SHIFT, card: "1..N"}
+  EMPLOYS:
+    label: Employs
+    note: Employment is contractual with the hospital; ward assignment may change without changing the employer.
+    ends:
+      - {entity: HOSPITAL, card: "1..N"}
+      - {entity: STAFF, card: "1..1"}
