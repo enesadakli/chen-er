@@ -9,7 +9,8 @@
     "bench": "tsx bench/run.ts",
     "gen:metrics": "tsx scripts/gen-metrics.ts",
     "gen:schema": "tsx scripts/gen-schema.ts",
-    "chen": "tsx src/cli/index.ts"
+    "chen": "tsx src/cli/index.ts",
+    "mcp": "tsx src/mcp/server.ts"
   },
   "keywords": [
     "er-diagram",
