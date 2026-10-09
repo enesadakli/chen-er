@@ -28,7 +28,7 @@ const rules = [...structureRules, ...weakRules, ...courseRules, ...heuristicRule
 
 export const RULES: RuleInfo[] = rules.map(({ id, severity, description }) => ({ id, severity, description }));
 
-const severityOrder: Record<Severity, number> = { error: 0, course: 1, heuristic: 2, info: 3 };
+const severityOrder: Record<Severity, number> = { error: 0, warning: 1, course: 2, heuristic: 3, info: 4 };
 
 export function lint(model: NModel, options: LintOptions = {}): Diagnostic[] {
   const disabled = new Set(options.disable);

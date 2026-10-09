@@ -51,7 +51,7 @@ error:4:11 [weak-without-identifying] Weak entity TASK has no identifying relati
 0 errors does not mean the model is right; it means nothing obviously wrong was found.
 ```
 
-Diagnostics include source positions, rule ids, severity and repair hints. `error` findings block model rendering; `course`, `heuristic` and `info` findings ask for review. A clean lint result does not establish domain correctness.
+Diagnostics include source positions, rule ids, severity and repair hints. There are five severities. `error` marks a malformed model or a broken ER rule and is the only one that makes `chen lint` and `chen render` exit with code 1. `warning` reports an operational problem with the rendering rather than the model, for example saved layout pins that make the drawing clearly worse (`pins-degrade-layout`); it is always shown, and `--no-course` and `--no-heuristic` do not hide it. `course` marks a course-convention issue (`--no-course` hides it), `heuristic` a modelling-quality suspicion (`--no-heuristic` hides it) and `info` a hint. `chen render --no-pins` ignores the layout file (pins, saved positions and stored engine) without modifying it, which helps to compare against a `pins-degrade-layout` warning. A clean lint result does not establish domain correctness.
 
 ## Agents: skill and MCP
 

@@ -120,7 +120,7 @@ export async function pinsDegradeDiagnostic(
   ];
   return {
     rule: "pins-degrade-layout",
-    severity: "heuristic",
+    severity: "warning",
     message: `The saved pins make this layout clearly worse than an unpinned one (${details.join("; ")}).`,
     hint: "run with --no-pins to compare, or use Reset pins in `chen serve`",
   };

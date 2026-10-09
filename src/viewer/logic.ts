@@ -2,8 +2,8 @@ import type { Box, Diagram, Point } from "../core/geometry.js";
 import type { Severity } from "../core/diagnostics.js";
 import type { ViewerDiagnostic } from "../app/serve.js";
 
-export const severities: Severity[] = ["error", "course", "heuristic", "info"];
-export const glyphs: Record<Severity, string> = { error: "✕", course: "△", heuristic: "○", info: "•" };
+export const severities: Severity[] = ["error", "warning", "course", "heuristic", "info"];
+export const glyphs: Record<Severity, string> = { error: "✕", warning: "!", course: "△", heuristic: "○", info: "•" };
 export interface Finding extends ViewerDiagnostic { number: number }
 export function findings(diagnostics: readonly ViewerDiagnostic[]): Finding[] {
   return diagnostics.map((d, index) => ({ d, index }))

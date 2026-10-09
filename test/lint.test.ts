@@ -334,7 +334,7 @@ describe("lint filtering and ordering", () => {
   it("sorts by severity, then line, then rule", () => {
     const parsed = model(input);
     const findings = lint(parsed);
-    const ranks = { error: 0, course: 1, heuristic: 2, info: 3 };
+    const ranks = { error: 0, course: 1, heuristic: 2, info: 3, warning: 9 };
     expect(findings.map((diagnostic) => ranks[diagnostic.severity])).toEqual([0, 1, 1, 2, 2, 3]);
     expect(findings.filter((diagnostic) => diagnostic.severity === "course").map((diagnostic) => diagnostic.rule))
       .toEqual(["entity-without-key", "generic-relationship-name"]);

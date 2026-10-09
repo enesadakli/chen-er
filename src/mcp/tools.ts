@@ -67,7 +67,7 @@ export async function lintEr(input: z.infer<typeof lintInput>, io: ToolIO): Prom
 }
 
 function summary(diagnostics: Diagnostic[]) {
-  return Object.fromEntries(["error", "course", "heuristic", "info"].map((severity) =>
+  return Object.fromEntries(["error", "warning", "course", "heuristic", "info"].map((severity) =>
     [severity, diagnostics.filter((d) => d.severity === severity).length]));
 }
 
