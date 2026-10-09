@@ -5,6 +5,8 @@ import { Notes } from "./notes.js";
 import { findings, type Finding } from "./logic.js";
 import type { Box } from "../core/geometry.js";
 import { placeMenu } from "./menu-position.js";
+import { AgentPanel } from "./agent.js";
+import type { Turn } from "./agent-logic.js";
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let state: ViewerState | undefined;
@@ -46,6 +48,8 @@ const notes = new Notes(element("findings"), choose, hover);
 const canvas = new NotebookCanvas(element("canvas"), choose, hover, async (id, point) => {
   await write(point ? "/api/pins" : `/api/pins/${encodeURIComponent(id)}`, point ? "POST" : "DELETE", point ? { pins: { [id]: point } } : undefined);
 }, nodeActions);
+const agent = new AgentPanel({ select: (id) => canvas.selectElement(id), flash: (ids) => canvas.flash(ids) });
+canvas.onSelection = (id) => agent.selected(id);
 function apply(next: ViewerState) {
   // A POST response may arrive after a newer event from the same write.
   if (state && next.updatedAt <= state.updatedAt) return;
@@ -60,7 +64,9 @@ function apply(next: ViewerState) {
   element("quality").textContent = q?.implemented ? `${q.overlaps} overlaps · ${q.edgeCrossings} crossings` : "Quality not measured";
   element("quality").title = q?.implemented ? `${q.shapeCrossings} shape crossings, ${q.labelCollisions} label collisions, ${q.pinDrift} pin drift` : "The layout quality checker is not implemented yet.";
   notes.show(list, next.yaml, selected);
+  const labels = new Map<string, string>([...(next.diagram?.nodes ?? []).map((n) => [n.id, n.label] as const), ...next.selection.owners.map((o) => [o.id, o.label] as const)]);
   canvas.show(next, list); if (selected !== undefined || previous) canvas.highlight(selected, true);
+  agent.diagram(labels);
   if (next.computing) status("Computing layout…");
   else if (!pendingWrites) status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
   historyControls();
@@ -101,10 +107,13 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 let delay = 1000;
 function connect() {
   events = new EventSource("/api/events");
-  events.onopen = () => { connected = true; delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
+  events.onopen = () => { connected = true; void agent.sync(); delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
   events.addEventListener("state", (event) => {
     try { apply(JSON.parse((event as MessageEvent<string>).data) as ViewerState); }
     catch { status("Invalid update. Reconnecting…"); events?.close(); retry = setTimeout(connect, delay); }
+  });
+  events.addEventListener("agent-turn", (event) => {
+    try { agent.event(JSON.parse((event as MessageEvent<string>).data) as Turn); } catch { /* A malformed agent event never breaks the diagram stream. */ }
   });
   events.onerror = () => { connected = false; status("disconnected"); events?.close(); retry = setTimeout(connect, delay); delay = Math.min(delay * 2, 30000); };
 }

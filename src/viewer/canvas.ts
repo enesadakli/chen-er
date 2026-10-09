@@ -32,6 +32,10 @@ export class NotebookCanvas {
   private lastNodeIds = "";
   private figure = document.querySelector<HTMLDivElement>("#figure")!;
   private overlay = document.querySelector<SVGSVGElement>("#overlay")!;
+  private flashes?: { ids: string[]; start: number; timer: ReturnType<typeof setTimeout> };
+  private notifiedSelection?: string;
+  /** Called whenever the selected drawing element changes (the agent panel turns it into a context chip). */
+  onSelection: (id?: string) => void = () => {};
   constructor(private canvas: HTMLElement, private selectFinding: (number: number) => void,
     private hover: (number?: number) => void, private pin: (id: string, point: Point | null) => Promise<void>,
     private actions: (id?: string, anchor?: Box, dragging?: boolean) => void = () => {}) {
@@ -148,6 +152,45 @@ export class NotebookCanvas {
   }
   clear() { this.actionsOpen = false; this.actions(); this.selected = undefined; this.selectedFinding = undefined; this.hovered = undefined; this.hoverFinding = undefined; this.drawOverlay(); }
   closeActions() { this.actionsOpen = false; this.actions(); }
+  has(id: string) { return !!this.good?.diagram?.nodes.some((n) => n.id === id); }
+  /** Select a drawing element by node id and bring its neighborhood into view (agent change-note links). */
+  selectElement(id: string): boolean {
+    const diagram = this.good?.diagram;
+    if (!diagram || !this.has(id)) return false;
+    this.selected = id; this.selectedFinding = undefined;
+    this.fit(/^[ER]:/.test(id) ? selectionNeighborhood(diagram, id).box : targetBox(diagram, id));
+    if (/^[ER]:/.test(id)) this.openActions(); else { this.actionsOpen = false; this.actions(); }
+    this.drawOverlay();
+    return true;
+  }
+  /** Briefly mark changed elements with the selection halo (screen only; the export SVG is never touched). */
+  flash(ids: string[], duration = 3000) {
+    if (this.flashes) clearTimeout(this.flashes.timer);
+    this.flashes = ids.length ? { ids, start: performance.now(), timer: setTimeout(() => { this.flashes = undefined; this.drawFlashes(); }, duration) } : undefined;
+    this.drawFlashes();
+  }
+  private drawFlashes() {
+    this.overlay.querySelector(".agent-flashes")?.remove();
+    const diagram = this.good?.diagram;
+    if (!diagram || !this.flashes) return;
+    const group = svg("g", { class: "agent-flashes", "aria-hidden": "true" });
+    // A redraw keeps the fade where it was instead of restarting it.
+    group.style.animationDelay = `${-(performance.now() - this.flashes.start)}ms`;
+    for (const id of this.flashes.ids) {
+      const shape = this.haloShape(id, { fill: "none", stroke: "var(--graphite)", "stroke-opacity": .35, "stroke-width": 3 });
+      if (shape) group.append(shape);
+    }
+    this.overlay.insertBefore(group, this.overlay.querySelector(".halos"));
+  }
+  private haloShape(id: string | undefined, attrs: Record<string, string | number>): SVGElement | undefined {
+    const diagram = this.good?.diagram;
+    const box = targetBox(diagram ?? null, id);
+    if (!diagram || !box) return undefined;
+    const node = diagram.nodes.find((n) => n.id === id);
+    if (node?.kind === "attribute") return svg("ellipse", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, rx: box.w / 2 + 6, ry: box.h / 2 + 6, ...attrs });
+    if (node?.kind === "relationship") return svg("polygon", { points: `${box.x + box.w / 2},${box.y - 6} ${box.x + box.w + 6},${box.y + box.h / 2} ${box.x + box.w / 2},${box.y + box.h + 6} ${box.x - 6},${box.y + box.h / 2}`, ...attrs });
+    return svg("rect", { x: box.x - 6, y: box.y - 6, width: box.w + 12, height: box.h + 12, ...attrs });
+  }
   focusSelection() {
     if (this.good?.diagram && this.selected) this.fit(selectionNeighborhood(this.good.diagram, this.selected).box);
   }
@@ -163,6 +206,7 @@ export class NotebookCanvas {
   }
   private drawOverlay(rebuild = false) {
     if (rebuild) this.overlay.replaceChildren();
+    if (this.selected !== this.notifiedSelection) { this.notifiedSelection = this.selected; this.onSelection(this.selected); }
     const diagram = this.good?.diagram;
     if (!diagram) return;
     const neighborhood = this.selected && /^[ER]:/.test(this.selected) ? selectionNeighborhood(diagram, this.selected) : undefined;
@@ -186,15 +230,11 @@ export class NotebookCanvas {
     for (const id of new Set([this.selected, this.hovered,
       this.list.find((f) => f.number === this.selectedFinding)?.target,
       this.list.find((f) => f.number === this.hoverFinding)?.target])) {
-      const box = targetBox(diagram, id);
-      if (!box) continue;
-      const node = diagram.nodes.find((n) => n.id === id);
-      const attrs = { fill: "none", stroke: "var(--graphite)", "stroke-opacity": .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) };
-      if (node?.kind === "attribute") halos.append(svg("ellipse", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, rx: box.w / 2 + 6, ry: box.h / 2 + 6, ...attrs }));
-      else if (node?.kind === "relationship") halos.append(svg("polygon", { points: `${box.x + box.w / 2},${box.y - 6} ${box.x + box.w + 6},${box.y + box.h / 2} ${box.x + box.w / 2},${box.y + box.h + 6} ${box.x - 6},${box.y + box.h / 2}`, ...attrs }));
-      else halos.append(svg("rect", { x: box.x - 6, y: box.y - 6, width: box.w + 12, height: box.h + 12, ...attrs }));
+      const shape = this.haloShape(id, { fill: "none", stroke: "var(--graphite)", "stroke-opacity": .35, "stroke-width": 3, ...(id && this.state?.pins[id] ? { "stroke-dasharray": "2 4" } : {}) });
+      if (shape) halos.append(shape);
     }
     if (!rebuild) return;
+    this.drawFlashes();
     for (const node of diagram.nodes) if (this.state?.pins[node.id]) {
       this.overlay.append(svg("path", { d: `M ${node.box.x - 3} ${node.box.y - 6} v 6 h 6`, fill: "none", stroke: "var(--graphite)", "stroke-width": 1 }));
     }
