@@ -1,43 +1,53 @@
-import { writeFileSync } from "node:fs";
-import { Command } from "commander";
-import { renderFile, svgToPng } from "../app/render.js";
-import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
+import { Command, CommanderError, Option } from "commander";
+import {
+  initCommand, lintCommand, renderCommand, rulesCommand, schemaCommand,
+  type CommandResult, type LintCommandOptions, type RenderCommandOptions,
+} from "./commands.js";
 
-/**
- * Exit codes: 0 ok · 1 model has errors · 2 usage or I/O failure.
- * Minimal vertical-slice CLI; the CLI lane adds lint, serve, schema and init.
- */
-const program = new Command("chen").description("Agent-first Chen ER diagrams").version("0.1.0");
+const program = new Command("chen")
+  .description("Chen ER diagrams")
+  .version("0.1.0")
+  .addHelpText("after", "\nExit codes: 0 ok; 1 model errors (parse/schema/lint); 2 usage or I/O failure.")
+  .exitOverride();
 
-program
-  .command("render")
+function print(result: CommandResult): void {
+  if (result.stdout) console.log(result.stdout);
+  if (result.stderr) console.error(result.stderr);
+  process.exitCode = result.exitCode;
+}
+
+program.command("render")
   .argument("<model>", "path to a .er.yaml model")
   .option("-o, --out <file>", "output SVG path (default: next to the model)")
   .option("--png", "also write a PNG")
-  .option("--engine <name>", "layout engine: layered | stress | simple")
-  .action(async (model: string, opts: { out?: string; png?: boolean; engine?: "layered" | "stress" | "simple" }) => {
-    const res = await renderFile(model, opts.engine ? { engine: opts.engine } : {});
-    printDiagnostics(res.diagnostics);
-    if (!res.svg) return void (process.exitCode = 1);
-    const out = opts.out ?? model.replace(/(\.er)?\.ya?ml$/i, "") + ".svg";
-    writeFileSync(out, res.svg);
-    console.log(out);
-    if (opts.png) {
-      const png = out.replace(/\.svg$/i, "") + ".png";
-      writeFileSync(png, svgToPng(res.svg));
-      console.log(png);
-    }
-    if (hasErrors(res.diagnostics)) process.exitCode = 1;
-  });
+  .option("--scale <number>", "PNG scale (positive number)", Number, 2)
+  .addOption(new Option("--engine <name>", "layout engine").choices(["layered", "stress", "simple"]))
+  .option("--report", "print the quality report")
+  .option("--json", "print one JSON object")
+  .action(async (model: string, options: RenderCommandOptions) => print(await renderCommand(model, options)));
 
-function printDiagnostics(ds: Diagnostic[]) {
-  for (const d of ds) {
-    const where = d.line ? `:${d.line}:${d.column ?? 1}` : "";
-    console.error(`${d.severity}${where} [${d.rule}] ${d.message}${d.hint ? `\n  hint: ${d.hint}` : ""}`);
+program.command("lint")
+  .argument("<model>", "path to a .er.yaml model")
+  .option("--json", "print diagnostics and disclaimer as JSON")
+  .option("--disable <rules>", "comma-separated rule ids to disable")
+  .option("--no-course", "disable course findings")
+  .option("--no-heuristic", "disable heuristic findings")
+  .action((model: string, options: LintCommandOptions) => print(lintCommand(model, options)));
+
+program.command("schema").description("print the model JSON Schema")
+  .action(() => print(schemaCommand()));
+program.command("init").description("write a commented starter model")
+  .argument("[file]", "output model path", "model.er.yaml")
+  .option("--force", "overwrite an existing file")
+  .action((file: string, options: { force?: boolean }) => print(initCommand(file, options)));
+program.command("rules").description("list lint rules")
+  .action(() => print(rulesCommand()));
+
+program.parseAsync().catch((error: unknown) => {
+  if (error instanceof CommanderError) {
+    process.exitCode = error.exitCode === 0 ? 0 : 2;
+  } else {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
   }
-}
-
-program.parseAsync().catch((err) => {
-  console.error((err as Error).message);
-  process.exitCode = 2;
 });

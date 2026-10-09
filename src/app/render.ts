@@ -1,12 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
-import type { Diagram, LayoutOptions } from "../core/geometry.js";
+import type { Diagram, LayoutOptions, Point } from "../core/geometry.js";
 import { layout } from "../core/layout/index.js";
 import { parseModel, type NModel } from "../core/normalize.js";
 import { renderSvg } from "../core/render/svg.js";
+import { lint, type LintOptions } from "../core/lint/index.js";
+import { assessQuality } from "../core/quality.js";
 import { LayoutFile } from "../core/schema.js";
 
 /**
@@ -43,7 +45,7 @@ export function readPins(modelPath: string): { options: LayoutOptions; diagnosti
 }
 
 export async function renderText(text: string, options: LayoutOptions = {}): Promise<RenderOutput> {
-  const parsed = parseModel(text);
+  const parsed = lintText(text);
   if (!parsed.model || hasErrors(parsed.diagnostics)) return { diagnostics: parsed.diagnostics };
   const result = await layout(parsed.model, options);
   return {
@@ -63,10 +65,68 @@ export async function renderFile(modelPath: string, options: LayoutOptions = {})
 
 /** SVG → PNG with the bundled fonts, so the PNG matches the measured text. */
 export function svgToPng(svg: string, scale = 2): Buffer {
+  if (!Number.isFinite(scale) || scale <= 0) throw new Error("Scale must be a positive finite number.");
   const resvg = new Resvg(svg, {
     fitTo: { mode: "zoom", value: scale },
     font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: "Inter" },
     background: "white",
   });
   return resvg.render().asPng();
+}
+
+export function lintText(text: string, options: LintOptions = {}) {
+  const parsed = parseModel(text);
+  return {
+    ...parsed,
+    diagnostics: [...parsed.diagnostics, ...(parsed.model ? lint(parsed.model, options) : [])],
+  };
+}
+
+export function lintFile(path: string, options: LintOptions = {}) {
+  return lintText(readFileSync(path, "utf8"), options);
+}
+
+export function quality(diagram: Diagram, pins: Record<string, Point> = {}) {
+  return assessQuality(diagram, pins);
+}
+
+export function writePins(modelPath: string, pins: Record<string, Point>): void {
+  const parsed = LayoutFile.parse({ version: 1, pins });
+  const sorted = Object.fromEntries(Object.keys(parsed.pins).sort().map((id) => [id, parsed.pins[id]]));
+  writeFileSync(layoutPathFor(modelPath), JSON.stringify({ version: 1, pins: sorted }, null, 2) + "\n");
+}
+
+export function writeRenderOutputs(svg: string, out: string, png = false, scale = 2): string[] {
+  if (!Number.isFinite(scale) || scale <= 0) throw new Error("Scale must be a positive finite number.");
+  const pngPath = out.replace(/\.svg$/i, "") + ".png";
+  if (png && pngPath === out) throw new Error("SVG and PNG output paths must differ.");
+  const buffer = png ? svgToPng(svg, scale) : undefined;
+  writeFileSync(out, svg);
+  if (buffer) writeFileSync(pngPath, buffer);
+  return buffer ? [out, pngPath] : [out];
+}
+
+export const STARTER_MODEL = `# Chen ER model, version 1. Run chen lint before rendering.
+version: 1
+title: Course enrollment
+entities:
+  STUDENT:
+    attrs: [StudentId, Name]
+    keys: [[StudentId]]
+  COURSE:
+    attrs: [CourseId, Title]
+    keys: [[CourseId]]
+relationships:
+  ENROLLS:
+    ends:
+      - entity: STUDENT
+        card: 0..N
+      - entity: COURSE
+        card: 0..N
+# Add free-form notes below the diagram.
+notes: []
+`;
+
+export function initFile(path = "model.er.yaml", force = false): void {
+  writeFileSync(path, STARTER_MODEL, { flag: force ? "w" : "wx" });
 }
