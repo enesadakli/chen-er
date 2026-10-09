@@ -1,6 +1,7 @@
 /** Pure agent-panel logic: no DOM, no fetch. Contract: docs/agent-panel.md. */
 
 export type TurnStatus = "running" | "ok" | "error" | "cancelled" | "limit" | "undone";
+export type ErrorKind = "not-found" | "not-logged-in" | "limit" | "other";
 export interface Step { kind: "tool" | "text"; summary: string }
 export interface Changes { added: string[]; removed: string[]; modified: string[]; parseError?: boolean }
 export interface Turn {
@@ -14,6 +15,7 @@ export interface Turn {
   steps: Step[];
   changes?: Changes;
   error?: string;
+  errorKind?: ErrorKind;
 }
 export interface AgentInfo { enabled: boolean; kind: string; cwd: string; running: string | null; turns: Turn[] }
 export interface ThreadState { turns: Turn[]; running: string | null }
@@ -134,10 +136,15 @@ export function outcome(turn: Turn, kind = "claude"): Outcome | undefined {
     case "error": {
       const detail = turn.error?.trim() || undefined;
       const text = detail ?? "";
-      if (/ENOENT|command not found|not found in PATH|spawn \S+ ENOENT|is not recognized/i.test(text)) {
+      // The server's errorKind decides; the text heuristics only cover servers that do not send it.
+      const missing = turn.errorKind ? turn.errorKind === "not-found"
+        : /ENOENT|command not found|not found in PATH|spawn \S+ ENOENT|is not recognized/i.test(text);
+      const login = turn.errorKind ? turn.errorKind === "not-logged-in"
+        : /not logged in|please log ?in|\/login|unauthori[sz]ed|authentication|invalid api key/i.test(text);
+      if (missing) {
         return { kind: "missing", message: `${product} was not found. Install it, run \`${cli}\` once in a terminal, then \`/login\`.` };
       }
-      if (/not logged in|please log ?in|\/login|unauthori[sz]ed|authentication|invalid api key/i.test(text)) {
+      if (login) {
         return { kind: "login", message: `${name} is not logged in. Run \`${cli}\` in a terminal, then \`/login\`.` };
       }
       return { kind: "error", message: `${name} stopped with an error.`, ...(detail ? { detail } : {}) };

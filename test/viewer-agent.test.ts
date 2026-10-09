@@ -94,6 +94,15 @@ describe("outcomes and input", () => {
     expect(outcome(turn("1", { status: "error", error: "Not logged in" }), "codex")?.message).toBe("Codex is not logged in. Run `codex` in a terminal, then `/login`.");
     expect(outcome(turn("1", { status: "error", error: "Invalid API key · Please run /login" }))?.kind).toBe("login");
     expect(outcome(turn("1", { status: "limit" }))?.message).toMatch(/usage limit/);
+  });
+  it("trusts the server's errorKind over the text heuristics", () => {
+    expect(outcome(turn("1", { status: "error", errorKind: "not-found", error: "something odd" }))?.kind).toBe("missing");
+    expect(outcome(turn("1", { status: "error", errorKind: "not-logged-in", error: "exit 1" }))?.kind).toBe("login");
+    // A generic failure whose text merely mentions authentication stays a generic error when the server says so.
+    expect(outcome(turn("1", { status: "error", errorKind: "other", error: "authentication module crashed" }))).toMatchObject({ kind: "error", detail: "authentication module crashed" });
+    expect(outcome(turn("1", { status: "error", errorKind: "other", error: "spawn claude ENOENT" }))?.kind).toBe("error");
+  });
+  it("reports other errors with the stderr excerpt", () => {
     const error = outcome(turn("1", { status: "error", error: "line 1\nline 2" }));
     expect(error).toMatchObject({ kind: "error", detail: "line 1\nline 2" });
     expect(outcome(turn("1", { status: "ok", changes: { added: [], removed: [], modified: [] } }))?.message).toBe("No changes to the model.");

@@ -3,7 +3,8 @@ import { spawn } from "node:child_process";
 import { parseStreamLine, type Step } from "./agent-stream.js";
 
 export type RunStatus = "ok" | "error" | "cancelled" | "limit";
-export interface RunOutcome { status: RunStatus; reply?: string; error?: string; sessionId?: string }
+export type ErrorKind = "not-found" | "not-logged-in" | "limit" | "other";
+export interface RunOutcome { status: RunStatus; reply?: string; error?: string; errorKind?: ErrorKind; sessionId?: string }
 export interface RunOptions {
   bin: string;
   args: string[];
@@ -15,6 +16,7 @@ export interface RunOptions {
 export interface RunHandle { done: Promise<RunOutcome>; cancel(): Promise<RunOutcome> }
 
 const LIMIT = /usage limit|limit reached|hit your (?:usage )?limit/i;
+const LOGIN = /\/login|not logged in|invalid api key|authentication/i;
 const STDERR_LINES = 20;
 
 export function tail(text: string, lines = STDERR_LINES): string {
@@ -38,7 +40,7 @@ export function classifyExit(facts: ExitFacts): Omit<RunOutcome, "sessionId"> {
   if (facts.cancelled) return { status: "cancelled", ...(reply ? { reply } : {}) };
   if (facts.spawnError) {
     const missing = facts.spawnError.code === "ENOENT";
-    return { status: "error", error: missing
+    return { status: "error", errorKind: missing ? "not-found" : "other", error: missing
       ? `The ${facts.bin} command was not found. Install Claude Code, run \`claude\`, then \`/login\`.`
       : `Could not start ${facts.bin}: ${facts.spawnError.message}` };
   }
@@ -46,9 +48,12 @@ export function classifyExit(facts: ExitFacts): Omit<RunOutcome, "sessionId"> {
   const resultText = facts.result?.text ?? "";
   // A short final result such as "Claude AI usage limit reached|…" can arrive even with exit 0.
   if (LIMIT.test(stderr) || ((failed || resultText.length < 300) && LIMIT.test(resultText))) {
-    return { status: "limit", error: tail(resultText || stderr) };
+    return { status: "limit", errorKind: "limit", error: tail(resultText || stderr) };
   }
-  if (failed) return { status: "error", error: stderr || tail(resultText) || `${facts.bin} exited with code ${facts.code}.` };
+  if (failed) {
+    const errorKind: ErrorKind = LOGIN.test(stderr) || LOGIN.test(resultText) ? "not-logged-in" : "other";
+    return { status: "error", errorKind, error: stderr || tail(resultText) || `${facts.bin} exited with code ${facts.code}.` };
+  }
   return { status: "ok", ...(reply ? { reply } : {}) };
 }
 

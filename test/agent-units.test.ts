@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { changeSet } from "../src/app/agent-changes.js";
 import { agentCommand, parseTurnRequest } from "../src/app/agent.js";
-import { buildPrompt, claudeArgs, lintCommandFor, selectionLabels } from "../src/app/agent-prompt.js";
+import { allowedTools, buildPrompt, claudeArgs, lintCommandFor, selectionLabels } from "../src/app/agent-prompt.js";
 import { classifyExit } from "../src/app/agent-runner.js";
 import { parseStreamLine, summarizeTool } from "../src/app/agent-stream.js";
 import { agentOptions } from "../src/cli/commands.js";
@@ -62,12 +62,17 @@ describe("agent stream parsing", () => {
     expect(classifyExit({ ...base, lastText: "Fallback reply." })).toEqual({ status: "ok", reply: "Fallback reply." });
     expect(classifyExit({ ...base, code: null, cancelled: true })).toEqual({ status: "cancelled" });
     expect(classifyExit({ ...base, result: { text: "Claude AI usage limit reached|1760000000", isError: false } }).status).toBe("limit");
-    expect(classifyExit({ ...base, code: 1, stderr: "Error: You've hit your limit" }).status).toBe("limit");
-    expect(classifyExit({ ...base, code: 2, stderr: "a\nb\n" })).toEqual({ status: "error", error: "a\nb" });
+    expect(classifyExit({ ...base, code: 1, stderr: "Error: You've hit your limit" })).toMatchObject({ status: "limit", errorKind: "limit" });
+    expect(classifyExit({ ...base, code: 2, stderr: "a\nb\n" })).toEqual({ status: "error", errorKind: "other", error: "a\nb" });
     expect(classifyExit({ ...base, code: 0, result: { text: "Invalid API key · Please run /login", isError: true } }))
-      .toEqual({ status: "error", error: "Invalid API key · Please run /login" });
+      .toEqual({ status: "error", errorKind: "not-logged-in", error: "Invalid API key · Please run /login" });
+    expect(classifyExit({ ...base, code: 1, stderr: "Not logged in" }).errorKind).toBe("not-logged-in");
+    expect(classifyExit({ ...base, code: 1, stderr: "Authentication failed" }).errorKind).toBe("not-logged-in");
+    expect(classifyExit({ ...base, result: { text: "Explained /login.", isError: false } })).toEqual({ status: "ok", reply: "Explained /login." });
     const missing = Object.assign(new Error("spawn claude ENOENT"), { code: "ENOENT" });
-    expect(classifyExit({ ...base, code: null, spawnError: missing }).error).toMatch(/claude command was not found/);
+    expect(classifyExit({ ...base, code: null, spawnError: missing })).toMatchObject({ status: "error", errorKind: "not-found", error: expect.stringMatching(/claude command was not found/) });
+    const denied = Object.assign(new Error("spawn claude EACCES"), { code: "EACCES" });
+    expect(classifyExit({ ...base, code: null, spawnError: denied }).errorKind).toBe("other");
   });
 });
 
@@ -94,9 +99,13 @@ describe("agent prompt and command", () => {
     expect(prompt).toContain("run `node /r/bin/chen.js lint '/m/My Model.er.yaml'` and fix any errors");
     expect(prompt).toContain("Keep its comments and formatting.");
     expect(prompt).toContain("Reply with one or two plain sentences");
+    expect(prompt).toContain("\n- Do not create or update notes, memory, receipts or logs outside the model file.\n");
     expect(buildPrompt({ modelPath: "/m", lintCommand: "x", selection: [], text: "t" })).toContain("Selected elements:\n(none)\n");
-    expect(claudeArgs("P", "/m", "s1")).toEqual(["-p", "P", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", "/m", "--resume", "s1"]);
-    expect(claudeArgs("P", "/m")).not.toContain("--resume");
+    const lint = "npx tsx '/r x/src/cli/index.ts' lint";
+    expect(allowedTools(lint)).toEqual(["Bash(npx tsx '/r x/src/cli/index.ts' lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er"]);
+    expect(claudeArgs("P", "/m", "node /r/bin/chen.js lint", "s1")).toEqual(["-p", "P", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
+      "--allowedTools", "Bash(node /r/bin/chen.js lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "--add-dir", "/m", "--resume", "s1"]);
+    expect(claudeArgs("P", "/m", "x")).not.toContain("--resume");
   });
 
   it("derives the lint command from how the server was started", () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stand-in for `claude -p ... --output-format stream-json` used by the agent panel tests.
-// FAKE_AGENT_MODE: ok (default) | error | limit | slow | stubborn | layout | noedit
+// FAKE_AGENT_MODE: ok (default) | error | limit | login | slow | stubborn | layout | noedit
 // FAKE_AGENT_LOG: append one JSON line per run with argv and cwd.
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -23,6 +23,10 @@ if (mode === "error") {
 }
 if (mode === "limit") {
   out({ type: "result", subtype: "success", is_error: true, result: "Claude AI usage limit reached|1760000000", session_id: session });
+  process.exit(1);
+}
+if (mode === "login") {
+  out({ type: "result", subtype: "success", is_error: true, result: "Invalid API key · Please run /login", session_id: session });
   process.exit(1);
 }
 if (mode === "slow" || mode === "stubborn") {

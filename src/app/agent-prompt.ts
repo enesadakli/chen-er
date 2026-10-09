@@ -43,6 +43,7 @@ export function buildPrompt(input: { modelPath: string; lintCommand: string; sel
     "- Keep its comments and formatting.",
     `- After editing, run \`${input.lintCommand} ${quote(input.modelPath)}\` and fix any errors.`,
     "- Never edit *.er.layout.json files.",
+    "- Do not create or update notes, memory, receipts or logs outside the model file.",
     "- Reply with one or two plain sentences describing what changed.",
     "",
     "Request:",
@@ -50,7 +51,23 @@ export function buildPrompt(input: { modelPath: string; lintCommand: string; sel
   ].join("\n");
 }
 
-export function claudeArgs(prompt: string, modelDir: string, sessionId?: string): string[] {
+/**
+ * Tools pre-approved for a headless turn: exactly what the prompt asks the agent to run.
+ * `--permission-mode acceptEdits` covers Edit/Write but not Bash or MCP tools, which would otherwise wait for a
+ * permission answer that never comes in `-p` mode. Claude Code rule syntax: `Bash(<command prefix>:*)` allows that
+ * command with any trailing arguments (here: the model path); MCP tools are `mcp__<server>__<tool>`.
+ * The Bash rule is built from the same `lintCommand` string the prompt shows, so the two cannot drift.
+ */
+export function allowedTools(lintCommand: string): string[] {
+  return [`Bash(${lintCommand}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er"];
+}
+
+/**
+ * `claude --help`: `--allowedTools, --allowed-tools <tools...>` takes a variadic list, so it is followed by another
+ * flag (`--add-dir`) to end the list. Each rule is its own argv element; spaces inside `Bash(...)` stay in the rule.
+ */
+export function claudeArgs(prompt: string, modelDir: string, lintCommand: string, sessionId?: string): string[] {
   return ["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
+    "--allowedTools", ...allowedTools(lintCommand),
     "--add-dir", modelDir, ...(sessionId ? ["--resume", sessionId] : [])];
 }

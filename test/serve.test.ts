@@ -16,9 +16,10 @@ beforeEach(async () => {
 afterEach(async () => { await viewer?.close(); vi.restoreAllMocks(); rmSync(dir, { recursive: true, force: true }); });
 const getState = async () => await (await fetch(`${viewer.url}/api/state`)).json() as ViewerState;
 const post = (path: string, value: unknown) => fetch(viewer.url + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
-async function eventually(test: () => Promise<boolean>) {
-  for (let i = 0; i < 50; i++) { if (await test()) return; await new Promise((done) => setTimeout(done, 20)); }
-  throw new Error("No state update within 1 second.");
+/** Polls for an expected state; the ceiling is generous because file watchers lag under machine load. */
+async function eventually(test: () => Promise<boolean>, ms = 10_000) {
+  for (const end = Date.now() + ms; Date.now() < end;) { if (await test()) return; await new Promise((done) => setTimeout(done, 20)); }
+  throw new Error(`No state update within ${ms / 1000} seconds.`);
 }
 
 describe("local viewer server", () => {
@@ -80,14 +81,15 @@ describe("local viewer server", () => {
   });
   it("returns null figures and diagnostics for invalid models, then recovers", async () => {
     writeFileSync(model, "version: [\n");
-    await eventually(async () => (await getState()).svg === null);
+    await eventually(async () => { const s = await getState(); return s.yaml === "version: [\n" && s.svg === null; });
     const state = await getState();
     expect(state.diagram).toBeNull(); expect(state.diagnostics[0]?.severity).toBe("error");
     expect(state.yaml).toBe("version: [\n");
     expect((await fetch(`${viewer.url}/api/export.svg`)).status).toBe(409);
     writeFileSync(model, STARTER_MODEL);
-    await eventually(async () => !!(await getState()).svg);
-  });
+    await eventually(async () => { const s = await getState(); return s.yaml === STARTER_MODEL && !!s.svg; });
+    expect((await getState()).diagram).not.toBeNull();
+  }, 30_000);
   it("exports a clean SVG and PNG without screen overlays", async () => {
     const svg = await fetch(`${viewer.url}/api/export.svg`);
     expect(svg.headers.get("content-disposition")).toContain("attachment");

@@ -2,7 +2,7 @@
 import { dirname, extname } from "node:path";
 import { changeSet, type ChangeSet } from "./agent-changes.js";
 import { buildPrompt, claudeArgs, selectionLabels } from "./agent-prompt.js";
-import { runAgent, type RunHandle, type RunOutcome } from "./agent-runner.js";
+import { runAgent, type ErrorKind, type RunHandle, type RunOutcome } from "./agent-runner.js";
 import { clip, type Step } from "./agent-stream.js";
 import { fileBytes, revision } from "./file-guard.js";
 
@@ -19,6 +19,8 @@ export interface Turn {
   steps: Step[];
   changes?: ChangeSet;
   error?: string;
+  /** Machine-readable cause when status is "error" or "limit". */
+  errorKind?: ErrorKind;
 }
 export interface AgentInfo { enabled: true; kind: AgentKind; cwd: string; running: string | null; turns: Turn[] }
 
@@ -99,6 +101,7 @@ export function createAgent(deps: AgentDeps) {
     turn.status = outcome.status;
     if (outcome.reply) turn.reply = outcome.reply;
     if (outcome.error) turn.error = outcome.error;
+    if (outcome.errorKind) turn.errorKind = outcome.errorKind;
     const last = turn.steps.at(-1);
     if (turn.reply && last?.kind === "text" && last.summary === clip(turn.reply)) turn.steps.pop();
     turn.finishedAt = new Date().toISOString();
@@ -121,7 +124,7 @@ export function createAgent(deps: AgentDeps) {
       const entry: Entry = { turn, before };
       const prompt = buildPrompt({ modelPath: deps.modelPath, lintCommand: deps.lintCommand,
         selection: selectionLabels(before?.toString("utf8") ?? null, request.selection), text: request.text });
-      const command = agentCommand(deps.bin, claudeArgs(prompt, dirname(deps.modelPath), sessionId));
+      const command = agentCommand(deps.bin, claudeArgs(prompt, dirname(deps.modelPath), deps.lintCommand, sessionId));
       const handle = runAgent({ ...command, cwd: deps.cwd, killAfterMs: deps.killAfterMs,
         onStep: (step) => { turn.steps.push(step); deps.emit(turn); } });
       entries.push(entry);

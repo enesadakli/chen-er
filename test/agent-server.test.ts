@@ -142,7 +142,10 @@ describe("agent routes", () => {
     const [first, second] = args();
     expect(first!.cwd).toBe(realpathSync(cwd));
     const prompt = first!.args[1]!;
-    expect(first!.args).toEqual(["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", dir]);
+    const lint = /run `(.+) \S+club\.er\.yaml` and fix any errors/.exec(prompt)?.[1];
+    expect(lint).toMatch(/^(npx tsx|node) \S+ lint$/);
+    expect(first!.args).toEqual(["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
+      "--allowedTools", `Bash(${lint}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "--add-dir", dir]);
     expect(prompt).toContain(`Model file: ${model}`);
     expect(prompt).toContain("E:MEMBER (MEMBER)\nA:MEMBER.MemberId (MemberId)\nE:NOPE\n");
     expect(prompt).toMatch(/run `(npx tsx|node) \S+ lint \S+club\.er\.yaml` and fix any errors/);
@@ -187,10 +190,14 @@ describe("agent routes", () => {
     await send("fail");
     const failed = (await settled()).turns[0]!;
     expect(failed.status).toBe("error");
+    expect(failed.errorKind).toBe("other");
     expect(failed.error!.split("\n")).toEqual(Array.from({ length: 20 }, (_, i) => `stderr line ${i + 6}`));
     process.env.FAKE_AGENT_MODE = "limit";
     await send("limit");
-    expect((await settled()).turns[1]!.status).toBe("limit");
+    expect((await settled()).turns[1]).toMatchObject({ status: "limit", errorKind: "limit" });
+    process.env.FAKE_AGENT_MODE = "login";
+    await send("login");
+    expect((await settled()).turns[2]).toMatchObject({ status: "error", errorKind: "not-logged-in" });
   });
 
   it("undoes the latest model change and restores the exact bytes", async () => {
@@ -247,5 +254,6 @@ describe("agent routes", () => {
     const turn = (await settled()).turns[0]!;
     expect(turn.status).toBe("error");
     expect(turn.error).toMatch(/not found.*\/login/);
+    expect(turn.errorKind).toBe("not-found");
   });
 });

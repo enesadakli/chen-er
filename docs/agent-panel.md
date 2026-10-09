@@ -44,18 +44,24 @@ chen serve model.er.yaml --agent claude [--agent-cwd <dir>]
 ## Agent invocation (claude)
 
 - Command (overridable for tests with env `CHEN_AGENT_BIN`, default `claude`):
-  `claude -p <prompt> --output-format stream-json --verbose --permission-mode acceptEdits --add-dir <modelDir>
-  [--resume <sessionId>]`, cwd = `--agent-cwd`.
+  `claude -p <prompt> --output-format stream-json --verbose --permission-mode acceptEdits
+  --allowedTools 'Bash(<chen lint command>:*)' mcp__chen-er__lint_er mcp__chen-er__render_er --add-dir <modelDir>
+  [--resume <sessionId>]`, cwd = `--agent-cwd`. The child inherits the server's environment variables.
+- `acceptEdits` covers file edits only; without `--allowedTools` a headless turn stalls waiting for permission to
+  run the lint command or the chen-er MCP tools. The pre-approved set is exactly what the prompt asks for: the
+  lint command (same string as in the prompt, any trailing arguments) and the chen-er MCP `lint_er`/`render_er`.
 - The session id comes from the stream (`session_id` field of the init/result events) and is reused with
   `--resume` for the next turn, so the conversation continues. Kept in memory for the server's lifetime.
 - Prompt = short fixed preamble + user text. Preamble (English, terse): the absolute model path; the selected
   elements as `id (label)` lines; rules: edit only that YAML file; keep comments and formatting; run
-  `<chen lint command> <model path>` after editing and fix errors; never edit `*.er.layout.json`; reply with one
+  `<chen lint command> <model path>` after editing and fix errors; never edit `*.er.layout.json`; do not create or
+  update notes, memory, receipts or logs outside the model file; reply with one
   or two plain sentences describing what changed. `<chen lint command>` is how this server itself was started
   (e.g. `node <repo>/bin/chen.js` or `npx tsx <repo>/src/cli/index.ts`).
 - One turn at a time. Cancel kills the child process (SIGTERM, then SIGKILL after 3 s).
 - Exit/limit handling: non-zero exit -> `error` with the last 20 lines of stderr; output mentioning a usage limit
-  -> status `limit`.
+  -> status `limit`. `errorKind` classifies the cause: `not-found` (spawn ENOENT), `not-logged-in` (stderr or result
+  mentions `/login`, "not logged in", "Invalid API key" or "authentication"), `limit`, otherwise `other`.
 
 ## Snapshot and undo
 
@@ -82,7 +88,8 @@ If either side fails to parse, report `parseError: true` and empty lists.
 | POST | `/api/agent/turns/:id/undo` | | `200 { status: "undone" }` or `409 { error }` |
 
 `Turn = { id, text, selection, startedAt, finishedAt?, status: "running"|"ok"|"error"|"cancelled"|"limit"|"undone",
-reply?: string, steps: Step[], changes?: { added, removed, modified, parseError? }, error?: string }`,
+reply?: string, steps: Step[], changes?: { added, removed, modified, parseError? }, error?: string,
+errorKind?: "not-found"|"not-logged-in"|"limit"|"other" }` (`errorKind` only on `error`/`limit` turns),
 `Step = { kind: "tool"|"text", summary: string }` (tool steps summarized as e.g. `Edit university.er.yaml`).
 
 ## Events (existing SSE channel `/api/events`)
@@ -107,7 +114,8 @@ diagram), but agent events are only emitted when the panel is enabled.
 - Empty state: one sentence and three example requests that fill the input when clicked
   (`Add a BirthDate attribute to the selected entity`, `Make ENROLLS one-to-many`, `Explain the heuristic findings`).
 - Errors: CLI not found / not logged in -> what to run (`claude` then `/login`); limit -> say the agent hit its usage
-  limit; error -> short message + stderr excerpt in a disclosure.
+  limit; error -> short message + stderr excerpt in a disclosure. The panel decides by `errorKind`; text heuristics
+  on `error` are only a fallback for turns without it.
 - Keyboard: `/` focuses the input (when focus is not in a text field), Enter sends, Shift+Enter newline, Escape
   cancels a running turn. Tabs are a proper tablist.
 - Follow DESIGN.md tokens (sheet, ink, graphite, rules, 13px system-ui, 28px buttons, 4px radius). Nothing new in
