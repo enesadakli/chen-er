@@ -1,0 +1,6 @@
+version: 1
+entities:
+  TASK:
+    weak: true
+    attrs: [TaskNo]
+    partialKey: [TaskNo]

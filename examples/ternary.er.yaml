@@ -1,0 +1,17 @@
+version: 1
+title: Workshop bookings
+entities:
+  HOST: {attrs: [HostId], keys: [[HostId]]}
+  TOPIC: {attrs: [TopicId], keys: [[TopicId]]}
+  ROOM: {attrs: [RoomId], keys: [[RoomId]]}
+relationships:
+  BOOKS:
+    ends:
+      - {entity: HOST, card: "0..N"}
+      - {entity: TOPIC, card: "0..N"}
+      - {entity: ROOM, card: "0..N"}
+    attrs: [StartsAt]
+notes:
+  - A booking records a host, topic and room together.
+  - Each host-topic-room combination has at most one current booking.
+  - Repeat bookings require a separate booking entity with its own key.
