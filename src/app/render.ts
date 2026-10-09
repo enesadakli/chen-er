@@ -35,7 +35,7 @@ export function readPins(modelPath: string): { options: LayoutOptions; diagnosti
   if (!existsSync(path)) return { options: {}, diagnostics: [] };
   try {
     const parsed = LayoutFile.parse(JSON.parse(readFileSync(path, "utf8")));
-    return { options: { pins: parsed.pins, engine: parsed.engine }, diagnostics: [] };
+    return { options: { pins: parsed.pins, engine: parsed.engine, positions: parsed.positions }, diagnostics: [] };
   } catch (err) {
     return {
       options: {},
@@ -90,10 +90,41 @@ export function quality(diagram: Diagram, pins: Record<string, Point> = {}) {
   return assessQuality(diagram, pins);
 }
 
+export interface LayoutFilePatch {
+  pins?: Record<string, Point>;
+  engine?: LayoutOptions["engine"];
+  /** `null` removes the soft positions (fresh layout next time). */
+  positions?: Record<string, Point> | null;
+}
+
+/**
+ * Merge a patch into *.er.layout.json and return the exact text written, so callers that watch
+ * the file can recognise their own writes. Keys are sorted and coordinates rounded for stable diffs.
+ */
+export function writeLayoutFile(modelPath: string, patch: LayoutFilePatch): string {
+  const path = layoutPathFor(modelPath);
+  let current: { pins: Record<string, Point>; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> } = { pins: {} };
+  if (existsSync(path)) current = LayoutFile.parse(JSON.parse(readFileSync(path, "utf8")));
+  const pins = patch.pins ?? current.pins;
+  const engine = patch.engine ?? current.engine;
+  const positions = patch.positions === null ? undefined : (patch.positions ?? current.positions);
+  const sorted = (r: Record<string, Point>) =>
+    Object.fromEntries(Object.keys(r).sort().map((id) => [id, { x: round(r[id]!.x), y: round(r[id]!.y) }]));
+  const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sorted(pins), ...(positions ? { positions: sorted(positions) } : {}) });
+  const text = JSON.stringify(file, null, 2) + "\n";
+  writeFileSync(path, text);
+  return text;
+}
+
+const round = (v: number) => Math.round(v * 10) / 10;
+
 export function writePins(modelPath: string, pins: Record<string, Point>): void {
-  const parsed = LayoutFile.parse({ version: 1, pins });
-  const sorted = Object.fromEntries(Object.keys(parsed.pins).sort().map((id) => [id, parsed.pins[id]]));
-  writeFileSync(layoutPathFor(modelPath), JSON.stringify({ version: 1, pins: sorted }, null, 2) + "\n");
+  writeLayoutFile(modelPath, { pins });
+}
+
+/** Node id → center for every node of a diagram: the soft positions of the next incremental layout. */
+export function diagramPositions(diagram: Diagram): Record<string, Point> {
+  return Object.fromEntries(diagram.nodes.map((n) => [n.id, { x: n.box.x + n.box.w / 2, y: n.box.y + n.box.h / 2 }]));
 }
 
 export function writeRenderOutputs(svg: string, out: string, png = false, scale = 2): string[] {

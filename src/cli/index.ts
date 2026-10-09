@@ -24,6 +24,7 @@ program.command("render")
   .addOption(new Option("--engine <name>", "layout engine").choices(["layered", "stress", "simple"]))
   .option("--report", "print the quality report")
   .option("--json", "print one JSON object")
+  .option("--fresh", "ignore saved positions and lay out from scratch (pins still apply)")
   .action(async (model: string, options: RenderCommandOptions) => print(await renderCommand(model, options)));
 
 program.command("lint")

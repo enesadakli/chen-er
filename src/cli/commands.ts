@@ -18,6 +18,8 @@ export interface RenderCommandOptions {
   engine?: LayoutOptions["engine"];
   report?: boolean;
   json?: boolean;
+  /** Ignore saved soft positions and lay the diagram out from scratch (pins still apply). */
+  fresh?: boolean;
 }
 
 export interface LintCommandOptions {
@@ -44,7 +46,7 @@ export async function renderCommand(modelPath: string, options: RenderCommandOpt
     }
     const scale = options.scale ?? 2;
     if (!Number.isFinite(scale) || scale <= 0) throw new Error("Scale must be a positive finite number.");
-    const result = await renderFile(modelPath, options.engine ? { engine: options.engine } : {});
+    const result = await renderFile(modelPath, { ...(options.engine ? { engine: options.engine } : {}), ...(options.fresh ? { positions: {} } : {}) });
     const outputs = result.svg
       ? writeRenderOutputs(result.svg, options.out ?? modelPath.replace(/(\.er)?\.ya?ml$/i, "") + ".svg", options.png, scale)
       : [];

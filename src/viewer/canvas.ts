@@ -24,6 +24,7 @@ export class NotebookCanvas {
   private pinch?: { distance: number; scale: number; diagram: Point };
   private pending?: { state: ViewerState; list: Finding[] };
   private sheet = document.querySelector<HTMLDivElement>("#sheet")!;
+  private lastNodeIds = "";
   private figure = document.querySelector<HTMLDivElement>("#figure")!;
   private overlay = document.querySelector<SVGSVGElement>("#overlay")!;
   constructor(private canvas: HTMLElement, private selectFinding: (number: number) => void,
@@ -88,7 +89,12 @@ export class NotebookCanvas {
       next.style.position = "absolute";
       this.figure.append(next);
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (previous && !reduced) {
+      // Crossfade only when the model itself changed; a drag or pin change swaps instantly so that
+      // untouched nodes (identical in both drawings) never flicker.
+      const ids = state.diagram.nodes.map((n) => n.id).sort().join("|");
+      const modelChanged = ids !== this.lastNodeIds;
+      this.lastNodeIds = ids;
+      if (previous && !reduced && modelChanged) {
         next.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120 });
         const fade = previous.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120 });
         fade.onfinish = () => previous.remove();

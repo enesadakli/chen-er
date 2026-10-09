@@ -43,6 +43,8 @@ function apply(next: ViewerState) {
 async function write(path: string, method: string, value?: unknown) {
   pendingWrites++;
   element<HTMLButtonElement>("reset").disabled = true;
+  element<HTMLButtonElement>("relayout").disabled = true;
+  element<HTMLButtonElement>("relayout-mobile").disabled = true;
   element<HTMLButtonElement>("reset-mobile").disabled = true;
   element<HTMLSelectElement>("engine").disabled = true;
   try {
@@ -53,6 +55,8 @@ async function write(path: string, method: string, value?: unknown) {
   finally {
     pendingWrites--;
     element<HTMLButtonElement>("reset").disabled = pendingWrites > 0;
+    element<HTMLButtonElement>("relayout").disabled = pendingWrites > 0;
+    element<HTMLButtonElement>("relayout-mobile").disabled = pendingWrites > 0;
     element<HTMLButtonElement>("reset-mobile").disabled = pendingWrites > 0;
     element<HTMLSelectElement>("engine").disabled = pendingWrites > 0;
     if (state) element<HTMLSelectElement>("engine").value = state.engine;
@@ -81,6 +85,7 @@ element("plus").addEventListener("click", () => canvas.zoom(1.2));
 element("minus").addEventListener("click", () => canvas.zoom(1 / 1.2));
 element("actual").addEventListener("click", () => canvas.actual());
 for (const id of ["reset", "reset-mobile"]) element(id).addEventListener("click", () => { void write("/api/pins", "DELETE"); });
+for (const id of ["relayout", "relayout-mobile"]) element(id).addEventListener("click", () => { void write("/api/relayout", "POST"); });
 element<HTMLSelectElement>("engine").addEventListener("change", (e) => { void write("/api/engine", "POST", { engine: (e.target as HTMLSelectElement).value }); });
 const dark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 function themeLabel() { element("theme").textContent = dark() ? "Light desk" : "Dark desk"; }

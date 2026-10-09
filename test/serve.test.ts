@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, symlinkSync, unlinkSync, readdirSync, linkSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync, symlinkSync, unlinkSync, readdirSync, linkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -115,12 +115,14 @@ describe("local viewer server", () => {
       req.on("error", reject); req.end();
     });
     expect(wrongHost).toBe(403);
-    expect(readdirSync(dir)).toEqual(["sample.er.yaml"]);
+    // The server only ever writes the model's own layout file (soft positions are saved on startup).
+    expect(readdirSync(dir).sort()).toEqual(["sample.er.layout.json", "sample.er.yaml"]);
     expect(readFileSync(model, "utf8")).toBe(STARTER_MODEL);
   });
   it("rejects layout symlinks, dangling symlinks and hardlinks without modifying their targets", async () => {
     const external = join(dir, "external.json"); writeFileSync(external, '{"version":1,"pins":{}}');
     for (const make of [() => symlinkSync(external, layoutPathFor(model)), () => symlinkSync(join(dir, "missing.json"), layoutPathFor(model)), () => linkSync(external, layoutPathFor(model))]) {
+      if (existsSync(layoutPathFor(model))) unlinkSync(layoutPathFor(model));
       make();
       expect((await post("/api/pins", { pins: {} })).status).toBe(403);
       unlinkSync(layoutPathFor(model));
@@ -141,4 +143,22 @@ describe("local viewer server", () => {
     expect((await post("/api/pins", { pins: {} })).status).toBe(409);
     expect(readFileSync(layoutPathFor(model), "utf8")).toBe("bad layout");
   });
+  it("moves only the dragged node and keeps the drawing after a restart; relayout starts fresh", async () => {
+    const centers = (st: ViewerState) => Object.fromEntries(st.diagram!.nodes.map((n) => [n.id, { x: n.box.x + n.box.w / 2, y: n.box.y + n.box.h / 2 }]));
+    const before = centers(await getState());
+    const target = { x: before["E:STUDENT"]!.x - 240, y: before["E:STUDENT"]!.y };
+    const after = centers(await (await post("/api/pins", { pins: { "E:STUDENT": target } })).json() as ViewerState);
+    expect(after["E:STUDENT"]).toEqual(target);
+    const near = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y) < 0.1;
+    for (const id of ["E:COURSE", "R:ENROLLS"]) expect(near(after[id]!, before[id]!)).toBe(true);
+    expect(Object.keys(JSON.parse(readFileSync(layoutPathFor(model), "utf8")).positions)).toContain("E:COURSE");
+
+    await viewer.close();
+    viewer = await serve(model, { port: 0 });
+    expect(near(centers(await getState())["E:COURSE"]!, after["E:COURSE"]!)).toBe(true);
+
+    const fresh = await (await post("/api/relayout", {})).json() as ViewerState;
+    expect(fresh.pins).toEqual({ "E:STUDENT": target });
+    expect(centers(fresh)["E:STUDENT"]).toEqual(target);
+  }, 20000);
 });

@@ -9,7 +9,7 @@ import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
 import { renderSvg } from "../core/render/svg.js";
 import type { QualityReport } from "../core/quality.js";
 import { LayoutFile } from "../core/schema.js";
-import { layoutPathFor, lintText, quality, readPins, svgToPng, writePins } from "./render.js";
+import { diagramPositions, layoutPathFor, lintText, quality, readPins, svgToPng, writeLayoutFile, type LayoutFilePatch } from "./render.js";
 import { diagnosticTarget } from "./targets.js";
 
 export interface ViewerDiagnostic extends Diagnostic { target?: string }
@@ -95,7 +95,9 @@ export async function serve(model: string, options: ServeOptions = {}) {
     queue = next.catch(() => undefined);
     return next;
   };
-  async function refresh(): Promise<ViewerState> {
+  /** Text of our last write to the layout file; the watcher ignores events that only see it. */
+  let lastWrite: string | undefined;
+  async function refresh(fresh = false): Promise<ViewerState> {
     let yaml = "";
     let diagnostics: ViewerDiagnostic[] = [];
     let diagram: Diagram | null = null;
@@ -110,10 +112,16 @@ export async function serve(model: string, options: ServeOptions = {}) {
       title = parsed.model?.title ?? title;
       let all = [...parsed.diagnostics, ...saved.diagnostics];
       if (parsed.model && !hasErrors(parsed.diagnostics)) {
-        const result = await layout(parsed.model, { engine, pins });
+        // Incremental by default: the last accepted positions keep untouched nodes in place.
+        const positions = fresh ? undefined : saved.options.positions;
+        const result = await layout(parsed.model, { engine, pins, positions });
         diagram = result.diagram;
         svg = renderSvg(diagram);
         all = [...all, ...result.diagnostics];
+        if (!saved.diagnostics.length) {
+          try { writeLayout({ positions: diagramPositions(diagram) }); }
+          catch (error) { all.push({ rule: "layout-file", severity: "info", message: `Positions not saved: ${(error as Error).message}` }); }
+        }
       }
       diagnostics = all.map((d) => ({ ...d, target: diagnosticTarget(d.path, parsed.model) }));
     } catch (error) {
@@ -126,7 +134,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
     return state;
   }
   await refresh();
-  function persist(pins: Record<string, Point>, engine?: LayoutOptions["engine"]): void {
+  function guardLayoutPath(): void {
     // Refuse symlinks so a layout file cannot redirect a write to another file.
     let stat;
     try { stat = lstatSync(pinsPath); }
@@ -138,13 +146,14 @@ export async function serve(model: string, options: ServeOptions = {}) {
       try { LayoutFile.parse(JSON.parse(readFileSync(pinsPath, "utf8"))); }
       catch { throw new HttpError(409, "Fix or delete the invalid layout file before writing pins."); }
     }
+  }
+  function writeLayout(patch: LayoutFilePatch): void {
+    guardLayoutPath();
+    lastWrite = writeLayoutFile(modelPath, patch);
+  }
+  function persist(pins: Record<string, Point>, engine?: LayoutOptions["engine"]): void {
     const parsed = LayoutFile.parse({ version: 1, pins, ...(engine ? { engine } : {}) });
-    writePins(modelPath, parsed.pins);
-    if (parsed.engine) {
-      const saved: unknown = JSON.parse(readFileSync(pinsPath, "utf8"));
-      const file = LayoutFile.parse(saved);
-      writeFileSync(pinsPath, JSON.stringify({ ...file, engine: parsed.engine }, null, 2) + "\n");
-    }
+    writeLayout({ pins: parsed.pins, ...(parsed.engine ? { engine: parsed.engine } : {}) });
   }
   const server = createServer((req, res) => {
     void (async () => {
@@ -178,6 +187,13 @@ export async function serve(model: string, options: ServeOptions = {}) {
         res.end(png ? svgToPng(state.svg, scale) : state.svg);
         return;
       }
+      if (req.method === "POST" && path === "/api/relayout") {
+        const next = await serial(async () => {
+          writeLayout({ positions: null });
+          return refresh(true);
+        });
+        return json(res, 200, next);
+      }
       const pinsRoute = path === "/api/pins" || path.startsWith("/api/pins/");
       if ((req.method === "POST" && path === "/api/pins") || (req.method === "DELETE" && pinsRoute) || (req.method === "POST" && path === "/api/engine")) {
         const hasBody = Number(req.headers["content-length"]) > 0 || !!req.headers["transfer-encoding"];
@@ -210,7 +226,12 @@ export async function serve(model: string, options: ServeOptions = {}) {
             delete pins[id];
           }
           persist(pins, engine);
-          if (path === "/api/engine") requestedEngine = undefined;
+          if (path === "/api/engine") {
+            requestedEngine = undefined;
+            // A new engine means a new drawing: start from scratch instead of keeping old positions.
+            writeLayout({ positions: null });
+            return refresh(true);
+          }
           return refresh();
         });
         return json(res, 200, next);
@@ -233,6 +254,9 @@ export async function serve(model: string, options: ServeOptions = {}) {
   let debounce: ReturnType<typeof setTimeout> | undefined;
   const watcher = watch(dirname(modelPath), (_event, filename) => {
     if (filename && ![basename(modelPath), basename(pinsPath)].includes(filename.toString())) return;
+    if (filename?.toString() === basename(pinsPath) && lastWrite !== undefined) {
+      try { if (readFileSync(pinsPath, "utf8") === lastWrite) return; } catch { /* deleted: refresh */ }
+    }
     clearTimeout(debounce);
     debounce = setTimeout(() => { if (!closed) void serial(refresh); }, 100);
   });
