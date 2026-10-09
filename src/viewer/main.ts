@@ -26,7 +26,8 @@ function apply(next: ViewerState) {
   state = next; list = findings(next.diagnostics);
   selected = previous ? list.find((f) => f.rule === previous.rule && f.path === previous.path && f.message === previous.message)?.number : undefined;
   element("title").textContent = next.title; document.title = `${next.title} · chen-er`;
-  element("path").textContent = next.modelPath; element("path").title = next.modelPath;
+  // LRM marks keep slashes in place inside the right-to-left box used for left-side truncation.
+  element("path").textContent = `\u200E${next.modelPath}\u200E`; element("path").title = next.modelPath;
   element<HTMLSelectElement>("engine").value = next.engine;
   const q = next.quality;
   element("quality").textContent = q?.implemented ? `${q.overlaps} overlaps · ${q.edgeCrossings} crossings` : "Quality not measured";
