@@ -126,6 +126,9 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
   for (let i = 0; i < owners.length; i++) for (let j = i + 1; j < owners.length; j++) {
     if (owners[i]!.from !== owners[j]!.from && owners[i]!.to !== owners[j]!.to) pairs.push([i, j]);
   }
+  // Successive calls move one or two entities, so pairs of unmoved paths reuse the previous result.
+  let previous: { a: Point; b: Point }[] | undefined;
+  const hits = new Uint8Array(pairs.length);
   return (columns, ranks) => {
     const point = (key: string) => ({ x: columns.get(key) ?? 0, y: ranks.get(key) ?? 0 });
     const positions = entities.map((e) => point(e.key));
@@ -142,10 +145,18 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
         paths.push({ a: p, b: q });
       });
     }
-    for (const [i, j] of pairs) {
-      const a = paths[i]!, b = paths[j]!;
-      if (segmentIntersection(a.a, a.b, b.a, b.b)) score += 6;
-    }
+    const moved = paths.map((path, i) => {
+      const old = previous?.[i];
+      return !old || old.a.x !== path.a.x || old.a.y !== path.a.y || old.b.x !== path.b.x || old.b.y !== path.b.y;
+    });
+    let crossings = 0;
+    pairs.forEach(([i, j], k) => {
+      if (moved[i] || moved[j]) hits[k] = segmentIntersection(paths[i]!.a, paths[i]!.b, paths[j]!.a, paths[j]!.b) ? 1 : 0;
+      crossings += hits[k]!;
+    });
+    previous = paths;
+    // Add one term per crossing, as a pairwise sum would.
+    for (let k = 0; k < crossings; k++) score += 6;
     for (const d of diamonds) {
       for (const e of positions) if (distance(d.p, e) < 0.35) score += 40;
       for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.key !== other.key) score += 10;
