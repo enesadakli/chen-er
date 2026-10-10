@@ -88,10 +88,21 @@ permit membership and absence rather than requiring them.
 ## Names, order and SQL
 
 Use model names, not display labels. Composite paths join names with `_`.
-Copied PK columns use `<role-or-entity>_<PK-column>`; multivalued tables use
-`<owner-table>_<attribute-path>`. Table names and each table's column names are
-reserved case-insensitively. Collisions receive `_2`, `_3`, etc. in a deterministic
-order, and notes record source ids and the rename. Entity/relationship
+Relationship FKs use `<role>_<PK-column>` when the referenced end has a role.
+Without a role, a single unambiguous reference uses `<ENTITY>_<PK-column>`.
+When a table has multiple FKs to the same referenced relation, every unroled
+reference uses `<RELATIONSHIP>_<PK-column>` instead. An entity-prefixed name
+collision also switches the whole FK, including every composite PK component,
+to its relationship prefix. All relationship FKs and stored attributes are
+considered before allocation, including attributes added by later relationships;
+the first reference is therefore just as descriptive as subsequent references.
+Roles take priority over the relationship fallback.
+
+Multivalued tables use `<owner-table>_<attribute-path>`. Table names and each
+table's column names are reserved case-insensitively. Numeric suffixes `_2`,
+`_3`, etc. are a last resort when descriptive FK prefixes still collide; other
+table/attribute collisions use the same deterministic suffixing. Notes record
+source ids and each numeric rename. Entity/relationship
 construction uses lexical names, while declared key order and relationship end
 order remain significant.
 
@@ -115,8 +126,9 @@ constraints remain notes.
 
 `bench/fixtures/campus.er.yaml` is named campus but models hospital operations.
 Its 11 output tables illustrate steps 1–6. `ADMISSION` uses the patient's identity
-plus `AdmittedOn`; its attending and discharging FKs collide, so the latter gets
-`STAFF_StaffId_2`. Optional `OCCUPIES` is 1:1; lexical tie-breaking puts its
+plus `AdmittedOn`; its two references to STAFF are named `ATTENDS_StaffId` and
+`DISCHARGES_StaffId`, so both meanings are visible without a numeric suffix.
+Optional `OCCUPIES` is 1:1; lexical tie-breaking puts its
 nullable UNIQUE bed FK in `ADMISSION`. The fixture's notes distinguish employment
 from ward assignment and the two clinician relationships.
 

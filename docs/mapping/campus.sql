@@ -84,14 +84,14 @@ CREATE TABLE ADMISSION (
   DischargedOn TEXT,
   Reason TEXT,
   PATIENT_PatientId TEXT NOT NULL,
-  STAFF_StaffId TEXT NOT NULL,
-  STAFF_StaffId_2 TEXT,
+  ATTENDS_StaffId TEXT NOT NULL,
+  DISCHARGES_StaffId TEXT,
   BED_BedNo TEXT,
   PRIMARY KEY (PATIENT_PatientId, AdmittedOn),
   UNIQUE (BED_BedNo),
   FOREIGN KEY (PATIENT_PatientId) REFERENCES PATIENT (PatientId),
-  FOREIGN KEY (STAFF_StaffId) REFERENCES STAFF (StaffId),
-  FOREIGN KEY (STAFF_StaffId_2) REFERENCES STAFF (StaffId),
+  FOREIGN KEY (ATTENDS_StaffId) REFERENCES STAFF (StaffId),
+  FOREIGN KEY (DISCHARGES_StaffId) REFERENCES STAFF (StaffId),
   FOREIGN KEY (BED_BedNo) REFERENCES BED (BedNo)
 );
 
@@ -123,7 +123,6 @@ CREATE TABLE STAFF_Qualifications (
 );
 
 -- Note: R:DISCHARGES: The discharging clinician can differ from the attending one recorded by ATTENDS.
--- Note: R:DISCHARGES, DISCHARGES#0, E:STAFF: name collision; STAFF_StaffId renamed to STAFF_StaffId_2.
 -- Note: R:EMPLOYS: Employment is contractual with the hospital; ward assignment may change without changing the employer.
 -- Note: R:EMPLOYS, EMPLOYS#0 (E:HOSPITAL 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.
 -- Note: R:HAS_BED, HAS_BED#0 (E:ROOM 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.

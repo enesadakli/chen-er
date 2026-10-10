@@ -178,10 +178,81 @@ describe("ER-to-relational mapping", () => {
       SHOP: { ends: [{ entity: "SHOP", card: "0..N" }, { entity: "ITEM", card: "0..N" }] },
     } });
     expect(table(result, "SHOP").columns.map((c) => c.name)).toContain("a_b_2");
-    expect(table(result, "SHOP").foreignKeys[0]!.columns).toEqual(["ITEM_ItemId_2"]);
+    expect(table(result, "SHOP").foreignKeys[0]!.columns).toEqual(["SELLS_ItemId"]);
     expect(result.relations.map((r) => r.name)).toContain("SHOP_2");
     expect(result.relations.map((r) => r.name)).toContain("SHOP_Tags_2");
-    expect(result.notes.filter((n) => n.includes("name collision"))).toHaveLength(4);
+    expect(result.notes.filter((n) => n.includes("name collision"))).toHaveLength(3);
+  });
+
+  it("names every repeated target FK by relationship, including every composite PK component", () => {
+    const input: Omit<ModelInput, "version"> = { entities: {
+      CLINIC: entity("ClinicId"), STAFF: { attrs: ["Region", "StaffNo"], keys: [["Region", "StaffNo"]] },
+    }, relationships: {
+      DISCHARGES: { ends: [{ entity: "STAFF", card: "0..N" }, { entity: "CLINIC", card: "0..1" }] },
+      ATTENDS: { ends: [{ entity: "CLINIC", card: "1..1" }, { entity: "STAFF", card: "0..N" }] },
+    } };
+    const result = mapping(input);
+    const out = table(result, "CLINIC");
+    expect(out.foreignKeys.map((fk) => fk.columns)).toEqual([
+      ["ATTENDS_Region", "ATTENDS_StaffNo"], ["DISCHARGES_Region", "DISCHARGES_StaffNo"],
+    ]);
+    expect(out.foreignKeys.every((fk) => fk.references.columns.join(",") === "Region,StaffNo")).toBe(true);
+    expect(out.columns.find((c) => c.name === "ATTENDS_StaffNo")!.notNull).toBe(true);
+    expect(out.columns.find((c) => c.name === "DISCHARGES_StaffNo")!.notNull).toBe(false);
+    expect(result.notes.some((n) => n.includes("name collision"))).toBe(false);
+    expect(mapping({ ...input, relationships: Object.fromEntries(Object.entries(input.relationships!).reverse()) })).toEqual(result);
+  });
+
+  it("preserves an explicit role while naming the unroled reference by relationship", () => {
+    const result = mapping({ entities: { CLINIC: entity("ClinicId"), STAFF: entity("StaffId") }, relationships: {
+      ATTENDS: { ends: [{ entity: "CLINIC", card: "1..1" }, { entity: "STAFF", card: "0..N", role: "attending" }] },
+      DISCHARGES: { ends: [{ entity: "CLINIC", card: "0..1" }, { entity: "STAFF", card: "0..N" }] },
+    } });
+    expect(table(result, "CLINIC").foreignKeys.map((fk) => fk.columns)).toEqual([["attending_StaffId"], ["DISCHARGES_StaffId"]]);
+  });
+
+  it("reserves future relationship attrs and explicit-role names before allocating unroled FKs", () => {
+    const result = mapping({ entities: { SHOP: entity("ShopId"), ITEM: entity("ItemId"), SUPPLIER: entity("ItemId") }, relationships: {
+      BUYS: { ends: [{ entity: "SHOP", card: "0..1" }, { entity: "ITEM", card: "0..N" }] },
+      ORDERS: { ends: [{ entity: "SHOP", card: "0..1" }, { entity: "SUPPLIER", card: "0..N", role: "BUYS" }], attrs: ["ITEM_ItemId"] },
+    } });
+    // Entity and relationship prefixes both collide; the numeric suffix is a last resort.
+    expect(table(result, "SHOP").foreignKeys.map((fk) => fk.columns)).toEqual([["BUYS_ItemId_2"], ["BUYS_ItemId"]]);
+    expect(table(result, "SHOP").columns.some((c) => c.name === "ITEM_ItemId")).toBe(true);
+    expect(result.notes.join("\n")).toContain("BUYS_ItemId renamed to BUYS_ItemId_2");
+  });
+
+  it("uses a relationship prefix when another target's explicit role collides with the entity prefix", () => {
+    const result = mapping({ entities: { SHOP: entity("ShopId"), ITEM: entity("ItemId"), SUPPLIER: entity("ItemId") }, relationships: {
+      BUYS: { ends: [{ entity: "SHOP", card: "0..1" }, { entity: "ITEM", card: "0..N" }] },
+      ORDERS: { ends: [{ entity: "SHOP", card: "0..1" }, { entity: "SUPPLIER", card: "0..N", role: "ITEM" }] },
+    } });
+    expect(table(result, "SHOP").foreignKeys.map((fk) => fk.columns)).toEqual([["BUYS_ItemId"], ["ITEM_ItemId"]]);
+    expect(result.notes.some((n) => n.includes("name collision"))).toBe(false);
+  });
+
+  it("uses numeric suffixes only after both entity and relationship prefixes collide", () => {
+    const result = mapping({ entities: {
+      SHOP: { attrs: ["ShopId", "item_ItemId", "BUYS_ItemId"], keys: [["ShopId"]] }, ITEM: entity("ItemId"),
+    }, relationships: { BUYS: { ends: [{ entity: "SHOP", card: "0..1" }, { entity: "ITEM", card: "0..N" }] } } });
+    expect(table(result, "SHOP").foreignKeys[0]!.columns).toEqual(["BUYS_ItemId_2"]);
+    expect(result.notes.join("\n")).toContain("R:BUYS, BUYS#1, E:ITEM: name collision; BUYS_ItemId renamed to BUYS_ItemId_2");
+  });
+
+  it("propagates descriptive identifying FK names through weak PK chains", () => {
+    const result = mapping({ entities: {
+      BOOK: entity("BookId"), VOLUME: { weak: true, attrs: ["VolumeNo"], partialKey: ["VolumeNo"] },
+      PAGE: { weak: true, attrs: ["PageNo"], partialKey: ["PageNo"] },
+    }, relationships: {
+      VOLUME_OF: { identifies: "VOLUME", ends: [{ entity: "BOOK", card: "0..N" }, { entity: "VOLUME", card: "1..1" }] },
+      INDEXES: { ends: [{ entity: "BOOK", card: "0..N" }, { entity: "VOLUME", card: "0..1" }] },
+      PAGE_OF: { identifies: "PAGE", ends: [{ entity: "VOLUME", card: "0..N" }, { entity: "PAGE", card: "1..1" }] },
+    } });
+    const volume = table(result, "VOLUME"), page = table(result, "PAGE");
+    expect(volume.primaryKey).toEqual(["VOLUME_OF_BookId", "VolumeNo"]);
+    expect(volume.foreignKeys.map((fk) => fk.columns)).toEqual([["VOLUME_OF_BookId"], ["INDEXES_BookId"]]);
+    expect(page.primaryKey).toEqual(["VOLUME_VOLUME_OF_BookId", "VOLUME_VolumeNo", "PageNo"]);
+    expect(page.foreignKeys[0]!.references.columns).toEqual(volume.primaryKey);
   });
 
   it("rejects invalid lint input and unrepresentable keys instead of returning partial tables", () => {

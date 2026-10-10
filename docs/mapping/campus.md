@@ -31,10 +31,10 @@ Step 4: R:ASSIGNED\_TO is 1:N (E:STAFF 1..1, E:WARD 0..N); FK on E:STAFF, the ma
 Step 4: R:EMPLOYS is 1:N (E:HOSPITAL 1..N, E:STAFF 1..1); FK on E:STAFF, the max=1 (relational N-side) end.  
 Step 4: R:SUPERVISES is 1:N (E:STAFF/supervisor 0..N, E:STAFF/trainee 0..1); FK on E:STAFF/trainee, the max=1 (relational N-side) end.
 
-ADMISSION(<u>PATIENT\_PatientId</u>, <u>AdmittedOn</u>, DischargedOn, Reason, STAFF\_StaffId, STAFF\_StaffId\_2, BED\_BedNo)  
+ADMISSION(<u>PATIENT\_PatientId</u>, <u>AdmittedOn</u>, DischargedOn, Reason, ATTENDS\_StaffId, DISCHARGES\_StaffId, BED\_BedNo)  
 PATIENT\_PatientId → PATIENT(PatientId) [NOT NULL]  
-STAFF\_StaffId → STAFF(StaffId) [NOT NULL]  
-STAFF\_StaffId\_2 → STAFF(StaffId)  
+ATTENDS\_StaffId → STAFF(StaffId) [NOT NULL]  
+DISCHARGES\_StaffId → STAFF(StaffId)  
 BED\_BedNo → BED(BedNo)  
 UNIQUE(BED\_BedNo)  
 Step 2: E:ADMISSION is weak, identified by R:ADMISSION\_OF; PK = owner PK(s) + partial key.  
@@ -59,7 +59,6 @@ Step 6: A:STAFF.Qualifications is multivalued; PK = owner PK + stored simple val
 Notes:
 
 - R:DISCHARGES: The discharging clinician can differ from the attending one recorded by ATTENDS.
-- R:DISCHARGES, DISCHARGES#0, E:STAFF: name collision; STAFF\_StaffId renamed to STAFF\_StaffId\_2.
 - R:EMPLOYS: Employment is contractual with the hospital; ward assignment may change without changing the employer.
 - R:EMPLOYS, EMPLOYS#0 (E:HOSPITAL 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.
 - R:HAS\_BED, HAS\_BED#0 (E:ROOM 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.

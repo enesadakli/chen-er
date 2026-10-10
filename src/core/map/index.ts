@@ -12,6 +12,25 @@ const sorted = <T extends { name: string }>(items: readonly T[]) => [...items].s
 const distinct = <T>(items: T[]) => [...new Set(items)];
 const isMany = (end: NEnd) => end.max !== 1;
 
+function binaryDestination(rel: NRelationship): { destination: NEnd; tied: boolean } {
+  const ones = rel.ends.filter((end) => !isMany(end));
+  const candidates = ones.length === 2 && ones.some((end) => end.min >= 1)
+    ? ones.filter((end) => end.min >= 1) : ones;
+  return {
+    destination: [...candidates].sort((a, b) => compare(a.entity, b.entity) || compare(a.id, b.id))[0]!,
+    tied: candidates.length > 1,
+  };
+}
+
+/** Names reserved by stored attributes, including relationship attributes added later. */
+function attributeNames(attributes: readonly NAttribute[], prefix = ""): string[] {
+  return attributes.flatMap((attr) => {
+    if (attr.derived || attr.multivalued) return [];
+    const name = prefix ? `${prefix}_${attr.name}` : attr.name;
+    return attr.parts.length ? attributeNames(attr.parts, name) : [name.toLowerCase()];
+  });
+}
+
 /** Map normalized ER data without I/O. No partial mapping is returned for invalid input. */
 export function mapModel(model: NModel): MappingResponse {
   // This diagnostic describes the renderer's capability, not an invalid EER model.
@@ -46,6 +65,29 @@ export function mapModel(model: NModel): MappingResponse {
 
   const result: MappingResult = { relations: [], notes: [...model.notes] };
   const entityTables = new Map<string, MappingRelation>();
+  // Plan every relationship FK before allocating any: the first of two references
+  // must get a descriptive name too, including owner FKs that form a weak PK.
+  type ForeignKeyPlan = { relationship: NRelationship; end: NEnd };
+  const foreignKeyPlans = new Map<string, ForeignKeyPlan[]>();
+  const reservedAttributes = new Map(model.entities.map((e) => [e.id, new Set(attributeNames(e.attrs))]));
+  for (const rel of model.relationships) {
+    let ownerId: string;
+    let targets: NEnd[];
+    if (rel.identifies) {
+      ownerId = `E:${rel.identifies}`;
+      const identified = rel.ends.find((end) => end.entity === rel.identifies);
+      targets = rel.ends.filter((end) => end !== identified);
+    } else if (rel.ends.length === 2 && rel.ends.some((end) => !isMany(end))) {
+      const { destination } = binaryDestination(rel);
+      ownerId = `E:${destination.entity}`;
+      targets = rel.ends.filter((end) => end !== destination);
+    } else {
+      ownerId = rel.id;
+      targets = rel.ends;
+    }
+    foreignKeyPlans.set(ownerId, [...(foreignKeyPlans.get(ownerId) ?? []), ...targets.map((end) => ({ relationship: rel, end }))]);
+    reservedAttributes.set(ownerId, new Set([...(reservedAttributes.get(ownerId) ?? []), ...attributeNames(rel.attrs)]));
+  }
   // A common ancestor's identity is reused across a specialization lattice.
   const identityRoots = new Map<string, string>();
   const relationNames = new Set<string>();
@@ -68,8 +110,8 @@ export function mapModel(model: NModel): MappingResponse {
     result.relations.push(relation);
     return relation;
   };
-  const column = (owner: MappingRelation, name: string, sourceIds: string[], notNull = false) => {
-    const used = new Set(owner.columns.map((c) => c.name.toLowerCase()));
+  const column = (owner: MappingRelation, name: string, sourceIds: string[], notNull = false, reserved: ReadonlySet<string> = new Set()) => {
+    const used = new Set([...owner.columns.map((c) => c.name.toLowerCase()), ...reserved]);
     const actual = allocate(name, used, sourceIds.join(", "));
     owner.columns.push({ name: actual, sourceIds, notNull });
     return actual;
@@ -96,15 +138,48 @@ export function mapModel(model: NModel): MappingResponse {
     }
     return mapped;
   };
-  const copyPk = (owner: MappingRelation, target: MappingRelation, prefix: string, sources: string[], notNull: boolean, reuse = false) => {
+  const copyPk = (owner: MappingRelation, target: MappingRelation, prefix: string, sources: string[], notNull: boolean, reuse = false, reserved?: ReadonlySet<string>) => {
     const columns = target.primaryKey.map((pk) => {
       const base = prefix ? `${prefix}_${pk}` : pk;
       const existing = reuse ? owner.columns.find((c) => c.name === base) : undefined;
       if (existing) { existing.sourceIds = distinct([...existing.sourceIds, ...sources]); existing.notNull ||= notNull; return existing.name; }
-      return column(owner, base, sources, notNull);
+      return column(owner, base, sources, notNull, reserved);
     });
     owner.foreignKeys.push({ columns, references: { relation: target.name, columns: [...target.primaryKey] }, sourceIds: sources });
     return columns;
+  };
+  const copyRelationshipPk = (owner: MappingRelation, target: MappingRelation, rel: NRelationship, end: NEnd, notNull: boolean) => {
+    const ownerId = owner.elementIds[0]!;
+    const plans = foreignKeyPlans.get(ownerId) ?? [];
+    const reserved = reservedAttributes.get(ownerId) ?? new Set<string>();
+    const repeatedTarget = (entity: string) => plans.filter((plan) => plan.end.entity === entity).length
+      + Number(ownerId.startsWith("E:") && (parents.get(ownerId.slice(2)) ?? []).includes(entity)) > 1;
+    const preferredPrefix = (plan: ForeignKeyPlan, pk: string[]) => plan.end.role || (
+      repeatedTarget(plan.end.entity) || pk.some((name) => reserved.has(`${plan.end.entity}_${name}`.toLowerCase()))
+        ? plan.relationship.name : plan.end.entity
+    );
+    let prefix = preferredPrefix({ relationship: rel, end }, target.primaryKey);
+    if (!end.role && prefix === end.entity) {
+      const candidates = target.primaryKey.map((pk) => `${prefix}_${pk}`.toLowerCase());
+      const collides = owner.columns.some((c) => candidates.includes(c.name.toLowerCase())) || plans.some((plan) => {
+        if (plan.relationship === rel && plan.end === end) return false;
+        const pk = entityTables.get(plan.end.entity)?.primaryKey ?? [];
+        const otherPrefix = preferredPrefix(plan, pk);
+        return pk.some((name) => candidates.includes(`${otherPrefix}_${name}`.toLowerCase()));
+      });
+      if (collides) prefix = rel.name;
+    }
+    const reservedNames = new Set(reserved);
+    if (!end.role) {
+      // Keep explicit roles readable even when their FK is allocated later.
+      for (const plan of plans) {
+        if (!plan.end.role) continue;
+        for (const pk of entityTables.get(plan.end.entity)?.primaryKey ?? []) {
+          reservedNames.add(`${plan.end.role}_${pk}`.toLowerCase());
+        }
+      }
+    }
+    return copyPk(owner, target, prefix, [rel.id, end.id, `E:${end.entity}`], notNull, false, reservedNames);
   };
   const participation = (rel: NRelationship, enforced: Set<string>) => {
     for (const end of rel.ends) {
@@ -158,7 +233,7 @@ export function mapModel(model: NModel): MappingResponse {
       });
     }
     else if (identifying) {
-      const ownerKeys = owners.flatMap((end, i) => copyPk(out, ownerTables[i]!, end.role || end.entity, [identifying.id, end.id, `E:${end.entity}`], true));
+      const ownerKeys = owners.flatMap((end, i) => copyRelationshipPk(out, ownerTables[i]!, identifying, end, true));
       key(out, [...ownerKeys, ...expand(e.partialKey)], true);
       attrs(out, identifying.attrs);
       participation(identifying, new Set(identifying.ends.filter((end) => end.entity === name).map((end) => end.id)));
@@ -185,16 +260,15 @@ export function mapModel(model: NModel): MappingResponse {
     const ones = rel.ends.filter((end) => !isMany(end));
     if (rel.ends.length === 2 && ones.length) {
       const step = ones.length === 2 ? 3 : 4;
-      const candidates = ones.length === 2 ? (ones.some((end) => end.min >= 1) ? ones.filter((end) => end.min >= 1) : ones) : ones;
-      const destination = [...candidates].sort((a, b) => compare(a.entity, b.entity) || compare(a.id, b.id))[0]!;
+      const { destination, tied } = binaryDestination(rel);
       const targetEnd = rel.ends.find((end) => end !== destination)!;
       const out = entityTables.get(destination.entity)!;
       const target = entityTables.get(targetEnd.entity)!;
-      const tie = candidates.length > 1 ? "; both or neither end is total: choose the first entity/end id in lexical order" : "";
+      const tie = tied ? "; both or neither end is total: choose the first entity/end id in lexical order" : "";
       const explanation = explain(step, [rel.id, destination.id, targetEnd.id],
         `${rel.id} is ${step === 3 ? "1:1" : "1:N"} (${cards}); FK on E:${destination.entity}${destination.role ? `/${destination.role}` : ""}, the ${step === 3 ? "chosen" : "max=1 (relational N-side)"} end${tie}.`);
       out.steps.push(explanation);
-      const fk = copyPk(out, target, targetEnd.role || targetEnd.entity, [rel.id, targetEnd.id, `E:${targetEnd.entity}`], destination.min >= 1);
+      const fk = copyRelationshipPk(out, target, rel, targetEnd, destination.min >= 1);
       if (step === 3) {
         // Optional 1:1 must retain nullable FK columns; UNIQUE does not imply NOT NULL.
         out.uniqueKeys.push(fk);
@@ -206,7 +280,7 @@ export function mapModel(model: NModel): MappingResponse {
     } else {
       const step = rel.ends.length > 2 ? 7 : 5;
       const out = table(rel.name, explain(step, [rel.id], `${rel.id} is ${step === 7 ? "n-ary" : "M:N"} (${cards}); PK = ${step === 7 ? "FKs of many ends only; max=1 ends excluded" : "all participating PKs"}.`));
-      const endKeys = rel.ends.map((end) => copyPk(out, entityTables.get(end.entity)!, end.role || end.entity, [rel.id, end.id, `E:${end.entity}`], true));
+      const endKeys = rel.ends.map((end) => copyRelationshipPk(out, entityTables.get(end.entity)!, rel, end, true));
       let pk = endKeys.filter((_, i) => step === 5 || isMany(rel.ends[i]!)).flat();
       if (!pk.length) {
         pk = endKeys.flat();
