@@ -5,7 +5,23 @@ All notable changes to chen-er are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-10
+
+The npm package is now `chen-erd` (`npm install -g chen-erd` provides the `chen` command; the
+name `chen-er` belongs to an unrelated package). The project keeps the name chen-er.
+
 ### Added
+
+- `chen report <model> [--format md|html] [--out file] [--no-pins]` and read-only MCP `report_er`: a
+  method report for course work. Requirements with their status and traced elements, the diagram, entity
+  and relationship tables (`Label (ID)` where they differ), untraced elements, lint findings and the
+  relational schema with mapping steps. The HTML file is self-contained and prints on A4. See
+  `docs/report.md`.
+- Agent panel in `chen serve --agent claude`: ask the local Claude Code CLI to change the model in plain
+  language; the panel streams its steps, lints the result, shows what changed and can undo the turn.
+- Diagram focus in the viewer: select a relationship or entity to dim the rest and highlight its edges
+  and labels; layout changes have session Undo/Redo.
+- `chen init --empty [--title <text>]` writes an empty model for a requirements-first start.
 
 - Parent-relative attribute pins (`{dx, dy}`) in version 1 layout files, including relationship attributes
   and composite parts. Entity/relationship pins remain absolute. Legacy absolute attributes stay exact on
