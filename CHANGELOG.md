@@ -7,6 +7,13 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Added
 
+- `chen map <model> --format text|md|sql|json [--out file]` and read-only MCP
+  `map_er`: deterministic, browser-safe ER-to-relational mapping with steps 1–7
+  and specialization option 8A, source ids, FK/PK/UNIQUE/NOT NULL constraints,
+  recursive roles, naming collision notes and unenforced participation constraints.
+  SQL uses `--default-type` placeholders (default `TEXT`). Invalid models are
+  refused. See `docs/mapping.md` for rules and the n-ary cardinality caveat.
+
 - Requirements tab in `chen serve`: write the requirements one sentence per line
   (Enter opens the next line, Backspace on an empty line removes it, a pasted
   list becomes lines). They autosave to `<model>.er.requirements.md`, a

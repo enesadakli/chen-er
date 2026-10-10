@@ -30,9 +30,9 @@ describe("MCP in-memory protocol", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("lists the three tools with input schemas", async () => {
+  it("lists the four tools with input schemas", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_schema", "lint_er", "render_er"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_schema", "lint_er", "map_er", "render_er"]);
     expect(tools.every((tool) => tool.inputSchema.type === "object" && tool.description)).toBe(true);
   });
 
@@ -58,11 +58,29 @@ describe("MCP in-memory protocol", () => {
     const invalid = await client.callTool({ name: "lint_er", arguments: { model: "version: 2" } });
     expect(invalid.isError).toBe(true);
     expect(payload(invalid).diagnostics[0].severity).toBe("error");
-    for (const name of ["lint_er", "render_er"]) {
+    for (const name of ["lint_er", "render_er", "map_er"]) {
       for (const args of [{}, { model: exampleModel, path: "model.er.yaml" }]) {
         expect((await client.callTool({ name, arguments: args })).isError).toBe(true);
       }
     }
+  });
+
+  it("maps text and file input to JSON with Markdown, and refuses lint errors", async () => {
+    const path = join(dir, "mapping.er.yaml");
+    await writeFile(path, exampleModel);
+    for (const args of [{ model: exampleModel }, { path }]) {
+      const result = await client.callTool({ name: "map_er", arguments: args });
+      expect(result.isError).not.toBe(true);
+      const data = payload(result);
+      expect(data.relations.map((r: { name: string }) => r.name)).toEqual(["BOOK", "COPY"]);
+      expect(data.relations[1].step).toBe(2);
+      expect(data.md).toContain("Step 2:");
+      expect(data.diagnostics).toEqual([]);
+    }
+    const result = await client.callTool({ name: "map_er", arguments: { model: exampleModel.replace("entity: BOOK", "entity: UNKNOWN") } });
+    expect(result.isError).toBe(true);
+    expect(payload(result).relations).toBeUndefined();
+    expect(payload(result).diagnostics.some((d: { rule: string }) => d.rule === "unknown-entity")).toBe(true);
   });
 
   it("renders text to one JSON item and one PNG image", async () => {

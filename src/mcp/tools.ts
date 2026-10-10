@@ -5,6 +5,8 @@ import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
 import { lint, RULES, LINT_DISCLAIMER } from "../core/lint/index.js";
 import { parseModel } from "../core/normalize.js";
 import { Model } from "../core/schema.js";
+import { mapText } from "../app/map.js";
+import { mappingMarkdown } from "../core/map/index.js";
 
 const source = {
   model: z.string().optional().describe("Complete .er.yaml model text. Supply exactly one of model or path."),
@@ -17,6 +19,18 @@ export const lintInput = z.object({
   ...source,
   disable: z.array(z.string()).optional().describe("Lint rule ids to skip; structural parsing errors cannot be disabled."),
 }).strict().refine(exactlyOne, "Supply exactly one of model or path.");
+
+export const mapInput = z.object(source).strict().refine(exactlyOne, "Supply exactly one of model or path.");
+
+export async function mapEr(input: z.infer<typeof mapInput>, io: ToolIO): Promise<CallToolResult> {
+  const args = mapInput.parse(input);
+  const result = mapText(args.model ?? await io.readText(args.path!));
+  return textResult({
+    ...(result.mapping ? { ...result.mapping, md: mappingMarkdown(result.mapping) } : {}),
+    diagnostics: result.diagnostics,
+    disclaimer: LINT_DISCLAIMER,
+  }, !result.mapping);
+}
 
 export const renderInput = z.object({
   ...source,

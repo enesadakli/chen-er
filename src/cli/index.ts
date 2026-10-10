@@ -1,6 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 import {
-  initCommand, lintCommand, renderCommand, rulesCommand, schemaCommand,
+  initCommand, lintCommand, mapCommand, renderCommand, rulesCommand, schemaCommand,
   type CommandResult, type LintCommandOptions, type RenderCommandOptions,
 } from "./commands.js";
 
@@ -35,6 +35,13 @@ program.command("lint")
   .option("--no-course", "disable course findings")
   .option("--no-heuristic", "disable heuristic findings")
   .action((model: string, options: LintCommandOptions) => print(lintCommand(model, options)));
+
+program.command("map").description("map ER elements to relations with course step explanations")
+  .argument("<model>", "path to a .er.yaml model")
+  .addOption(new Option("--format <name>", "output format").choices(["text", "md", "sql", "json"]).default("text"))
+  .option("-o, --out <file>", "write the mapping to a file")
+  .option("--default-type <type>", "placeholder SQL column type", "TEXT")
+  .action(async (model: string, options: import("./commands.js").MapCommandOptions) => print(await mapCommand(model, options)));
 
 program.command("schema").description("print the model JSON Schema")
   .action(() => print(schemaCommand()));

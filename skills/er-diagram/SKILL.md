@@ -11,10 +11,21 @@ participation, crossings and attribute ownership. Rename or restructure ambiguou
 facts; pin a node in `model.er.layout.json` when placement needs correction. Repeat.
 With a source checkout, replace `chen` with `npx tsx src/cli/index.ts`.
 
+For relational design, run `chen map model.er.yaml --format md` after checking
+the model; use `--format sql --default-type TEXT --out tables.sql` for SQL or
+`--format json` for table metadata. Each table explains its producing course
+step (1–7, specialization option 8A) and later FK additions. Read notes for
+unenforced constraints, name collisions and the n-ary participation caveat in
+`docs/mapping.md`. SQL types are placeholders. Fix errors before mapping.
+
 If the CLI is unavailable, call MCP `get_schema`, then `lint_er`, then `render_er`.
 Supply exactly one of `model` (YAML text) or `path` (server-side file path).
 Inspect the returned PNG. Use `path` to load sibling layout pins; `out` writes
 both an SVG and a sibling PNG.
+
+MCP `map_er` accepts the same exactly-one-of `model`/`path` source and returns
+JSON relations, keys, FKs, explanations, notes, diagnostics and `md`, without
+writing files. Mapping supports specializations; rendering still does not.
 
 ## Model cheat sheet
 
