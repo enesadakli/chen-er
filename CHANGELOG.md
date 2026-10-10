@@ -3,6 +3,28 @@
 All notable changes to chen-er are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `chen serve --agent codex`: the agent panel runs the local Codex CLI headless
+  (`codex exec --json`, workspace-write sandbox limited to the agent's working
+  directory and the model's directory, `resume` for follow-up requests) with
+  the same steps, cancel, change notes, undo and error messages as Claude Code.
+- The agent thread survives a server restart. It is kept in
+  `<model>.er.agent.json` next to the model (written atomically after every
+  change; never contains the URL token): requests, steps, change notes, the
+  agent session for resume and the undo snapshot of the latest change. A
+  request that was running when the server stopped is shown as cancelled with
+  a notice. Add `*.er.agent.json` to `.gitignore`.
+
+### Changed
+
+- The agent prompt also forbids editing `*.er.agent.json` files.
+- From a source checkout, the lint command given to the agent uses the
+  checkout's own `node_modules/.bin/tsx` when present instead of `npx tsx`,
+  which needs the network when run from another directory.
+
 ## [0.3.0] - 2026-10-09
 
 ### Added
