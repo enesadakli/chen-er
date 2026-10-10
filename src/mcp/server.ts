@@ -6,6 +6,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { getSchema, lintEr, lintInput, mapEr, mapInput, renderEr, renderInput, type ToolIO } from "./tools.js";
 import { reportEr, reportInput } from "./tools.js";
+import { packageVersion } from "../app/version.js";
 
 const fileIO: ToolIO = {
   readText: (path) => readFile(path, "utf8"),
@@ -21,7 +22,7 @@ async function safely(run: () => CallToolResult | Promise<CallToolResult>): Prom
 }
 
 export function createServer(io: ToolIO = fileIO): McpServer {
-  const server = new McpServer({ name: "chen-er", version: "0.1.0" });
+  const server = new McpServer({ name: "chen-er", version: packageVersion });
   server.registerTool("get_schema", {
     description: "Get the authoritative draft-2020-12 ER model schema, annotated YAML example, notation cheat sheet and available lint rules. Start here before writing a model.",
     inputSchema: {},

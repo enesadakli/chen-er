@@ -3,10 +3,11 @@ import {
   initCommand, lintCommand, mapCommand, renderCommand, rulesCommand, schemaCommand,
   type CommandResult, type LintCommandOptions, type RenderCommandOptions,
 } from "./commands.js";
+import { packageVersion } from "../app/version.js";
 
 const program = new Command("chen")
   .description("Chen ER diagrams")
-  .version("0.1.0")
+  .version(packageVersion)
   .addHelpText("after", "\nExit codes: 0 ok; 1 model errors (parse/schema/lint); 2 usage or I/O failure.")
   .exitOverride();
 
