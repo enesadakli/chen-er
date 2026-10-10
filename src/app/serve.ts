@@ -16,6 +16,7 @@ import { fileBytes, GuardError, replaceBytes, revision } from "./file-guard.js";
 import { selectionMetadata, type SelectionMetadata } from "../viewer/selection.js";
 import { AgentError, createAgent, parseTurnRequest, type AgentController, type AgentKind, type Turn } from "./agent.js";
 import { lintCommandFor } from "./agent-prompt.js";
+import { agentStatePathFor } from "./agent-store.js";
 
 export interface ViewerDiagnostic extends Diagnostic { target?: string }
 export interface ViewerState {
@@ -38,12 +39,14 @@ export interface AgentOptions {
   kind: AgentKind;
   /** Agent working directory (default: the model's directory). */
   cwd?: string;
-  /** Executable (default: env CHEN_AGENT_BIN, then "claude"). */
+  /** Executable (default: env CHEN_AGENT_BIN, then the kind: "claude" or "codex"). */
   bin?: string;
   /** Command prefix the agent runs as `<lintCommand> <model>` (default: derived from how this process started). */
   lintCommand?: string;
   /** Delay between SIGTERM and SIGKILL on cancel (default 3000 ms). */
   killAfterMs?: number;
+  /** Keep the thread in `<model>.er.agent.json` across restarts (default true). */
+  persist?: boolean;
 }
 export interface ServeOptions {
   port?: number; open?: boolean; engine?: LayoutOptions["engine"]; agent?: AgentOptions;
@@ -257,9 +260,10 @@ export async function serve(model: string, options: ServeOptions = {}) {
     cwd: agentCwd,
     modelPath,
     layoutPath: pinsPath,
-    bin: options.agent.bin ?? process.env.CHEN_AGENT_BIN ?? "claude",
+    bin: options.agent.bin ?? process.env.CHEN_AGENT_BIN ?? options.agent.kind,
     lintCommand: options.agent.lintCommand ?? lintCommandFor(process.argv[1], root),
     killAfterMs: options.agent.killAfterMs,
+    ...(options.agent.persist !== false ? { statePath: agentStatePathFor(modelPath) } : {}),
     emit: (turn: Turn) => { for (const client of clients) client.write(`event: agent-turn\ndata: ${JSON.stringify(turn)}\n\n`); },
     writeModel: (expected, next) => serial(async () => { replaceBytes(modelPath, expected, next); }),
     writeLayout: (expected, next) => serial(async () => { guardLayoutPath(); replaceBytes(pinsPath, expected, next); }),

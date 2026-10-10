@@ -1,11 +1,11 @@
 # Agent panel (design brief and API contract)
 
-Status: phase 1 (Claude backend + working panel). Codex backend and visual polish follow.
+Status: phase 2 (Claude and Codex backends, thread kept across server restarts).
 
 ## Job
 
 A student reviewing a diagram in `chen serve` asks for model changes in plain language without leaving the
-viewer. The request runs a local coding agent (Claude Code headless, later Codex) that edits the YAML model; the
+viewer. The request runs a local coding agent (Claude Code or the Codex CLI, headless) that edits the YAML model; the
 diagram updates through the existing live reload. Mode: Operate. The diagram stays the task; the panel is a quiet
 helper in the notebook margin.
 
@@ -14,20 +14,19 @@ helper in the notebook margin.
 - The viewer still never writes the model itself. The agent writes the model. The only server-side model write is
   **Undo agent change**, an explicit user action that restores the snapshot taken before that agent turn.
 - The agent never writes the layout file (pins/positions stay the human's).
-- No API keys: the server runs the user's installed, logged-in CLI (`claude -p`).
+- No API keys: the server runs the user's installed, logged-in CLI (`claude -p` or `codex exec`).
 - The panel exists only when `chen serve` is started with `--agent`.
 
 ## CLI
 
 ```
-chen serve model.er.yaml --agent claude [--agent-cwd <dir>]
+chen serve model.er.yaml --agent claude|codex [--agent-cwd <dir>]
 ```
 
-- `--agent claude` enables the panel (phase 1 supports only `claude`; `codex` is reserved and rejected with a clear
-  message until phase 2).
+- `--agent claude` or `--agent codex` enables the panel with that CLI. Any other value is a usage error.
 - `--agent-cwd` is the agent's working directory (default: the model's directory). Users who keep project memory
   elsewhere (for example a notes vault with its own agent instructions) point it there. The model's directory is
-  always added with `--add-dir`.
+  always added with `--add-dir` (both CLIs).
 - On start with `--agent`, the server prints the viewer URL including a one-time token:
   `http://127.0.0.1:<port>/?t=<token>`; `--open` opens that URL.
 
@@ -43,7 +42,7 @@ chen serve model.er.yaml --agent claude [--agent-cwd <dir>]
 
 ## Agent invocation (claude)
 
-- Command (overridable for tests with env `CHEN_AGENT_BIN`, default `claude`):
+- Command (overridable for tests with env `CHEN_AGENT_BIN`, default `claude`; the same variable overrides `codex`):
   `claude -p <prompt> --output-format stream-json --verbose --permission-mode acceptEdits
   --allowedTools 'Bash(<chen lint command>:*)' mcp__chen-er__lint_er mcp__chen-er__render_er --add-dir <modelDir>
   [--resume <sessionId>]`, cwd = `--agent-cwd`. The child inherits the server's environment variables.
@@ -51,17 +50,44 @@ chen serve model.er.yaml --agent claude [--agent-cwd <dir>]
   run the lint command or the chen-er MCP tools. The pre-approved set is exactly what the prompt asks for: the
   lint command (same string as in the prompt, any trailing arguments) and the chen-er MCP `lint_er`/`render_er`.
 - The session id comes from the stream (`session_id` field of the init/result events) and is reused with
-  `--resume` for the next turn, so the conversation continues. Kept in memory for the server's lifetime.
+  `--resume` for the next turn, so the conversation continues. It is stored with the thread (see Persistence).
 - Prompt = short fixed preamble + user text. Preamble (English, terse): the absolute model path; the selected
   elements as `id (label)` lines; rules: edit only that YAML file; keep comments and formatting; run
   `<chen lint command> <model path>` after editing and fix errors; never edit `*.er.layout.json`; do not create or
-  update notes, memory, receipts or logs outside the model file; reply with one
-  or two plain sentences describing what changed. `<chen lint command>` is how this server itself was started
-  (e.g. `node <repo>/bin/chen.js` or `npx tsx <repo>/src/cli/index.ts`).
+  update notes, memory, receipts or logs outside the model file; never edit `*.er.layout.json` or `*.er.agent.json`;
+  reply with one or two plain sentences describing what changed. `<chen lint command>` is how this server itself was
+  started (e.g. `node <repo>/bin/chen.js`, or for a source checkout `<repo>/node_modules/.bin/tsx
+  <repo>/src/cli/index.ts`, falling back to `npx tsx` when the checkout has no tsx; `npx` would otherwise try the
+  network from another directory, which the Codex sandbox does not have). Both backends get the same prompt.
 - One turn at a time. Cancel kills the child process (SIGTERM, then SIGKILL after 3 s).
 - Exit/limit handling: non-zero exit -> `error` with the last 20 lines of stderr; output mentioning a usage limit
   -> status `limit`. `errorKind` classifies the cause: `not-found` (spawn ENOENT), `not-logged-in` (stderr or result
   mentions `/login`, "not logged in", "Invalid API key" or "authentication"), `limit`, otherwise `other`.
+
+## Agent invocation (codex)
+
+- Command (`codex-cli` 0.160; `CHEN_AGENT_BIN` overrides `codex`), cwd = `--agent-cwd`, stdin closed:
+  `codex exec --json --sandbox workspace-write --cd <agent cwd> --add-dir <modelDir> --skip-git-repo-check <prompt>`;
+  later turns: `codex exec --json --sandbox workspace-write --cd <agent cwd> --add-dir <modelDir>
+  --skip-git-repo-check resume <threadId> <prompt>`. `resume` does not accept `--sandbox`/`--cd`, so the exec-level
+  options come before the subcommand.
+- Why: `--json` streams thread events as JSONL. `workspace-write` lets the agent write only inside the working
+  directory and `--add-dir` directories, and run commands without network; `codex exec` never asks for approval,
+  so a headless turn cannot stall on a permission prompt (a command the sandbox denies simply fails and the agent
+  sees the error). `--skip-git-repo-check` allows model folders outside a git repository. With an open stdin pipe
+  codex waits for more prompt input, so the server spawns it with stdin ignored. The user's `~/.codex/config.toml`
+  (model, MCP servers such as chen-er) still applies.
+- Events → steps: `thread.started.thread_id` is the session id. Tool items become a step when first seen
+  (`item.started`, or `item.completed` if no start was seen), once per item id: `command_execution` →
+  `Shell <first word of the command inside the shell wrapper>`, `file_change` → `Edit|Create|Delete <file names>`,
+  `mcp_tool_call` → `mcp__<server>__<tool>`, `web_search` → `Web search`, an `error` item → a text step.
+  `agent_message` items become a text step when completed; the last one is the reply. `reasoning` and `todo_list`
+  are not shown. A top-level `error` or `turn.failed` marks the result as an error with its message;
+  `turn.completed` clears it again (retried stream errors arrive as `error` events too).
+- Error classification is shared with Claude: spawn ENOENT → `not-found` ("Install the Codex CLI, then run
+  `codex login`"); `not-logged-in` also matches `codex login` and "Unauthorized"; "usage limit" / "hit your
+  limit" → `limit`; otherwise `other` with the stderr tail (codex writes "Reading additional input from stdin..."
+  and MCP startup noise to stderr; only a failed turn shows it).
 
 ## Snapshot and undo
 
@@ -70,7 +96,29 @@ chen serve model.er.yaml --agent claude [--agent-cwd <dir>]
 - `Undo agent change` for turn T is allowed only if T is the most recent turn that changed the model and the
   current model bytes equal T's post-turn bytes; it then writes the snapshot atomically (temp file + rename) and
   reports `undone`. Otherwise 409 with a reason ("the model changed after this turn").
-- History is in memory (cleared on restart).
+- The comparison uses sha256 revisions of the bytes, so it works the same after a restart.
+
+## Persistence
+
+- File: `<model>.er.agent.json` next to the model, named like the layout file (`club.er.yaml` →
+  `club.er.agent.json`). It belongs in `.gitignore` (`*.er.agent.json`). The server's file watcher ignores it.
+- Written after every turn state change (start, each step, finish, undo) atomically: a private (0600) temp file in
+  the same directory, then rename. A write failure is reported once on stderr and does not stop the turn.
+  The programmatic `serve()` option `agent.persist: false` keeps the thread in memory only (the CLI always persists).
+- Format (JSON, `version: 1`): `{ version, model: <absolute model path>, kind: "claude"|"codex", sessionId?,
+  entries: [{ turn: Turn, beforeRevision, afterRevision?, before? }] }`. Revisions are sha256 hex of the model
+  bytes (or `absent`). `before` (base64, or null when there was no model file) is kept only for the latest
+  model-changing turn and for a running turn; older snapshots are dropped. The URL token is never stored.
+- On start the server loads the file only when it is a regular file, parses as this format, and its `model` and
+  `kind` equal the current model path and `--agent`; otherwise the thread starts empty and the file is replaced at
+  the next request. The stored session id is used for `--resume` / `resume`, and turn ids continue after the
+  highest stored `t<n>`.
+- A turn stored as `running` (the process died mid-turn) becomes `cancelled` with `notice`: "The server stopped
+  while this request was running, so it was cancelled. Changes are measured against the model as found at
+  restart." Its change set compares the stored snapshot with the model file at restart, so it can be undone while
+  the file stays as found. A graceful stop (Ctrl+C) cancels the running turn normally before exit.
+- Undo after a restart follows the same rules as before: latest model-changing turn only, and only while the model
+  bytes match that turn's after revision.
 
 ## Change set
 
@@ -89,7 +137,8 @@ If either side fails to parse, report `parseError: true` and empty lists.
 
 `Turn = { id, text, selection, startedAt, finishedAt?, status: "running"|"ok"|"error"|"cancelled"|"limit"|"undone",
 reply?: string, steps: Step[], changes?: { added, removed, modified, parseError? }, error?: string,
-errorKind?: "not-found"|"not-logged-in"|"limit"|"other" }` (`errorKind` only on `error`/`limit` turns),
+errorKind?: "not-found"|"not-logged-in"|"limit"|"other", notice?: string }` (`errorKind` only on `error`/`limit` turns;
+`notice` when the server ended the turn itself, shown instead of "Cancelled."),
 `Step = { kind: "tool"|"text", summary: string }` (tool steps summarized as e.g. `Edit university.er.yaml`).
 
 ## Events (existing SSE channel `/api/events`)
@@ -108,12 +157,13 @@ diagram), but agent events are only emitted when the panel is enabled.
   `- HAS`, each a link that selects/focuses the element on the drawing, plus **Undo** when allowed.
 - Context chips above the input show the current diagram selection (`▸ STUDENT`), removable with ×; the selection
   is sent with the request.
-- Running state: one line `Claude is working… 12 s` with a Cancel button; tool steps folded under a disclosure.
+- Running state: one line `Claude is working… 12 s` (`Codex is working…` with `--agent codex`) with a Cancel
+  button; tool steps folded under a disclosure. All agent names in the panel come from `kind`.
 - After a turn, changed elements get the existing selection-style halo for ~3 s (screen only; never in exports;
   none with prefers-reduced-motion beyond a static mark).
 - Empty state: one sentence and three example requests that fill the input when clicked
   (`Add a BirthDate attribute to the selected entity`, `Make ENROLLS one-to-many`, `Explain the heuristic findings`).
-- Errors: CLI not found / not logged in -> what to run (`claude` then `/login`); limit -> say the agent hit its usage
+- Errors: CLI not found / not logged in -> what to run (`claude` then `/login`; `codex login` for Codex); limit -> say the agent hit its usage
   limit; error -> short message + stderr excerpt in a disclosure. The panel decides by `errorKind`; text heuristics
   on `error` are only a fallback for turns without it.
 - Keyboard: `/` focuses the input (when focus is not in a text field), Enter sends, Shift+Enter newline, Escape

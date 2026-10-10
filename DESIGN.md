@@ -126,8 +126,9 @@ notes column looks exactly as before.
 - **Empty state.** One sentence on what the panel does and three example requests as dotted-underline text
   links that fill the input.
 - **Errors.** Error text uses the red pencil, always as a sentence that names the problem and the fix: CLI not
-  found or not logged in (names the command and `/login`), usage limit, a generic stop with the stderr excerpt in
-  an `Error output` disclosure (12px mono, 1px graphite rule on the left). A request while one is running says
-  "A request is already running."
+  found or not logged in (names the command and `/login`, or `codex login` for Codex), usage limit, a generic
+  stop with the stderr excerpt in an `Error output` disclosure (12px mono, 1px graphite rule on the left). A
+  request while one is running says "A request is already running." A request the server cancelled because it
+  stopped mid-turn shows the server's notice in place of "Cancelled."
 - **Keys.** `/` opens the Agent tab and focuses the input from anywhere outside a text field; Enter sends,
   Shift+Enter adds a line; Escape cancels a running turn while the Agent tab is open.

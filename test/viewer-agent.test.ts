@@ -91,7 +91,10 @@ describe("context chips", () => {
 describe("outcomes and input", () => {
   it("names what to run when the CLI is missing or logged out", () => {
     expect(outcome(turn("1", { status: "error", error: "spawn claude ENOENT" }))).toEqual({ kind: "missing", message: "Claude Code was not found. Install it, run `claude` once in a terminal, then `/login`." });
-    expect(outcome(turn("1", { status: "error", error: "Not logged in" }), "codex")?.message).toBe("Codex is not logged in. Run `codex` in a terminal, then `/login`.");
+    expect(outcome(turn("1", { status: "error", error: "Not logged in" }), "codex")?.message).toBe("Codex is not logged in. Run `codex login` in a terminal.");
+    expect(outcome(turn("1", { status: "error", errorKind: "not-found" }), "codex")?.message).toBe("Codex CLI was not found. Install it, then run `codex login` in a terminal.");
+    expect(outcome(turn("1", { status: "error", errorKind: "other", error: "boom" }), "codex")?.message).toBe("Codex stopped with an error.");
+    expect(outcome(turn("1", { status: "limit" }), "codex")?.message).toBe("Codex hit its usage limit. Try again after the limit resets.");
     expect(outcome(turn("1", { status: "error", error: "Invalid API key · Please run /login" }))?.kind).toBe("login");
     expect(outcome(turn("1", { status: "limit" }))?.message).toMatch(/usage limit/);
   });
@@ -107,6 +110,11 @@ describe("outcomes and input", () => {
     expect(error).toMatchObject({ kind: "error", detail: "line 1\nline 2" });
     expect(outcome(turn("1", { status: "ok", changes: { added: [], removed: [], modified: [] } }))?.message).toBe("No changes to the model.");
     expect(outcome(turn("1"))).toBeUndefined();
+  });
+  it("shows the server's notice on a turn it cancelled itself", () => {
+    expect(outcome(turn("1", { status: "cancelled" }))).toEqual({ kind: "cancelled", message: "Cancelled." });
+    expect(outcome(turn("1", { status: "cancelled", notice: "The server stopped while this request was running, so it was cancelled." })))
+      .toEqual({ kind: "cancelled", message: "The server stopped while this request was running, so it was cancelled." });
   });
   it("takes the token from the address once and strips it", () => {
     expect(takeToken("http://127.0.0.1:4000/?t=abc&x=1#h", null)).toEqual({ token: "abc", cleanHref: "/?x=1#h" });

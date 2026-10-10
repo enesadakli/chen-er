@@ -124,20 +124,19 @@ export interface ServeCommandOptions {
   port?: number;
   open?: boolean;
   engine?: LayoutOptions["engine"];
-  /** `claude` enables the agent panel; `codex` is reserved. */
+  /** `claude` or `codex` enables the agent panel with that CLI. */
   agent?: string;
   agentCwd?: string;
 }
 
 /** Maps CLI flags to the server's agent options; throws a usage message for unsupported combinations. */
-export function agentOptions(options: Pick<ServeCommandOptions, "agent" | "agentCwd">): { kind: "claude"; cwd?: string } | undefined {
+export function agentOptions(options: Pick<ServeCommandOptions, "agent" | "agentCwd">): { kind: "claude" | "codex"; cwd?: string } | undefined {
   if (options.agent === undefined) {
-    if (options.agentCwd !== undefined) throw new Error("--agent-cwd requires --agent claude.");
+    if (options.agentCwd !== undefined) throw new Error("--agent-cwd requires --agent claude or --agent codex.");
     return undefined;
   }
-  if (options.agent === "codex") throw new Error("--agent codex is not supported yet. Use --agent claude.");
-  if (options.agent !== "claude") throw new Error(`Unknown agent: ${options.agent}. Use --agent claude.`);
-  return { kind: "claude", ...(options.agentCwd !== undefined ? { cwd: options.agentCwd } : {}) };
+  if (options.agent !== "claude" && options.agent !== "codex") throw new Error(`Unknown agent: ${options.agent}. Use --agent claude or --agent codex.`);
+  return { kind: options.agent, ...(options.agentCwd !== undefined ? { cwd: options.agentCwd } : {}) };
 }
 
 export async function serveCommand(modelPath: string, options: ServeCommandOptions = {}) {
