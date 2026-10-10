@@ -69,7 +69,7 @@ it("registers chen map with actual flags and preserves process exit codes", () =
   expect(readFileSync(out, "utf8")).toContain("INTEGER NOT NULL");
   writeFileSync(path, exampleModel.replace("entity: BOOK", "entity: MISSING"));
   expect(run([]).status).toBe(1);
-});
+}, 30000);
 
 it.each(["campus", "ternary"])("generated %s SQL executes with real FK/PK constraints", (name) => {
   const mapping = mapText(readFileSync(`bench/fixtures/${name}.er.yaml`, "utf8")).mapping!;

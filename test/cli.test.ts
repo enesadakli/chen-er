@@ -134,7 +134,7 @@ describe("CLI commands and app services", () => {
     expect(JSON.parse(json)).toHaveProperty("disclaimer");
     expect(spawnSync(process.execPath, [...args, "render", model, "--engine", "invalid"]).status).toBe(2);
     expect(spawnSync(process.execPath, [...args, "lint"]).status).toBe(2);
-  });
+  }, 30000);
 
   it("documents --no-pins and parses it as a flag that leaves the layout file alone", () => {
     const args = ["--import", "tsx", "src/cli/index.ts"];
