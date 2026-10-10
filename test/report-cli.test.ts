@@ -19,6 +19,8 @@ it("writes Markdown and sibling SVG with relative reference and deterministic by
   const md = readFileSync(out, "utf8"), diagram = readFileSync(svg, "utf8");
   expect(md).toContain("![ER diagram](library.report.svg)");
   expect(md).toContain("Not applied yet");
+  expect(md).toContain("No requirement has been applied to the model yet, so traceability is not available.");
+  expect(md).not.toContain("Untraced elements");
   expect(md).not.toContain(dir);
   expect(diagram).toContain("<svg");
   expect((await reportCommand(path)).exitCode).toBe(0);

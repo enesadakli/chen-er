@@ -44,7 +44,7 @@ describe("method report core", () => {
     ] });
     expect(requirements[1]).toMatchObject({ kind: "list", title: "Rationale", numbered: true, items: ["R1: A key | identifies <people>."] });
     const trace = doc.sections.find((s) => s.heading === "Traceability")!;
-    expect(trace.blocks[0]).toMatchObject({ title: "Untraced elements", items: expect.arrayContaining(["First (Person | <student>)", "Date (HAS_RECORD)"]) });
+    expect(trace.blocks[0]).toMatchObject({ title: "Untraced elements", items: expect.arrayContaining(["First (Name, Person | <student>)", "Date (HAS_RECORD)"]) });
     expect(trace.blocks[1]).toMatchObject({ title: "Not covered", items: ["R4: Missing capacity"] });
   });
 
@@ -68,6 +68,69 @@ describe("method report core", () => {
     expect(html).toContain("Person | &lt;student&gt;");
     expect(html).not.toContain("<script>");
     expect(html).toContain("<svg>");
+  });
+
+  it.each([
+    { items: [] },
+    { items: [{ id: "r1", text: "New requirement" }] },
+    { items: [applied("r1", "No coverage", [])] },
+    { items: [applied("r1", "Removed element", ["E:REMOVED"])] },
+  ])("shows a traceability sentence when no live trace exists: %j", ({ items }) => {
+    const doc = buildReport({ model, fileName: "course.er.yaml", requirements: { items } });
+    expect(doc.sections.find((s) => s.heading === "Traceability")!.blocks).toEqual([
+      { kind: "text", text: "No requirement has been applied to the model yet, so traceability is not available." },
+    ]);
+    for (const output of [reportMarkdown(doc), reportHtml(doc, { svg: "<svg></svg>" })]) {
+      expect(output).not.toContain("Untraced elements");
+    }
+  });
+
+  it("qualifies composite parts by their full labeled parent chain for both owner kinds", () => {
+    const club = normalize({ version: 1, entities: { CLUB: { label: "Sports Club", keys: [["Id"]], attrs: ["Id", "Name",
+      { name: "TrainingGround", label: "Training ground", parts: ["Name", { name: "Address", label: "Postal address", parts: ["Name", "City"] }] },
+    ] } }, relationships: { MEETS: { attrs: [{ name: "Venue", parts: ["Name", "City"] }], ends: [
+      { entity: "CLUB", role: "host", card: "0..N" }, { entity: "CLUB", role: "guest", card: "0..N" },
+    ] } } });
+    const input = { model: club, fileName: "club.er.yaml", requirements: { items: [applied("r1", "Naming", [
+      "A:CLUB.Name", "A:CLUB.TrainingGround.Name", "A:CLUB.TrainingGround.Address.Name", "A:MEETS.Venue.Name",
+    ], "Keep this rationale unchanged.")] } };
+    const doc = buildReport(input);
+    expect(doc.sections[0]!.blocks[0]).toMatchObject({ rows: [["R1", "Naming",
+      "Name (Sports Club), Name (Training ground, Sports Club), Name (Training ground, Postal address, Sports Club), Name (Venue, MEETS)", "Covered"]] });
+    expect(doc.sections[0]!.blocks[1]).toMatchObject({ items: ["R1: Keep this rationale unchanged."] });
+    const partial = buildReport({ ...input, requirements: { items: [applied("r1", "Club", ["E:CLUB"])] } });
+    expect(partial.sections.find((s) => s.heading === "Traceability")!.blocks[0]).toMatchObject({ items: expect.arrayContaining([
+      "Name (Sports Club)", "Name (Training ground, Sports Club)", "Name (Training ground, Postal address, Sports Club)", "Name (Venue, MEETS)",
+    ]) });
+    expect(reportHtml(doc, { svg: "<svg></svg>" })).toContain("Name (Training ground, Postal address, Sports Club)");
+  });
+
+  it("connects model labels to relational ids without repeating identical labels", () => {
+    const labeled = { ...model, relationships: model.relationships.map((r) => ({ ...r, label: "Has record" })) };
+    const doc = buildReport({ model: labeled, fileName: "course.er.yaml" });
+    const blocks = doc.sections.find((s) => s.heading === "Model")!.blocks;
+    expect(blocks[0]).toMatchObject({ rows: [
+      ["Person | <student> (PERSON)", "Strong", "(Id)", expect.any(String)],
+      ["RECORD", "Weak", "Sequence", "Sequence"],
+    ] });
+    expect(blocks[1]).toMatchObject({ rows: [["Has record (HAS_RECORD)", "2",
+      "Person | <student> (PERSON) [owner] (0,N), RECORD (1,1)", "Date", "Yes (RECORD)"]] });
+    const html = reportHtml(doc, { svg: "<svg></svg>" });
+    expect(html).toContain("Person | &lt;student&gt; (PERSON)");
+    expect(html).toContain("Has record (HAS_RECORD)");
+    expect(reportMarkdown(doc)).toContain("Has record (HAS\\_RECORD)");
+    expect(html).not.toContain("RECORD (RECORD)");
+  });
+
+  it("keeps R10 and status cells on one line with widths scoped to the HTML requirements table", () => {
+    const doc = buildReport({ model, fileName: "course.er.yaml", requirements: { items: Array.from({ length: 10 }, (_, i) => ({ id: `r${i + 1}`, text: "New requirement" })) } });
+    const html = reportHtml(doc, { svg: "<svg></svg>" });
+    expect(html).toContain('<table class="requirements">');
+    expect(html).toContain("<td>R10</td>");
+    expect(html).toMatch(/\.requirements th:first-child, \.requirements td:first-child \{ white-space: nowrap; min-width: 3ch;/);
+    expect(html).toMatch(/\.requirements th:last-child, \.requirements td:last-child \{ white-space: nowrap; min-width: 16ch;/);
+    expect(reportMarkdown(doc)).toContain("| R10 | New requirement |  | Not applied yet |");
+    expect(reportMarkdown(doc)).not.toContain("requirements\"");
   });
 
   it("includes specializations and mapping failure diagnostics", () => {

@@ -20,7 +20,11 @@ and Relational schema, using the same mapping as `chen map`.
 
 Requirements use the [requirements file contract](requirements.md). A trace counts
 only when its element still exists. New requirements remain “Not applied yet” even
-if their text describes the model; coverage is not inferred. Candidate keys are
+if their text describes the model; coverage is not inferred. Without any live
+requirement trace, the report says traceability is not available instead of listing
+every model element. Composite part references include the labeled parent chain
+and owner, for example `Name (TrainingGround, CLUB)`. Model tables show differing
+labels as `Label (ID)` to connect them to relational schema names. Candidate keys are
 parenthesized groups; weak entities show their partial key. Composite attributes
 use `Name(First, Last)`, multivalued attributes `{Phones}`, and derived attributes
 `/Age/`. Relationship degree is the number of ends.

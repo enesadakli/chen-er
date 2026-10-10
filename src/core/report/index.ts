@@ -36,13 +36,26 @@ function attribute(a: NAttribute): string {
   return name;
 }
 
+function reportElementName(id: string, labels: ReadonlyMap<string, string>): string {
+  const parts = id.slice(2).split(".");
+  if (!id.startsWith("A:") || parts.length < 3) return elementName(id, labels);
+  const owner = parts[0]!;
+  const parents = parts.slice(1, -1).map((part, i) => labels.get(`A:${parts.slice(0, i + 2).join(".")}`) ?? part);
+  const ownerLabel = labels.get(`E:${owner}`) ?? labels.get(`R:${owner}`) ?? owner;
+  return `${labels.get(id) ?? parts.at(-1)} (${[...parents, ownerLabel].join(", ")})`;
+}
+
+const modelName = (element: { label: string; name: string }): string =>
+  element.label === element.name ? element.name : `${element.label} (${element.name})`;
+
 /** Build a submission document without I/O or layout work. */
 export function buildReport(input: ReportInput): ReportDoc {
   const { model, requirements } = input;
   const elements = [...model.entities, ...model.relationships].flatMap((owner) => [owner, ...flattenAttrs(owner.attrs)]);
   const liveIds = input.liveIds ?? new Set(elements.map((e) => e.id));
   const labels = input.labels ?? new Map(elements.map((e) => [e.id, e.label]));
-  const name = (id: string) => elementName(id, labels);
+  const name = (id: string) => reportElementName(id, labels);
+  const entities = new Map(model.entities.map((e) => [e.name, modelName(e)]));
   const sections: ReportSection[] = [];
   if (requirements) {
     const blocks: ReportBlock[] = [table(["#", "Requirement", "Model elements", "Status"], requirements.items.map((item, i) => [
@@ -57,10 +70,10 @@ export function buildReport(input: ReportInput): ReportDoc {
     table(["Entity", "Kind", "Key", "Attributes"], model.entities.map((e) => {
       const keyName = (key: string) => e.attrs.find((a) => a.name === key)?.label ?? key;
       const key = e.weak ? e.partialKey.map(keyName).join(", ") : e.keys.map((k) => `(${k.map(keyName).join(", ")})`).join("; ");
-      return [e.label, e.weak ? "Weak" : "Strong", key, e.attrs.map(attribute).join(", ")];
+      return [modelName(e), e.weak ? "Weak" : "Strong", key, e.attrs.map(attribute).join(", ")];
     })),
     table(["Relationship", "Degree", "Participants (min,max)", "Attributes", "Identifying"], model.relationships.map((r) => [
-      r.label, String(r.ends.length), r.ends.map((e) => `${name(`E:${e.entity}`)}${e.role ? ` [${e.role}]` : ""} (${e.min},${e.max})`).join(", "),
+      modelName(r), String(r.ends.length), r.ends.map((e) => `${entities.get(e.entity) ?? e.entity}${e.role ? ` [${e.role}]` : ""} (${e.min},${e.max})`).join(", "),
       r.attrs.map(attribute).join(", "), r.identifies ? `Yes (${name(`E:${r.identifies}`)})` : "No",
     ])),
     ...model.specializations.map((s) => text(`Specialization: ${name(`E:${s.supertype}`)} → ${s.subtypes.map((n) => name(`E:${n}`)).join(", ")} (${s.disjointness}, ${s.completeness}).`)),
@@ -70,7 +83,9 @@ export function buildReport(input: ReportInput): ReportDoc {
     const traced = new Set(requirements.items.flatMap((item) => liveTrace(item, liveIds)));
     const untraced = elements.filter((e) => !traced.has(e.id)).map((e) => name(e.id));
     const uncovered = requirements.items.flatMap((item, i) => requirementState(item, liveIds) === "uncovered" ? [`${ordinalLabel(i)}: ${item.text}`] : []);
-    sections.push({ heading: "Traceability", blocks: [
+    sections.push({ heading: "Traceability", blocks: traced.size === 0
+      ? [text("No requirement has been applied to the model yet, so traceability is not available.")]
+      : [
       untraced.length ? { kind: "list", title: "Untraced elements", items: untraced } : text("Every model element is traced to a requirement."),
       ...(uncovered.length ? [{ kind: "list" as const, title: "Not covered", items: uncovered }] : []),
     ] });
@@ -116,7 +131,7 @@ export function reportHtml(doc: ReportDoc, options: { svg: string }): string {
     switch (b.kind) {
       case "text": return `<p>${b.italic ? `<em>${escapeHtml(b.text)}</em>` : escapeHtml(b.text)}</p>`;
       case "diagram": return `<figure aria-label="ER diagram">${options.svg.replace(/^\s*<\?xml[^?]*\?>\s*/, "")}</figure>`;
-      case "table": return `<table><thead><tr>${b.headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      case "table": return `<table${b.headers[0] === "#" ? ' class="requirements"' : ""}><thead><tr>${b.headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
       case "list": return (b.title ? `<h3>${escapeHtml(b.title)}</h3>` : "") + `<${b.numbered ? "ol" : "ul"}>${b.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</${b.numbered ? "ol" : "ul"}>`;
       case "mapping": return `<div class="mapping">${mappingHtml(b.markdown)}</div>`;
     }
@@ -128,6 +143,8 @@ export function reportHtml(doc: ReportDoc, options: { svg: string }): string {
 body { font: 11pt/1.5 Arial, Helvetica, sans-serif; color: #202020; background: white; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
 h1, h2, h3 { line-height: 1.2; } h2 { margin-top: 2rem; } h1, h2, h3 { break-after: avoid; }
 table { border-collapse: collapse; width: 100%; margin: 1rem 0; } th, td { border: 1px solid #777; padding: .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-line; } th { background: #f0f0f0; }
+.requirements th:first-child, .requirements td:first-child { white-space: nowrap; min-width: 3ch; overflow-wrap: normal; }
+.requirements th:last-child, .requirements td:last-child { white-space: nowrap; min-width: 16ch; overflow-wrap: normal; }
 table, figure { page-break-inside: avoid; break-inside: avoid; } figure { margin: 1rem 0; } svg { width: 100%; height: auto; } .mapping p { break-inside: avoid; }
 @media print { body { margin: 0; padding: 0; max-width: none; font-size: 10pt; } }
 </style></head><body>

@@ -23,83 +23,33 @@ Model: campus.er.yaml
 
 | Entity | Kind | Key | Attributes |
 | --- | --- | --- | --- |
-| Hospital Campus | Strong | (HospitalId) | HospitalId, Name, City |
-| Care Ward | Strong | (WardCode) | WardCode, Name, Specialty |
-| Patient Room | Strong | (RoomNo) | RoomNo, Floor |
-| Hospital Bed | Strong | (BedNo) | BedNo, Kind |
-| Staff Member | Strong | (StaffId) | StaffId, Name(First, Last), Role, \{Qualifications\} |
-| Registered Patient | Strong | (PatientId) | PatientId, Name(First, Last), BirthDate, Allergy |
-| Admission Record | Weak | AdmittedOn | AdmittedOn, DischargedOn, Reason |
-| Duty Shift | Strong | (ShiftId) | ShiftId, Day, StartTime |
+| Hospital Campus (HOSPITAL) | Strong | (HospitalId) | HospitalId, Name, City |
+| Care Ward (WARD) | Strong | (WardCode) | WardCode, Name, Specialty |
+| Patient Room (ROOM) | Strong | (RoomNo) | RoomNo, Floor |
+| Hospital Bed (BED) | Strong | (BedNo) | BedNo, Kind |
+| Staff Member (STAFF) | Strong | (StaffId) | StaffId, Name(First, Last), Role, \{Qualifications\} |
+| Registered Patient (PATIENT) | Strong | (PatientId) | PatientId, Name(First, Last), BirthDate, Allergy |
+| Admission Record (ADMISSION) | Weak | AdmittedOn | AdmittedOn, DischargedOn, Reason |
+| Duty Shift (SHIFT) | Strong | (ShiftId) | ShiftId, Day, StartTime |
 
 | Relationship | Degree | Participants (min,max) | Attributes | Identifying |
 | --- | --- | --- | --- | --- |
-| Has ward | 2 | Hospital Campus (1,N), Care Ward (1,1) |  | No |
-| Has room | 2 | Care Ward (1,N), Patient Room (1,1) |  | No |
-| Has bed | 2 | Patient Room (1,N), Hospital Bed (1,1) |  | No |
-| Assigned to | 2 | Staff Member (1,1), Care Ward (0,N) |  | No |
-| Supervises | 2 | Staff Member \[supervisor\] (0,N), Staff Member \[trainee\] (0,1) |  | No |
-| Treats | 2 | Staff Member (0,N), Registered Patient (0,N) | StartDate | No |
-| Admission of | 2 | Registered Patient (0,N), Admission Record (1,1) |  | Yes (Admission Record) |
-| Occupies | 2 | Hospital Bed (0,1), Admission Record (0,1) |  | No |
-| Attends | 2 | Staff Member (0,N), Admission Record (1,1) |  | No |
-| Discharges | 2 | Staff Member (0,N), Admission Record (0,1) |  | No |
-| Rosters | 2 | Staff Member (0,N), Duty Shift (1,N) |  | No |
-| Employs | 2 | Hospital Campus (1,N), Staff Member (1,1) |  | No |
+| Has ward (HAS\_WARD) | 2 | Hospital Campus (HOSPITAL) (1,N), Care Ward (WARD) (1,1) |  | No |
+| Has room (HAS\_ROOM) | 2 | Care Ward (WARD) (1,N), Patient Room (ROOM) (1,1) |  | No |
+| Has bed (HAS\_BED) | 2 | Patient Room (ROOM) (1,N), Hospital Bed (BED) (1,1) |  | No |
+| Assigned to (ASSIGNED\_TO) | 2 | Staff Member (STAFF) (1,1), Care Ward (WARD) (0,N) |  | No |
+| Supervises (SUPERVISES) | 2 | Staff Member (STAFF) \[supervisor\] (0,N), Staff Member (STAFF) \[trainee\] (0,1) |  | No |
+| Treats (TREATS) | 2 | Staff Member (STAFF) (0,N), Registered Patient (PATIENT) (0,N) | StartDate | No |
+| Admission of (ADMISSION\_OF) | 2 | Registered Patient (PATIENT) (0,N), Admission Record (ADMISSION) (1,1) |  | Yes (Admission Record) |
+| Occupies (OCCUPIES) | 2 | Hospital Bed (BED) (0,1), Admission Record (ADMISSION) (0,1) |  | No |
+| Attends (ATTENDS) | 2 | Staff Member (STAFF) (0,N), Admission Record (ADMISSION) (1,1) |  | No |
+| Discharges (DISCHARGES) | 2 | Staff Member (STAFF) (0,N), Admission Record (ADMISSION) (0,1) |  | No |
+| Rosters (ROSTERS) | 2 | Staff Member (STAFF) (0,N), Duty Shift (SHIFT) (1,N) |  | No |
+| Employs (EMPLOYS) | 2 | Hospital Campus (HOSPITAL) (1,N), Staff Member (STAFF) (1,1) |  | No |
 
 ## Traceability
 
-### Untraced elements
-
-- Hospital Campus
-- HospitalId (Hospital Campus)
-- Name (Hospital Campus)
-- City (Hospital Campus)
-- Care Ward
-- WardCode (Care Ward)
-- Name (Care Ward)
-- Specialty (Care Ward)
-- Patient Room
-- RoomNo (Patient Room)
-- Floor (Patient Room)
-- Hospital Bed
-- BedNo (Hospital Bed)
-- Kind (Hospital Bed)
-- Staff Member
-- StaffId (Staff Member)
-- Name (Staff Member)
-- First (Staff Member)
-- Last (Staff Member)
-- Role (Staff Member)
-- Qualifications (Staff Member)
-- Registered Patient
-- PatientId (Registered Patient)
-- Name (Registered Patient)
-- First (Registered Patient)
-- Last (Registered Patient)
-- BirthDate (Registered Patient)
-- Allergy (Registered Patient)
-- Admission Record
-- AdmittedOn (Admission Record)
-- DischargedOn (Admission Record)
-- Reason (Admission Record)
-- Duty Shift
-- ShiftId (Duty Shift)
-- Day (Duty Shift)
-- StartTime (Duty Shift)
-- Has ward
-- Has room
-- Has bed
-- Assigned to
-- Supervises
-- Treats
-- StartDate (Treats)
-- Admission of
-- Occupies
-- Attends
-- Discharges
-- Rosters
-- Employs
+No requirement has been applied to the model yet, so traceability is not available.
 
 ## Lint
 
