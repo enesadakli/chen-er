@@ -1,5 +1,5 @@
 import { lint } from "../../src/core/lint/index.js";
-import { flattenAttrs, type NAttribute, type NEnd, type NEntity, type NModel, type NRelationship } from "../../src/core/normalize.js";
+import { flattenAttrs, parseCard, type NAttribute, type NEnd, type NEntity, type NModel, type NRelationship } from "../../src/core/normalize.js";
 import { liveTrace, parseRequirements, type RequirementsDoc } from "../../src/core/requirements.js";
 
 export interface Aliases {
@@ -8,6 +8,26 @@ export interface Aliases {
   attributes?: Record<string, string[]>;
 }
 export interface ItemMatch { gold: string; candidate: string }
+export type GoldVariantName = "primary" | `alt-${string}`;
+interface CheckBase { id: string; why: string; variants?: GoldVariantName[] }
+export type DecisionCheck = CheckBase & (
+  | { kind: "weak"; entity: string; owner: string }
+  | { kind: "ternary" | "recursive"; relationship: string }
+  | { kind: "multivalued" | "derived" | "composite"; attribute: string; minParts?: number }
+  | { kind: "relationshipAttribute"; relationship: string; attribute: string }
+  | { kind: "entity"; entity: string }
+  | { kind: "cardinality"; relationship: string; entity: string; card: string; role?: string }
+  | { kind: "key"; entity: string; attrs: string[] }
+);
+export interface ChecksDocument { checks: DecisionCheck[] }
+export interface Decisions {
+  correct: number;
+  total: number;
+  accuracy: number;
+  failed: { id: string; kind: DecisionCheck["kind"]; why: string; reason: string }[];
+}
+export interface GoldVariant { name: GoldVariantName; model: NModel }
+export interface EntityMatch extends ItemMatch { matchedBy: "name" | "alias" | "structure" }
 export interface PRF {
   gold: number;
   candidate: number;
@@ -20,6 +40,8 @@ export interface Accuracy { correct: number; total: number; evaluated: number; a
 export interface CardinalityValue { min: number; max: number | "N" }
 export interface ScoreReport {
   overall: number;
+  goldVariant: GoldVariantName;
+  decisions: Decisions | null;
   entities: PRF;
   relationships: PRF;
   attributes: PRF;
@@ -28,7 +50,7 @@ export interface ScoreReport {
   attributeProperties: Accuracy;
   structure: { lintErrorCount: number; errors: ReturnType<typeof lint> };
   trace: { covered: number; total: number; coverage: number; uncovered: string[] } | null;
-  matches: { entities: ItemMatch[]; relationships: ItemMatch[]; attributes: ItemMatch[] };
+  matches: { entities: EntityMatch[]; relationships: ItemMatch[]; attributes: ItemMatch[] };
   details: {
     unmatchedGold: { entities: string[]; relationships: string[]; attributes: string[] };
     extraCandidate: { entities: string[]; relationships: string[]; attributes: string[] };
@@ -71,12 +93,40 @@ function greedy<T extends Named>(gold: readonly T[], candidate: readonly T[], ac
   return pairs;
 }
 
+function entityPairs(gold: NModel, candidate: NModel, aliases: Aliases): Pair<NEntity>[] {
+  const pairs = greedy(gold.entities, candidate.entities, (g, c) => nameMatches(g.name, c.name, aliases.entities));
+  const usedGold = new Set(pairs.map((p) => p.gold.id)), usedCandidate = new Set(pairs.map((p) => p.candidate.id));
+  const choices: (Pair<NEntity> & { jaccard: number })[] = [];
+  for (const g of sorted(gold.entities).filter((e) => !usedGold.has(e.id))) {
+    const ga = sorted(flattenAttrs(g.attrs)), names = new Set(ga.map((a) => normalizeName(a.name)));
+    const canonical = (name: string): string => normalizeName((ga.find((a) => normalizeName(a.name) === normalizeName(name)) ??
+      ga.find((a) => nameMatches(a.name, name, aliases.attributes, [a.id, a.id.slice(2)])))?.name ?? name);
+    const keys = (e: NEntity): string[][] => [...e.keys, ...(e.partialKey.length ? [e.partialKey] : [])];
+    for (const c of sorted(candidate.entities).filter((e) => !usedCandidate.has(e.id))) {
+      const cn = new Set(flattenAttrs(c.attrs).map((a) => canonical(a.name)));
+      const shared = [...names].filter((name) => cn.has(name)).length;
+      const union = new Set([...names, ...cn]).size;
+      const jaccard = union ? shared / union : 0;
+      const equalKey = keys(g).some((gk) => gk.length > 0 && keys(c).some((ck) =>
+        signature([...new Set(gk.map(normalizeName))]) === signature([...new Set(ck.map(canonical))])));
+      if ((jaccard >= 0.5 && shared >= 2) || equalKey) choices.push({ gold: g, candidate: c, jaccard });
+    }
+  }
+  choices.sort((a, b) => b.jaccard - a.jaccard || compare(a.gold.id, b.gold.id) || compare(a.candidate.id, b.candidate.id));
+  for (const choice of choices) {
+    if (usedGold.has(choice.gold.id) || usedCandidate.has(choice.candidate.id)) continue;
+    pairs.push({ gold: choice.gold, candidate: choice.candidate });
+    usedGold.add(choice.gold.id); usedCandidate.add(choice.candidate.id);
+  }
+  return pairs.sort((a, b) => compare(a.gold.id, b.gold.id));
+}
+
 function attributePairs(gold: readonly NAttribute[], candidate: readonly NAttribute[], aliases: Aliases): Pair<NAttribute>[] {
   const pairs = greedy(gold, candidate, (g, c) => nameMatches(g.name, c.name, aliases.attributes, [g.id, g.id.slice(2)]));
   return pairs.flatMap((pair) => [pair, ...attributePairs(pair.gold.parts, pair.candidate.parts, aliases)]);
 }
 
-const signature = (names: string[]): string => JSON.stringify(names.sort(compare));
+const signature = (names: string[]): string => JSON.stringify([...names].sort(compare));
 function relationshipPairs(gold: NModel, candidate: NModel, entities: Pair<NEntity>[], aliases: Aliases): Pair<NRelationship>[] {
   const entityMap = new Map(entities.map((pair) => [pair.candidate.name, pair.gold.name]));
   const available = sorted(candidate.relationships), pairs: Pair<NRelationship>[] = [];
@@ -158,9 +208,128 @@ function keyScores(gold: NModel, entities: Pair<NEntity>[], relationships: Pair<
   return { keys: { correct, total, evaluated: strong.evaluated + weak.evaluated + identifying.evaluated, accuracy: ratio(correct, total), strong, weak, identifying }, wrongKeys };
 }
 
+/** Gold references are exact model names; aliases apply only when mapping to the candidate. */
+export function checkReferenceErrors(check: DecisionCheck, gold: NModel): string[] {
+  const errors: string[] = [];
+  const entity = (name: string): NEntity | undefined => {
+    const found = gold.entities.find((e) => e.name === name);
+    if (!found) errors.push(`Unknown gold entity: ${name}`);
+    return found;
+  };
+  const relationship = "relationship" in check ? gold.relationships.find((r) => r.name === check.relationship) : undefined;
+  if ("relationship" in check && !relationship) errors.push(`Unknown gold relationship: ${check.relationship}`);
+  if ("entity" in check) {
+    entity(check.entity);
+    if (check.kind === "cardinality" && relationship && !relationship.ends.some((e) =>
+      e.entity === check.entity && (check.role === undefined || e.role === check.role))) errors.push("Unknown gold end or role");
+  }
+  if (check.kind === "weak") entity(check.owner);
+  const attributes = [...gold.entities, ...gold.relationships].flatMap((o) => flattenAttrs(o.attrs));
+  if ("attribute" in check) {
+    const path = check.kind === "relationshipAttribute" && !check.attribute.includes(".")
+      ? `${check.relationship}.${check.attribute}` : check.attribute;
+    if (!attributes.some((a) => a.id === `A:${path}`)) errors.push(`Unknown gold attribute: ${path}`);
+  }
+  if (check.kind === "key") for (const name of check.attrs) {
+    if (!attributes.some((a) => a.id === `A:${check.entity}.${name}`)) errors.push(`Unknown gold attribute: ${check.entity}.${name}`);
+  }
+  return errors;
+}
+
+function decisionScores(gold: NModel, candidate: NModel, entities: Pair<NEntity>[], relationships: Pair<NRelationship>[],
+  attrs: Pair<NAttribute>[], aliases: Aliases, checks: ChecksDocument | undefined, variant: GoldVariantName): Decisions | null {
+  if (!checks) return null;
+  const applicable = checks.checks.filter((c) => !c.variants || c.variants.includes(variant));
+  const entity = (name: string): NEntity | undefined => entities.find((p) => p.gold.name === name)?.candidate;
+  const relationship = (name: string): NRelationship | undefined => relationships.find((p) => p.gold.name === name)?.candidate;
+  const attribute = (path: string): NAttribute | undefined => attrs.find((p) => p.gold.id === `A:${path}`)?.candidate;
+  const evaluate = (check: DecisionCheck): string | null => {
+    const invalid = checkReferenceErrors(check, gold);
+    if (invalid.length) return invalid.join("; ");
+    const e = "entity" in check ? entity(check.entity) : undefined;
+    const r = "relationship" in check ? relationship(check.relationship) : undefined;
+    if ("entity" in check && !e) return `No candidate entity matches ${check.entity}`;
+    switch (check.kind) {
+      case "entity": return null;
+      case "weak": {
+        const owner = entity(check.owner);
+        if (!owner) return `No candidate entity matches owner ${check.owner}`;
+        if (!e!.weak) return "Matched entity is not weak";
+        if (!e!.partialKey.length || !e!.partialKey.every((name) => e!.attrs.some((a) => a.name === name))) return "Matched entity has no valid partial key";
+        return candidate.relationships.some((rel) => rel.identifies === e!.name && rel.ends.some((end) => end.entity === e!.name) &&
+          rel.ends.some((end) => end.entity === owner.name)) ? null : "No identifying relationship links the matched entity to its owner";
+      }
+      case "ternary": {
+        if (!r) return `No candidate relationship matches ${check.relationship}`;
+        const g = gold.relationships.find((rel) => rel.name === check.relationship)!;
+        const participants = g.ends.map((end) => entity(end.entity)?.name);
+        if (participants.some((name) => name === undefined)) return "A gold participant has no candidate entity match";
+        return participants.length === 3 && candidate.relationships.some((rel) => rel.ends.length === 3 &&
+          signature(rel.ends.map((end) => end.entity)) === signature(participants as string[])) ? null : "No three-ended relationship has the matched participants";
+      }
+      case "recursive": {
+        if (!r) return `No candidate relationship matches ${check.relationship}`;
+        const g = gold.relationships.find((rel) => rel.name === check.relationship)!;
+        const participant = entity(g.ends[0]!.entity);
+        return participant && r.ends.length === 2 && r.ends.every((end) => end.entity === participant.name)
+          ? null : "Matched relationship does not have two ends on the same matched entity";
+      }
+      case "multivalued": case "derived": case "composite": {
+        const a = attribute(check.attribute);
+        if (!a) return `No candidate attribute matches ${check.attribute}`;
+        if (check.kind === "composite") return a.parts.length >= (check.minParts ?? 2) ? null : `Matched attribute has fewer than ${check.minParts ?? 2} parts`;
+        return a[check.kind] ? null : `Matched attribute is not ${check.kind}`;
+      }
+      case "relationshipAttribute": {
+        if (!r) return `No candidate relationship matches ${check.relationship}`;
+        const path = check.attribute.includes(".") ? check.attribute : `${check.relationship}.${check.attribute}`;
+        const a = attribute(path);
+        if (!a || a.ownerKind !== "relationship" || a.owner !== r.name) return "Attribute is missing from the matched relationship";
+        const g = attrs.find((p) => p.gold.id === `A:${path}`)!.gold;
+        const onParticipant = r.ends.some((end) => {
+          const participant = candidate.entities.find((item) => item.name === end.entity);
+          return flattenAttrs(participant?.attrs ?? []).some((item) => nameMatches(g.name, item.name, aliases.attributes, [g.id, path]));
+        });
+        return onParticipant ? "Attribute also occurs on a participant entity" : null;
+      }
+      case "cardinality": {
+        if (!r) return `No candidate relationship matches ${check.relationship}`;
+        const g = gold.relationships.find((rel) => rel.name === check.relationship)!;
+        const goldEnds = g.ends.filter((end) => end.entity === check.entity && (check.role === undefined || end.role === check.role));
+        if (goldEnds.length !== 1) return "Gold end is ambiguous; specify a role";
+        const end = endPairs({ gold: g, candidate: r }, entities).find((p) => p.gold === goldEnds[0])?.candidate;
+        if (!end) return "No candidate end matches the gold end";
+        const expected = parseCard(check.card);
+        return end.min === expected.min && end.max === expected.max ? null : `Expected ${check.card}, got ${end.min}..${end.max}`;
+      }
+      case "key": {
+        if (e!.weak) return "Matched entity is weak instead of strong";
+        const mapped = check.attrs.map((name) => attribute(`${check.entity}.${name}`)?.name);
+        if (mapped.some((name) => name === undefined)) return "A key attribute has no candidate match";
+        return e!.keys.some((key) => signature([...new Set(key)]) === signature([...new Set(mapped as string[])])) ? null : "No candidate key equals the matched attribute set";
+      }
+    }
+  };
+  const failed = applicable.flatMap((check) => {
+    const reason = evaluate(check);
+    return reason === null ? [] : [{ id: check.id, kind: check.kind, why: check.why, reason }];
+  });
+  const correct = applicable.length - failed.length;
+  return { correct, total: applicable.length, accuracy: ratio(correct, applicable.length), failed };
+}
+
+/** Select the highest overall score, breaking ties by primary then lexical variant name. */
+export function scoreVariants(variants: readonly GoldVariant[], candidate: NModel, aliases: Aliases = {},
+  requirements?: RequirementsDoc | string, checks?: ChecksDocument): ScoreReport {
+  if (!variants.length) throw new Error("At least one gold variant is required");
+  const ordered = [...variants].sort((a, b) => Number(b.name === "primary") - Number(a.name === "primary") || compare(a.name, b.name));
+  const reports = ordered.map((variant) => scoreModels(variant.model, candidate, aliases, requirements, checks, variant.name));
+  return reports.reduce((best, report) => report.overall > best.overall ? report : best);
+}
+
 /** Scores normalized models without I/O, mutation, randomness, or global state. */
-export function scoreModels(gold: NModel, candidate: NModel, aliases: Aliases = {}, requirements?: RequirementsDoc | string): ScoreReport {
-  const entities = greedy(gold.entities, candidate.entities, (g, c) => nameMatches(g.name, c.name, aliases.entities));
+export function scoreModels(gold: NModel, candidate: NModel, aliases: Aliases = {}, requirements?: RequirementsDoc | string, checks?: ChecksDocument, goldVariant: GoldVariantName = "primary"): ScoreReport {
+  const entities = entityPairs(gold, candidate, aliases);
   const relationships = relationshipPairs(gold, candidate, entities, aliases);
   const attrs = [...entities, ...relationships].flatMap((p) => attributePairs(p.gold.attrs, p.candidate.attrs, aliases));
   const allAttrs = (model: NModel): NAttribute[] => [...model.entities, ...model.relationships].flatMap((owner) => flattenAttrs(owner.attrs));
@@ -183,14 +352,20 @@ export function scoreModels(gold: NModel, candidate: NModel, aliases: Aliases = 
   const attrMetric = precisionRecallF1(goldAttrs.length, candidateAttrs.length, attrs.length);
   const cardinality: Accuracy = { correct: cardCorrect, total: cardTotal, evaluated: ends.length, accuracy: ratio(cardCorrect, cardTotal) };
   const ids = <T extends Named>(pairs: Pair<T>[]): ItemMatch[] => pairs.map((p) => ({ gold: p.gold.id, candidate: p.candidate.id }));
+  const decisions = decisionScores(gold, candidate, entities, relationships, attrs, aliases, checks, goldVariant);
+  const terms = [entityMetric.f1, relMetric.f1, attrMetric.f1, keys.accuracy, cardinality.accuracy];
+  if (decisions) terms.push(decisions.accuracy);
   return {
-    overall: (entityMetric.f1 + relMetric.f1 + attrMetric.f1 + keys.accuracy + cardinality.accuracy) / 5,
+    goldVariant, decisions,
+    overall: terms.reduce((sum, term) => sum + term, 0) / terms.length,
     entities: entityMetric, relationships: relMetric, attributes: attrMetric, keys, cardinality,
     attributeProperties: { correct: attrs.length - wrongAttributeProperties.length, total: goldAttrs.length, evaluated: attrs.length,
       accuracy: ratio(attrs.length - wrongAttributeProperties.length, goldAttrs.length) },
     structure: { lintErrorCount: errors.length, errors },
     trace: doc ? { covered: doc.items.length - uncovered.length, total: doc.items.length, coverage: ratio(doc.items.length - uncovered.length, doc.items.length), uncovered } : null,
-    matches: { entities: ids(entities), relationships: ids(relationships), attributes: ids(attrs) },
+    matches: { entities: entities.map((p) => ({ gold: p.gold.id, candidate: p.candidate.id,
+      matchedBy: normalizeName(p.gold.name) === normalizeName(p.candidate.name) ? "name" :
+        nameMatches(p.gold.name, p.candidate.name, aliases.entities) ? "alias" : "structure" })), relationships: ids(relationships), attributes: ids(attrs) },
     details: {
       unmatchedGold: { entities: missing(gold.entities, entities, "gold"), relationships: missing(gold.relationships, relationships, "gold"), attributes: missing(goldAttrs, attrs, "gold") },
       extraCandidate: { entities: missing(candidate.entities, entities, "candidate"), relationships: missing(candidate.relationships, relationships, "candidate"), attributes: missing(candidateAttrs, attrs, "candidate") },

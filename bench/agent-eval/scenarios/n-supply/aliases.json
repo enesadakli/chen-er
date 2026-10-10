@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "SUPPLIER": [
+      "Vendor",
+      "Provider"
+    ],
+    "PART": [
+      "Component",
+      "Item"
+    ],
+    "PROJECT": [
+      "Job",
+      "WorkProject"
+    ],
+    "WAREHOUSE": [
+      "Depot",
+      "Storehouse"
+    ]
+  },
+  "attributes": {
+    "SUPPLIER.SupplierNo": [
+      "SupplierId",
+      "VendorNumber"
+    ],
+    "SUPPLIER.Name": [
+      "SupplierName",
+      "VendorName"
+    ],
+    "SUPPLIER.City": [
+      "Town",
+      "SupplierCity"
+    ],
+    "PART.PartNo": [
+      "PartId",
+      "ComponentNumber"
+    ],
+    "PART.Description": [
+      "PartDescription",
+      "Name"
+    ],
+    "PART.Colour": [
+      "Color",
+      "PartColour"
+    ],
+    "PROJECT.ProjectNo": [
+      "ProjectId",
+      "JobNumber"
+    ],
+    "PROJECT.Name": [
+      "ProjectName",
+      "JobName"
+    ],
+    "PROJECT.Budget": [
+      "ProjectBudget",
+      "AllocatedBudget"
+    ],
+    "WAREHOUSE.WarehouseNo": [
+      "WarehouseId",
+      "DepotNumber"
+    ],
+    "WAREHOUSE.Location": [
+      "Address",
+      "WarehouseLocation"
+    ],
+    "DELIVERS.Quantity": [
+      "Amount",
+      "DeliveredQuantity",
+      "Units"
+    ]
+  },
+  "relationships": {
+    "DELIVERS": [
+      "Supply",
+      "Supplies",
+      "Delivery"
+    ],
+    "STORES": [
+      "StoredAt",
+      "Houses"
+    ]
+  }
+}

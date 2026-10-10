@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "OWNER": [
+      "Client",
+      "PetOwner",
+      "Keeper"
+    ],
+    "PET": [
+      "Animal",
+      "Companion"
+    ],
+    "VET": [
+      "Veterinarian",
+      "Doctor"
+    ]
+  },
+  "attributes": {
+    "OWNER.OwnerNo": [
+      "OwnerId",
+      "ClientNumber",
+      "ClientId"
+    ],
+    "OWNER.Name": [
+      "FullName",
+      "OwnerName"
+    ],
+    "OWNER.Name.FirstName": [
+      "GivenName",
+      "First"
+    ],
+    "OWNER.Name.LastName": [
+      "Surname",
+      "FamilyName"
+    ],
+    "OWNER.Phones": [
+      "PhoneNumbers",
+      "TelephoneNumbers",
+      "Phone"
+    ],
+    "PET.Name": [
+      "PetName",
+      "AnimalName"
+    ],
+    "PET.BirthDate": [
+      "DateOfBirth",
+      "Birthday"
+    ],
+    "PET.Age": [
+      "CurrentAge",
+      "PetAge"
+    ],
+    "VET.VetNo": [
+      "VetId",
+      "VeterinarianNumber",
+      "DoctorId"
+    ],
+    "VET.Name": [
+      "VetName",
+      "FullName"
+    ],
+    "TREATS.LastTreatmentDate": [
+      "TreatmentDate",
+      "LastVisitDate",
+      "LastTreatment"
+    ]
+  },
+  "relationships": {
+    "OWNS": [
+      "HasPet",
+      "BelongsTo"
+    ],
+    "TREATS": [
+      "TreatsPet",
+      "Treatment"
+    ],
+    "MENTORS": [
+      "Mentorship",
+      "Supervises"
+    ]
+  }
+}

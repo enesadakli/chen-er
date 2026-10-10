@@ -9,18 +9,20 @@ import type { Turn } from "../../src/app/agent-store.js";
 import { codexParser, parseStreamLine } from "../../src/app/agent-stream.js";
 import { initFile } from "../../src/app/render.js";
 import { createRequirements, requirementsPathFor } from "../../src/app/requirements.js";
-import { lint } from "../../src/core/lint/index.js";
-import { parseModel, type NModel } from "../../src/core/normalize.js";
-import { scoreModels, type Aliases, type ScoreReport } from "./score.js";
+import { parseModel } from "../../src/core/normalize.js";
+import { scoreVariants, type ScoreReport } from "./score.js";
+import { loadScenario, selectScenarios, type Scenario, type SetFilter } from "./scenarios.js";
+import { summary, type SummaryRecord } from "./summary.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const scenariosDir = join(here, "scenarios");
-const usage = `Usage: node_modules/.bin/tsx bench/agent-eval/run.ts --agent claude|codex [--scenario <name>]... [--runs N] [--out <dir>]
+const usage = `Usage: node_modules/.bin/tsx bench/agent-eval/run.ts --agent claude|codex [--scenario <name>]... [--set explicit|natural|all] [--runs N] [--out <dir>]
 
 Options:
   --agent       CLI to run, using its own login (required)
   --scenario    Scenario name; repeat to select several (default: all)
+  --set         Scenario set: explicit, natural, or all (default: all)
   --runs        Positive integer attempts per scenario (default: 1)
   --out         Artifact directory (default: bench/agent-eval/results/<UTC date-time>)
   --help        Print this help without invoking a CLI
@@ -29,9 +31,9 @@ Runs one Requirements Apply per fresh model, sequentially. Failed or limited run
 This script calls real CLIs and is intentionally excluded from tests and CI.
 `;
 
-interface Scenario { name: string; dir: string; gold: NModel; aliases: Aliases }
-interface RunRecord {
+interface RunRecord extends SummaryRecord {
   agent: AgentKind;
+  language: Scenario["language"];
   scenario: string;
   run: number;
   status: RunStatus;
@@ -49,15 +51,6 @@ interface RunRecord {
 
 const json = (path: string, value: unknown): void => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
-
-function loadScenario(name: string): Scenario {
-  const dir = join(scenariosDir, name);
-  const parsed = parseModel(readFileSync(join(dir, "gold.er.yaml"), "utf8"));
-  if (!parsed.model || lint(parsed.model).some((d) => d.severity === "error")) throw new Error(`Invalid gold model: ${name}`);
-  const aliasPath = join(dir, "aliases.json");
-  const aliases: Aliases = existsSync(aliasPath) ? JSON.parse(readFileSync(aliasPath, "utf8")) as Aliases : {};
-  return { name, dir, gold: parsed.model, aliases };
-}
 
 /** Keep only numeric usage metadata from terminal CLI events, never arbitrary event text. */
 function captureUsage(line: string, counters: Record<string, number>): void {
@@ -87,7 +80,7 @@ async function evaluate(agent: AgentKind, scenario: Scenario, run: number, artif
     modelPath = join(workspace, "model.er.yaml");
     requirementsPath = requirementsPathFor(modelPath);
     copyFileSync(join(scenario.dir, "requirements.md"), requirementsPath);
-    initFile(modelPath, false, { empty: true, title: scenario.gold.title ?? scenario.name });
+    initFile(modelPath, false, { empty: true, title: scenario.variants[0]!.model.title ?? scenario.name });
     const lintCommand = lintCommandFor(join(root, "src/cli/index.ts"), root);
     const controller = createRequirements({ path: requirementsPath, modelPath, agent, lintCommand,
       serial: async (task) => task(), emit: () => {} });
@@ -128,9 +121,9 @@ async function evaluate(agent: AgentKind, scenario: Scenario, run: number, artif
     writeFileSync(join(artifactDir, "model.er.requirements.md"), requirements);
     writeFileSync(join(artifactDir, "reply.txt"), reply);
     const parsed = parseModel(yaml);
-    const score = parsed.model ? scoreModels(scenario.gold, parsed.model, scenario.aliases, requirements) : null;
+    const score = parsed.model ? scoreVariants(scenario.variants, parsed.model, scenario.aliases, requirements, scenario.checks) : null;
     if (!parsed.model && status === "ok") { status = "error"; error = "The final model does not parse."; }
-    const record: RunRecord = { agent, scenario: scenario.name, run, status, cliStatus, startedAt, finishedAt: new Date().toISOString(),
+    const record: RunRecord = { agent, scenario: scenario.name, set: scenario.set, language: scenario.language, hasChecks: !!scenario.checks, run, status, cliStatus, startedAt, finishedAt: new Date().toISOString(),
       wallTimeMs: performance.now() - start, usage: Object.keys(counters).length ? counters : null, score,
       parseDiagnostics: parsed.diagnostics, error, sessionId, settleError };
     json(join(artifactDir, "score.json"), score);
@@ -140,23 +133,11 @@ async function evaluate(agent: AgentKind, scenario: Scenario, run: number, artif
   } finally { if (workspace) rmSync(workspace, { recursive: true, force: true }); }
 }
 
-function summary(agent: AgentKind, records: RunRecord[]): string {
-  const lines = [`# Requirements evaluation: ${agent}`, "", "Failed, limited, cancelled, or unparseable attempts contribute zero to score means. Time includes every attempt.", "",
-    "| Scenario | Runs (ok/total) | Overall mean | Entity F1 | Rel F1 | Attr F1 | Key acc | Card acc | Time (mean s) |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"];
-  for (const scenario of [...new Set(records.map((record) => record.scenario))]) {
-    const runs = records.filter((record) => record.scenario === scenario);
-    const mean = (pick: (report: ScoreReport) => number): string =>
-      (runs.reduce((sum, record) => sum + (record.status === "ok" && record.score ? pick(record.score) : 0), 0) / runs.length).toFixed(4);
-    lines.push(`| ${scenario} | ${runs.filter((record) => record.status === "ok").length}/${runs.length} | ${mean((s) => s.overall)} | ${mean((s) => s.entities.f1)} | ${mean((s) => s.relationships.f1)} | ${mean((s) => s.attributes.f1)} | ${mean((s) => s.keys.accuracy)} | ${mean((s) => s.cardinality.accuracy)} | ${(runs.reduce((sum, r) => sum + r.wallTimeMs, 0) / runs.length / 1000).toFixed(2)} |`);
-  }
-  return `${lines.join("\n")}\n`;
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { agent: { type: "string" }, scenario: { type: "string", multiple: true },
-    runs: { type: "string", default: "1" }, out: { type: "string" }, help: { type: "boolean" } }, allowPositionals: false });
+    set: { type: "string", default: "all" }, runs: { type: "string", default: "1" }, out: { type: "string" }, help: { type: "boolean" } }, allowPositionals: false });
   if (values.help) { console.log(usage); return; }
+  if (!["explicit", "natural", "all"].includes(values.set!)) throw new Error("--set must be explicit, natural, or all.");
   if (values.agent !== "claude" && values.agent !== "codex") throw new Error("--agent must be claude or codex. Use --help for usage.");
   if (!/^[1-9]\d*$/.test(values.runs!) || !Number.isSafeInteger(Number(values.runs))) throw new Error("--runs must be a positive safe integer.");
   for (const key of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "AZURE_OPENAI_API_KEY"]) {
@@ -165,7 +146,8 @@ async function main(): Promise<void> {
   const available = readdirSync(scenariosDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
   const names = [...new Set(values.scenario ?? available)];
   for (const name of names) if (!available.includes(name)) throw new Error(`Unknown scenario: ${name}. Available: ${available.join(", ")}`);
-  const scenarios = names.map(loadScenario);
+  const scenarios = selectScenarios(names.map((name) => loadScenario(scenariosDir, name)), values.set as SetFilter);
+  if (!scenarios.length) throw new Error("No scenarios match the selected --set and --scenario filters.");
   const out = resolve(values.out ?? join(here, "results", new Date().toISOString().replace(/[:.]/g, "-")));
   const attempts = scenarios.flatMap((scenario) => Array.from({ length: Number(values.runs) }, (_, index) => ({ scenario, run: index + 1,
     dir: join(out, `${values.agent}-${scenario.name}-${index + 1}`) })));

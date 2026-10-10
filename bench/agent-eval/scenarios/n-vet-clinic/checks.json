@@ -1,0 +1,84 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "composite",
+      "why": "An owner name retains its first and last parts.",
+      "attribute": "OWNER.Name"
+    },
+    {
+      "id": "c2",
+      "kind": "multivalued",
+      "why": "All of an owner’s phone numbers must be represented.",
+      "attribute": "OWNER.Phones"
+    },
+    {
+      "id": "c3",
+      "kind": "weak",
+      "why": "A pet name is unique only within its owner.",
+      "entity": "PET",
+      "owner": "OWNER"
+    },
+    {
+      "id": "c4",
+      "kind": "derived",
+      "why": "Age is calculated from the birth date.",
+      "attribute": "PET.Age"
+    },
+    {
+      "id": "c5",
+      "kind": "relationshipAttribute",
+      "why": "The last treatment date belongs to the vet–pet pair.",
+      "relationship": "TREATS",
+      "attribute": "LastTreatmentDate"
+    },
+    {
+      "id": "c6",
+      "kind": "recursive",
+      "why": "Mentoring connects two vets.",
+      "relationship": "MENTORS"
+    },
+    {
+      "id": "c7",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "OWNS",
+      "entity": "PET",
+      "card": "1..1"
+    },
+    {
+      "id": "c8",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "TREATS",
+      "entity": "VET",
+      "card": "0..N"
+    },
+    {
+      "id": "c9",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "TREATS",
+      "entity": "PET",
+      "card": "0..N"
+    },
+    {
+      "id": "c10",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "MENTORS",
+      "entity": "VET",
+      "card": "0..1",
+      "role": "junior"
+    },
+    {
+      "id": "c11",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "MENTORS",
+      "entity": "VET",
+      "card": "0..N",
+      "role": "senior"
+    }
+  ]
+}

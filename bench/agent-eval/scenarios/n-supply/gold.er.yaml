@@ -1,0 +1,47 @@
+version: 1
+title: Supplies for projects
+entities:
+  SUPPLIER:
+    attrs:
+      - SupplierNo
+      - Name
+      - City
+    keys:
+      - - SupplierNo
+  PART:
+    attrs:
+      - PartNo
+      - Description
+      - Colour
+    keys:
+      - - PartNo
+  PROJECT:
+    attrs:
+      - ProjectNo
+      - Name
+      - Budget
+    keys:
+      - - ProjectNo
+  WAREHOUSE:
+    attrs:
+      - WarehouseNo
+      - Location
+    keys:
+      - - WarehouseNo
+relationships:
+  DELIVERS:
+    ends:
+      - entity: SUPPLIER
+        card: 0..N
+      - entity: PART
+        card: 0..N
+      - entity: PROJECT
+        card: 0..N
+    attrs:
+      - Quantity
+  STORES:
+    ends:
+      - entity: PART
+        card: 1..1
+      - entity: WAREHOUSE
+        card: 0..N

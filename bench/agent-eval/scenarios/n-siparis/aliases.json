@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "MÜŞTERİ": [
+      "Musteri",
+      "Customer",
+      "Alıcı"
+    ],
+    "ÜRÜN": [
+      "Urun",
+      "Product",
+      "Mal"
+    ],
+    "SİPARİŞ": [
+      "Siparis",
+      "Order"
+    ],
+    "SATIR": [
+      "SiparişSatırı",
+      "SiparisKalemi",
+      "OrderLine"
+    ],
+    "KURYE": [
+      "Courier",
+      "Teslimatçı"
+    ]
+  },
+  "attributes": {
+    "MÜŞTERİ.MüşteriNo": [
+      "MusteriNumarasi",
+      "CustomerId",
+      "MüşteriNumarası"
+    ],
+    "MÜŞTERİ.Ad": [
+      "İsim",
+      "Name",
+      "MüşteriAdı"
+    ],
+    "MÜŞTERİ.TeslimatAdresleri": [
+      "Adresler",
+      "DeliveryAddresses",
+      "TeslimatAdresi"
+    ],
+    "MÜŞTERİ.TeslimatAdresleri.İl": [
+      "Sehir",
+      "City",
+      "Şehir"
+    ],
+    "MÜŞTERİ.TeslimatAdresleri.İlçe": [
+      "Ilce",
+      "District"
+    ],
+    "MÜŞTERİ.TeslimatAdresleri.AçıkAdres": [
+      "AcikAdres",
+      "StreetAddress",
+      "AdresMetni"
+    ],
+    "ÜRÜN.ÜrünKodu": [
+      "UrunKodu",
+      "ProductCode"
+    ],
+    "ÜRÜN.Ad": [
+      "ÜrünAdı",
+      "Name"
+    ],
+    "SİPARİŞ.SiparişNo": [
+      "SiparisNumarasi",
+      "OrderId"
+    ],
+    "SİPARİŞ.Tarih": [
+      "SiparişTarihi",
+      "OrderDate"
+    ],
+    "SİPARİŞ.ToplamTutar": [
+      "Toplam",
+      "TotalAmount",
+      "SiparişToplamı"
+    ],
+    "SATIR.SatırNo": [
+      "SatirNumarasi",
+      "LineNumber"
+    ],
+    "SATIR.Miktar": [
+      "Adet",
+      "Quantity"
+    ],
+    "SATIR.BirimFiyat": [
+      "UnitPrice",
+      "Fiyat"
+    ],
+    "KURYE.KuryeNo": [
+      "KuryeNumarası",
+      "CourierId"
+    ],
+    "KURYE.Ad": [
+      "KuryeAdı",
+      "Name"
+    ]
+  },
+  "relationships": {
+    "VERİR": [
+      "SiparişVerir",
+      "Places"
+    ],
+    "İÇERİR": [
+      "Satırları",
+      "Contains"
+    ],
+    "GÖSTERİR": [
+      "Ürünüdür",
+      "RefersTo"
+    ],
+    "TESLİM_EDER": [
+      "Taşır",
+      "Delivers"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+version: 1
+title: Veterinary clinic
+entities:
+  OWNER:
+    attrs:
+      - OwnerNo
+      - name: Name
+        parts:
+          - FirstName
+          - LastName
+      - name: Phones
+        multivalued: true
+    keys:
+      - - OwnerNo
+  PET:
+    weak: true
+    attrs:
+      - Name
+      - BirthDate
+      - name: Age
+        derived: true
+    partialKey:
+      - Name
+  VET:
+    attrs:
+      - VetNo
+      - Name
+    keys:
+      - - VetNo
+relationships:
+  OWNS:
+    ends:
+      - entity: OWNER
+        card: 0..N
+      - entity: PET
+        card: 1..1
+    identifies: PET
+  TREATS:
+    ends:
+      - entity: VET
+        card: 0..N
+      - entity: PET
+        card: 0..N
+    attrs:
+      - LastTreatmentDate
+  MENTORS:
+    ends:
+      - entity: VET
+        card: 0..N
+        role: senior
+        id: senior
+      - entity: VET
+        card: 0..1
+        role: junior
+        id: junior

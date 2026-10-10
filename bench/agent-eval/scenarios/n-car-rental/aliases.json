@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "BRANCH": [
+      "Office",
+      "RentalBranch"
+    ],
+    "CAR": [
+      "Vehicle",
+      "Automobile"
+    ],
+    "CUSTOMER": [
+      "Renter",
+      "Client"
+    ],
+    "RENTAL": [
+      "Hire",
+      "RentalAgreement"
+    ],
+    "PAYMENT": [
+      "Installment",
+      "Transaction"
+    ],
+    "INSURANCE_OPTION": [
+      "Insurance",
+      "CoverageOption",
+      "Option"
+    ]
+  },
+  "attributes": {
+    "BRANCH.BranchNo": [
+      "BranchId",
+      "OfficeNumber"
+    ],
+    "BRANCH.Location": [
+      "Address",
+      "BranchLocation"
+    ],
+    "CAR.RegistrationNo": [
+      "RegistrationNumber",
+      "Plate",
+      "LicencePlate"
+    ],
+    "CAR.Model": [
+      "CarModel",
+      "VehicleModel"
+    ],
+    "CAR.InsuranceOptions": [
+      "Insurance",
+      "Options",
+      "Coverages"
+    ],
+    "CUSTOMER.LicenceNo": [
+      "LicenseNumber",
+      "LicenceNumber",
+      "DrivingLicence"
+    ],
+    "CUSTOMER.Name": [
+      "CustomerName",
+      "FullName"
+    ],
+    "RENTAL.RentalNo": [
+      "RentalId",
+      "RentalNumber",
+      "HireNumber"
+    ],
+    "RENTAL.PickupDate": [
+      "StartDate",
+      "CollectionDate"
+    ],
+    "RENTAL.ReturnDate": [
+      "EndDate",
+      "DropoffDate"
+    ],
+    "PAYMENT.PaymentNo": [
+      "PaymentNumber",
+      "Number"
+    ],
+    "PAYMENT.Date": [
+      "PaymentDate",
+      "PaidOn"
+    ],
+    "PAYMENT.Amount": [
+      "PaymentAmount",
+      "Sum"
+    ],
+    "INSURANCE_OPTION.Name": [
+      "OptionName",
+      "InsuranceName"
+    ]
+  },
+  "relationships": {
+    "KEPT_AT": [
+      "LocatedAt",
+      "Houses"
+    ],
+    "RENTS": [
+      "MadeBy",
+      "CustomerRental"
+    ],
+    "FOR_CAR": [
+      "Uses",
+      "CarRental"
+    ],
+    "HAS_PAYMENT": [
+      "PaidBy",
+      "BelongsTo"
+    ],
+    "OFFERS": [
+      "HasOption",
+      "AvailableInsurance"
+    ]
+  }
+}

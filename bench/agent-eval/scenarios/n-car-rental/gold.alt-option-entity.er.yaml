@@ -1,0 +1,73 @@
+version: 1
+title: Car rental
+entities:
+  BRANCH:
+    attrs:
+      - BranchNo
+      - Location
+    keys:
+      - - BranchNo
+  CAR:
+    attrs:
+      - RegistrationNo
+      - Model
+    keys:
+      - - RegistrationNo
+  CUSTOMER:
+    attrs:
+      - LicenceNo
+      - Name
+    keys:
+      - - LicenceNo
+  RENTAL:
+    attrs:
+      - RentalNo
+      - PickupDate
+      - ReturnDate
+    keys:
+      - - RentalNo
+  PAYMENT:
+    weak: true
+    attrs:
+      - PaymentNo
+      - Date
+      - Amount
+    partialKey:
+      - PaymentNo
+  INSURANCE_OPTION:
+    attrs:
+      - Name
+    keys:
+      - - Name
+relationships:
+  KEPT_AT:
+    ends:
+      - entity: CAR
+        card: 1..1
+      - entity: BRANCH
+        card: 0..N
+  RENTS:
+    ends:
+      - entity: RENTAL
+        card: 1..1
+      - entity: CUSTOMER
+        card: 0..N
+  FOR_CAR:
+    ends:
+      - entity: RENTAL
+        card: 1..1
+      - entity: CAR
+        card: 0..N
+  HAS_PAYMENT:
+    ends:
+      - entity: RENTAL
+        card: 0..N
+      - entity: PAYMENT
+        card: 1..1
+    identifies: PAYMENT
+  OFFERS:
+    ends:
+      - entity: CAR
+        card: 1..N
+      - entity: INSURANCE_OPTION
+        card: 1..N

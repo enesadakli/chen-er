@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "multivalued",
+      "why": "Bir müşteri birden fazla teslimat adresi saklayabilir.",
+      "attribute": "MÜŞTERİ.TeslimatAdresleri"
+    },
+    {
+      "id": "c2",
+      "kind": "composite",
+      "why": "Her adres il, ilçe ve açık adresi birlikte tutar.",
+      "attribute": "MÜŞTERİ.TeslimatAdresleri",
+      "minParts": 3
+    },
+    {
+      "id": "c3",
+      "kind": "weak",
+      "why": "Satır numarası sipariş içinde ayırt edicidir.",
+      "entity": "SATIR",
+      "owner": "SİPARİŞ"
+    },
+    {
+      "id": "c4",
+      "kind": "derived",
+      "why": "Toplam tutar satırlardan hesaplanır.",
+      "attribute": "SİPARİŞ.ToplamTutar"
+    },
+    {
+      "id": "c5",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "İÇERİR",
+      "entity": "SATIR",
+      "card": "1..1"
+    },
+    {
+      "id": "c6",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "İÇERİR",
+      "entity": "SİPARİŞ",
+      "card": "1..N"
+    },
+    {
+      "id": "c7",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "GÖSTERİR",
+      "entity": "SATIR",
+      "card": "1..1"
+    },
+    {
+      "id": "c8",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "TESLİM_EDER",
+      "entity": "SİPARİŞ",
+      "card": "0..1"
+    },
+    {
+      "id": "c9",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "TESLİM_EDER",
+      "entity": "KURYE",
+      "card": "0..N"
+    }
+  ]
+}

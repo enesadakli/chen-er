@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "ŞUBE": [
+      "Sube",
+      "Branch",
+      "KütüphaneŞubesi"
+    ],
+    "KİTAP": [
+      "Kitap",
+      "Book",
+      "Eser"
+    ],
+    "KOPYA": [
+      "Nüsha",
+      "Copy",
+      "KitapKopyası"
+    ],
+    "ÜYE": [
+      "Uye",
+      "Member",
+      "Okuyucu"
+    ]
+  },
+  "attributes": {
+    "ŞUBE.ŞubeKodu": [
+      "SubeKodu",
+      "BranchCode"
+    ],
+    "ŞUBE.Ad": [
+      "ŞubeAdı",
+      "Name"
+    ],
+    "KİTAP.KitapNo": [
+      "KitapNumarası",
+      "BookId"
+    ],
+    "KİTAP.Başlık": [
+      "Baslik",
+      "Title",
+      "KitapAdı"
+    ],
+    "KİTAP.Yazar": [
+      "Author",
+      "YazarAdı"
+    ],
+    "KOPYA.DemirbaşNo": [
+      "DemirbasNumarasi",
+      "InventoryNumber",
+      "DemirbaşNumarası"
+    ],
+    "ÜYE.ÜyeNo": [
+      "UyeNumarasi",
+      "MemberId"
+    ],
+    "ÜYE.Ad": [
+      "ÜyeAdı",
+      "Name"
+    ],
+    "ÜYE.Telefonlar": [
+      "TelefonNumaraları",
+      "Phones",
+      "PhoneNumbers"
+    ],
+    "ÖDÜNÇ.ÖdünçTarihi": [
+      "OduncTarihi",
+      "LoanDate",
+      "AlışTarihi"
+    ]
+  },
+  "relationships": {
+    "BULUNDURUR": [
+      "Sahiptir",
+      "HasCopy"
+    ],
+    "AİTTİR": [
+      "Kitabıdır",
+      "CopyOf"
+    ],
+    "ÖDÜNÇ": [
+      "BorçAlır",
+      "Loan",
+      "Borrows"
+    ],
+    "REFERANS": [
+      "ReferansGösterir",
+      "Refers"
+    ]
+  }
+}
