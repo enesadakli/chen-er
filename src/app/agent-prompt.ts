@@ -65,6 +65,21 @@ export function buildPrompt(input: { modelPath: string; lintCommand: string; sel
   ].join("\n");
 }
 
+/** Enough of docs/model-reference.md to build a model from nothing without guessing the format. */
+const MODEL_FORMAT = [
+  "  entities:",
+  "    COURSE: {attrs: [Code, Title, {name: Name, parts: [First, Last]}, {name: Phones, multivalued: true}, {name: Age, derived: true}], keys: [[Code]]}",
+  "    SECTION: {weak: true, attrs: [No], partialKey: [No]}",
+  "  relationships:",
+  "    OFFERS:",
+  "      ends:",
+  "        - {entity: DEPARTMENT, card: \"1..N\"}   # the card beside an entity is that entity's own (min,max) participation",
+  "        - {entity: COURSE, card: \"1..1\"}",
+  "      attrs: [Since]",
+  "    HAS_SECTION: {identifies: SECTION, ends: [{entity: COURSE, card: \"0..N\"}, {entity: SECTION, card: \"1..1\"}]}",
+  "  Every strong entity needs a key; repeated entities need a role and an id on each end.",
+];
+
 export interface PromptRequirement { id: string; label: string; text: string; changed?: boolean; trace?: readonly string[] }
 
 /**
@@ -91,6 +106,9 @@ export function buildRequirementsPrompt(input: { modelPath: string; lintCommand:
     "All requirements, for context:",
     ...input.all.map(line),
     "",
+    "Model format (version 1 YAML; unknown keys are rejected; names are identifiers):",
+    ...MODEL_FORMAT,
+    "",
     "Element ids: E:<Entity>, R:<Relationship>, A:<Owner>.<attribute> (A:<Owner>.<attribute>.<part> for composite parts),",
     "using the names in the YAML file.",
     "Reply with one or two plain sentences describing what changed. Then end the reply with a fenced block tagged",
@@ -109,7 +127,7 @@ export function buildRequirementsPrompt(input: { modelPath: string; lintCommand:
  * The Bash rule is built from the same `lintCommand` string the prompt shows, so the two cannot drift.
  */
 export function allowedTools(lintCommand: string): string[] {
-  return [`Bash(${lintCommand}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er"];
+  return [`Bash(${lintCommand}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "mcp__chen-er__get_schema"];
 }
 
 /**

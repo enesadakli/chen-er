@@ -204,6 +204,9 @@ export function extractTrace(reply: string): { raw?: unknown; reply: string } {
   return { raw: found.value, reply: `${reply.slice(0, found.start)}${reply.slice(found.end)}`.replace(/\n{3,}/g, "\n\n").trim() };
 }
 
+/** A rationale reads as a sentence in the file and the viewer. */
+const sentence = (text: string): string => /[.!?…:)]$/.test(text) ? text : `${text}.`;
+
 export interface TraceResult {
   /** One entry per applied requirement id that the agent answered for; elements are only ids present in the model. */
   entries: Record<string, TraceEntry>;
@@ -247,7 +250,7 @@ export function validateTrace(raw: unknown, applied: readonly string[], modelIds
       else if (!dropped.includes(element.trim())) dropped.push(element.trim());
     }
     const entry: TraceEntry = { elements: elements.slice(0, MAX_TRACE) };
-    if (typeof why === "string" && normalizeText(why)) entry.why = normalizeText(why).slice(0, MAX_WHY);
+    if (typeof why === "string" && normalizeText(why)) entry.why = sentence(normalizeText(why).slice(0, MAX_WHY));
     if (dropped.length) entry.dropped = dropped.slice(0, MAX_TRACE);
     entries[id] = entry;
   }

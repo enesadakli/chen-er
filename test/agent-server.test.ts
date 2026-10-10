@@ -147,7 +147,7 @@ describe("agent routes", () => {
     const lint = /run `(.+) \S+club\.er\.yaml` and fix any errors/.exec(prompt)?.[1];
     expect(lint).toMatch(/^(npx tsx|node|\S+\/node_modules\/\.bin\/tsx) \S+ lint$/);
     expect(first!.args).toEqual(["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
-      "--allowedTools", `Bash(${lint}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "--add-dir", dir]);
+      "--allowedTools", `Bash(${lint}:*)`, "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "mcp__chen-er__get_schema", "--add-dir", dir]);
     expect(prompt).toContain(`Model file: ${model}`);
     expect(prompt).toContain("E:MEMBER (MEMBER)\nA:MEMBER.MemberId (MemberId)\nE:NOPE\n");
     expect(prompt).toMatch(/run `\S+ (\S+ )?lint \S+club\.er\.yaml` and fix any errors/);

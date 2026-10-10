@@ -120,7 +120,7 @@ describe("trace from the agent", () => {
       r9: { elements: ["E:COURSE"] },
     }, ["r1", "r2", "r3"], model);
     expect(result.entries).toEqual({
-      r1: { elements: ["E:COURSE", "R:OFFERS"], why: "one line", dropped: ["E:GHOST", "DUP"] },
+      r1: { elements: ["E:COURSE", "R:OFFERS"], why: "one line.", dropped: ["E:GHOST", "DUP"] },
       r2: { elements: ["A:COURSE.Title"] },
     });
     expect(result.missing).toEqual(["r3"]);
@@ -146,6 +146,8 @@ describe("requirements prompt", () => {
     expect(prompt).toContain("- Never write coordinates or layout");
     expect(prompt).toContain("Requirements to apply now (new or changed since the last apply):\nr2 (R2): Students enroll in courses.  [changed; it was linked to R:ENROLLS]\nr5 (R3): Rooms have a capacity.  [new]\n");
     expect(prompt).toContain("All requirements, for context:\nr1 (R1): Every course has a code.\nr2 (R2)");
+    expect(prompt).toContain("Model format (version 1 YAML");
+    expect(prompt).toContain("{entity: DEPARTMENT, card: \"1..N\"}");
     expect(prompt).toMatch(/```chen-trace\n\{"r2":\{"elements":\["E:COURSE","R:OFFERS","A:COURSE.Title"\],"why":"[^"]+"\},"r5":\{"elements":\[\],"why":"[^"]+"\}\}\n```$/);
   });
 });
