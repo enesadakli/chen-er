@@ -1,22 +1,27 @@
 // Runs one headless agent process and turns its stream into steps and a final outcome.
 import { spawn } from "node:child_process";
-import { parseStreamLine, type Step } from "./agent-stream.js";
+import { codexParser, parseStreamLine, type LineParser, type Step } from "./agent-stream.js";
 
 export type RunStatus = "ok" | "error" | "cancelled" | "limit";
 export type ErrorKind = "not-found" | "not-logged-in" | "limit" | "other";
+export type AgentKind = "claude" | "codex";
 export interface RunOutcome { status: RunStatus; reply?: string; error?: string; errorKind?: ErrorKind; sessionId?: string }
 export interface RunOptions {
   bin: string;
   args: string[];
   cwd: string;
   onStep(step: Step): void;
+  /** Which CLI runs, for its stream format and error messages (default claude). */
+  kind?: AgentKind;
+  /** Stdout line parser for this run (default: the parser for `kind`). */
+  parse?: LineParser;
   /** Delay between SIGTERM and SIGKILL on cancel. */
   killAfterMs?: number;
 }
 export interface RunHandle { done: Promise<RunOutcome>; cancel(): Promise<RunOutcome> }
 
 const LIMIT = /usage limit|limit reached|hit your (?:usage )?limit/i;
-const LOGIN = /\/login|not logged in|invalid api key|authentication/i;
+const LOGIN = /\/login|codex login|not logged in|invalid api key|authentication|unauthori[sz]ed/i;
 const STDERR_LINES = 20;
 
 export function tail(text: string, lines = STDERR_LINES): string {
@@ -28,6 +33,7 @@ export interface ExitFacts {
   cancelled: boolean;
   spawnError?: NodeJS.ErrnoException;
   bin: string;
+  kind?: AgentKind;
   result?: { text: string; isError: boolean };
   lastText?: string;
   stderr: string;
@@ -41,7 +47,9 @@ export function classifyExit(facts: ExitFacts): Omit<RunOutcome, "sessionId"> {
   if (facts.spawnError) {
     const missing = facts.spawnError.code === "ENOENT";
     return { status: "error", errorKind: missing ? "not-found" : "other", error: missing
-      ? `The ${facts.bin} command was not found. Install Claude Code, run \`claude\`, then \`/login\`.`
+      ? facts.kind === "codex"
+        ? `The ${facts.bin} command was not found. Install the Codex CLI, then run \`codex login\`.`
+        : `The ${facts.bin} command was not found. Install Claude Code, run \`claude\`, then \`/login\`.`
       : `Could not start ${facts.bin}: ${facts.spawnError.message}` };
   }
   const failed = facts.code !== 0 || facts.result?.isError === true;
@@ -66,9 +74,11 @@ export function runAgent(options: RunOptions): RunHandle {
   let cancelled = false;
   let spawnError: NodeJS.ErrnoException | undefined;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
+  // stdin is closed: `codex exec` otherwise waits for more prompt input on an open pipe.
   const child = spawn(options.bin, options.args, { cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"] });
+  const parse = options.parse ?? (options.kind === "codex" ? codexParser() : parseStreamLine);
   const line = (raw: string) => {
-    const update = parseStreamLine(raw);
+    const update = parse(raw);
     if (update.sessionId) sessionId = update.sessionId;
     if (update.result) result = update.result;
     if (update.lastText) lastText = update.lastText;
@@ -91,7 +101,7 @@ export function runAgent(options: RunOptions): RunHandle {
       clearTimeout(killTimer);
       if (buffer.trim()) line(buffer);
       buffer = "";
-      const outcome = classifyExit({ code, cancelled, spawnError, bin: options.bin, result, lastText, stderr });
+      const outcome = classifyExit({ code, cancelled, spawnError, bin: options.bin, kind: options.kind, result, lastText, stderr });
       settle({ ...outcome, ...(sessionId ? { sessionId } : {}) });
     };
     child.once("error", (error) => {

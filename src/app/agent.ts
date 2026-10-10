@@ -1,27 +1,14 @@
-// Agent panel controller: turns, snapshots, change sets and undo. HTTP lives in serve.ts.
+// Agent panel controller: turns, snapshots, change sets, undo and the stored thread. HTTP lives in serve.ts.
 import { dirname, extname } from "node:path";
-import { changeSet, type ChangeSet } from "./agent-changes.js";
-import { buildPrompt, claudeArgs, selectionLabels } from "./agent-prompt.js";
-import { runAgent, type ErrorKind, type RunHandle, type RunOutcome } from "./agent-runner.js";
-import { clip, type Step } from "./agent-stream.js";
+import { changeSet } from "./agent-changes.js";
+import { buildPrompt, claudeArgs, codexArgs, selectionLabels } from "./agent-prompt.js";
+import { runAgent, type AgentKind, type RunHandle, type RunOutcome } from "./agent-runner.js";
+import { readThread, writeThread, type StoredThread, type Turn, type TurnStatus } from "./agent-store.js";
+import { clip } from "./agent-stream.js";
 import { fileBytes, revision } from "./file-guard.js";
 
-export type AgentKind = "claude";
-export type TurnStatus = "running" | "ok" | "error" | "cancelled" | "limit" | "undone";
-export interface Turn {
-  id: string;
-  text: string;
-  selection: string[];
-  startedAt: string;
-  finishedAt?: string;
-  status: TurnStatus;
-  reply?: string;
-  steps: Step[];
-  changes?: ChangeSet;
-  error?: string;
-  /** Machine-readable cause when status is "error" or "limit". */
-  errorKind?: ErrorKind;
-}
+export type { AgentKind } from "./agent-runner.js";
+export type { Turn, TurnStatus } from "./agent-store.js";
 export interface AgentInfo { enabled: true; kind: AgentKind; cwd: string; running: string | null; turns: Turn[] }
 
 export class AgentError extends Error {
@@ -44,10 +31,16 @@ export interface AgentDeps {
   isServerLayout(bytes: Buffer | null): boolean;
   /** Called once a turn has settled, so the server can save positions it skipped during the turn. */
   afterTurn?(modelChanged: boolean): void;
+  /** Thread file (`<model>.er.agent.json`); without it the thread lives only in memory. */
+  statePath?: string;
   killAfterMs?: number;
 }
 
-interface Entry { turn: Turn; before: Buffer | null; after?: Buffer | null }
+/** `before` holds the pre-turn model bytes (null: no model file) while they may be needed for undo; revisions
+ * outlive it, so a restored thread still knows which turns changed the model. */
+interface Entry { turn: Turn; beforeRevision: string; afterRevision?: string; before?: Buffer | null }
+
+export const INTERRUPTED = "The server stopped while this request was running, so it was cancelled. Changes are measured against the model as found at restart.";
 
 export const MAX_TEXT = 4000;
 export const MAX_SELECTION = 20;
@@ -69,7 +62,7 @@ export function agentCommand(bin: string, args: string[]): { bin: string; args: 
   return [".js", ".mjs", ".cjs"].includes(extname(bin)) ? { bin: process.execPath, args: [bin, ...args] } : { bin, args };
 }
 
-const changed = (entry: Entry): boolean => entry.after !== undefined && revision(entry.after) !== revision(entry.before);
+const changed = (entry: Entry): boolean => entry.afterRevision !== undefined && entry.afterRevision !== entry.beforeRevision;
 
 export function createAgent(deps: AgentDeps) {
   const entries: Entry[] = [];
@@ -77,19 +70,62 @@ export function createAgent(deps: AgentDeps) {
   let running: { entry: Entry; handle: RunHandle; finished: Promise<void> } | undefined;
   let undoing = false;
   let counter = 0;
+  let warned = false;
   const find = (id: string): Entry => {
     const entry = entries.find((e) => e.turn.id === id);
     if (!entry) throw new AgentError(404, "Unknown turn.");
     return entry;
   };
 
+  /** Writes the thread file. Snapshot bytes are kept only for the latest model-changing turn and a running turn. */
+  function save(): void {
+    const keep = new Set([entries.findLast(changed), running?.entry]);
+    for (const entry of entries) if (!keep.has(entry)) delete entry.before;
+    if (!deps.statePath) return;
+    const thread: StoredThread = { version: 1, model: deps.modelPath, kind: deps.kind, ...(sessionId ? { sessionId } : {}),
+      entries: entries.map((e) => ({ turn: e.turn, beforeRevision: e.beforeRevision,
+        ...(e.afterRevision ? { afterRevision: e.afterRevision } : {}),
+        ...(e.before !== undefined ? { before: e.before === null ? null : e.before.toString("base64") } : {}) })) };
+    try { writeThread(deps.statePath, thread); }
+    catch (error) {
+      if (!warned) console.error(`The agent thread was not saved to ${deps.statePath}: ${(error as Error).message}`);
+      warned = true;
+    }
+  }
+  const emit = (turn: Turn): void => { save(); deps.emit(turn); };
+  /** Measures the model after a turn: its revision and the change set against the snapshot. */
+  function measure(entry: Entry): void {
+    const after = fileBytes(deps.modelPath);
+    entry.afterRevision = revision(after);
+    entry.turn.changes = !changed(entry) ? { added: [], removed: [], modified: [] }
+      : entry.before === undefined ? { added: [], removed: [], modified: [], parseError: true }
+        : changeSet(entry.before?.toString("utf8") ?? null, after?.toString("utf8") ?? null);
+  }
+
+  const stored = deps.statePath ? readThread(deps.statePath, deps.modelPath, deps.kind) : undefined;
+  if (stored) {
+    sessionId = stored.sessionId;
+    let interrupted = false;
+    for (const item of stored.entries) {
+      const entry: Entry = { turn: item.turn, beforeRevision: item.beforeRevision,
+        ...(item.afterRevision ? { afterRevision: item.afterRevision } : {}),
+        ...(item.before !== undefined ? { before: item.before === null ? null : Buffer.from(item.before, "base64") } : {}) };
+      if (entry.turn.status === "running") {
+        // The process died mid-turn: the agent is gone, so the turn ends here, measured against the model as it is now.
+        measure(entry);
+        interrupted = true;
+        Object.assign(entry.turn, { status: "cancelled", notice: INTERRUPTED, finishedAt: new Date().toISOString() });
+      }
+      entries.push(entry);
+      counter = Math.max(counter, Number(/^t(\d+)$/.exec(entry.turn.id)?.[1] ?? 0));
+    }
+    if (interrupted) save();
+  }
+
   async function finish(entry: Entry, layoutBefore: Buffer | null, outcome: RunOutcome): Promise<void> {
     const { turn } = entry;
     if (outcome.sessionId) sessionId = outcome.sessionId;
-    entry.after = fileBytes(deps.modelPath);
-    turn.changes = changed(entry)
-      ? changeSet(entry.before?.toString("utf8") ?? null, entry.after?.toString("utf8") ?? null)
-      : { added: [], removed: [], modified: [] };
+    measure(entry);
     const layout = fileBytes(deps.layoutPath);
     if (revision(layout) !== revision(layoutBefore) && !deps.isServerLayout(layout)) {
       // Pins and positions belong to the person; revert an agent write to the layout file.
@@ -106,7 +142,7 @@ export function createAgent(deps: AgentDeps) {
     if (turn.reply && last?.kind === "text" && last.summary === clip(turn.reply)) turn.steps.pop();
     turn.finishedAt = new Date().toISOString();
     running = undefined;
-    deps.emit(turn);
+    emit(turn);
     deps.afterTurn?.(changed(entry));
   }
 
@@ -121,16 +157,17 @@ export function createAgent(deps: AgentDeps) {
       const layoutBefore = fileBytes(deps.layoutPath);
       const turn: Turn = { id: `t${++counter}`, text: request.text, selection: request.selection,
         startedAt: new Date().toISOString(), status: "running", steps: [] };
-      const entry: Entry = { turn, before };
+      const entry: Entry = { turn, beforeRevision: revision(before), before };
       const prompt = buildPrompt({ modelPath: deps.modelPath, lintCommand: deps.lintCommand,
         selection: selectionLabels(before?.toString("utf8") ?? null, request.selection), text: request.text });
-      const command = agentCommand(deps.bin, claudeArgs(prompt, dirname(deps.modelPath), deps.lintCommand, sessionId));
-      const handle = runAgent({ ...command, cwd: deps.cwd, killAfterMs: deps.killAfterMs,
-        onStep: (step) => { turn.steps.push(step); deps.emit(turn); } });
+      const modelDir = dirname(deps.modelPath);
+      const args = deps.kind === "codex" ? codexArgs(prompt, deps.cwd, modelDir, sessionId) : claudeArgs(prompt, modelDir, deps.lintCommand, sessionId);
+      const handle = runAgent({ ...agentCommand(deps.bin, args), kind: deps.kind, cwd: deps.cwd, killAfterMs: deps.killAfterMs,
+        onStep: (step) => { turn.steps.push(step); emit(turn); } });
       entries.push(entry);
       const finished = handle.done.then((outcome) => finish(entry, layoutBefore, outcome));
       running = { entry, handle, finished };
-      deps.emit(turn);
+      emit(turn);
       return turn.id;
     },
     async cancel(id: string): Promise<{ status: TurnStatus }> {
@@ -148,14 +185,15 @@ export function createAgent(deps: AgentDeps) {
       if (undoing) throw new AgentError(409, "An undo is in progress.");
       if (entry.turn.status === "undone") throw new AgentError(409, "This turn was already undone.");
       if (!changed(entry)) throw new AgentError(409, "This turn did not change the model.");
-      if (entry.before === null) throw new AgentError(409, "No model snapshot exists for this turn.");
       if (entries.findLast(changed) !== entry) throw new AgentError(409, "Only the most recent agent change can be undone.");
-      if (revision(fileBytes(deps.modelPath)) !== revision(entry.after ?? null)) throw new AgentError(409, "The model changed after this turn.");
+      if (entry.before === undefined || entry.before === null) throw new AgentError(409, "No model snapshot exists for this turn.");
+      const current = fileBytes(deps.modelPath);
+      if (revision(current) !== entry.afterRevision) throw new AgentError(409, "The model changed after this turn.");
       undoing = true;
-      try { await deps.writeModel(entry.after ?? null, entry.before); }
+      try { await deps.writeModel(current, entry.before); }
       finally { undoing = false; }
       entry.turn.status = "undone";
-      deps.emit(entry.turn);
+      emit(entry.turn);
       return { status: "undone" };
     },
     async close(): Promise<void> {

@@ -16,6 +16,8 @@ export interface Turn {
   changes?: Changes;
   error?: string;
   errorKind?: ErrorKind;
+  /** Set when the server ended the turn itself (it stopped while the turn was running). */
+  notice?: string;
 }
 export interface AgentInfo { enabled: boolean; kind: string; cwd: string; running: string | null; turns: Turn[] }
 export interface ThreadState { turns: Turn[]; running: string | null }
@@ -130,7 +132,7 @@ export function outcome(turn: Turn, kind = "claude"): Outcome | undefined {
   const product = kind === "codex" ? "Codex CLI" : "Claude Code";
   switch (turn.status) {
     case "running": return undefined;
-    case "cancelled": return { kind: "cancelled", message: "Cancelled." };
+    case "cancelled": return { kind: "cancelled", message: turn.notice ?? "Cancelled." };
     case "undone": return { kind: "undone", message: "Undone. The model is back to how it was before this request." };
     case "limit": return { kind: "limit", message: `${name} hit its usage limit. Try again after the limit resets.` };
     case "error": {
@@ -140,12 +142,17 @@ export function outcome(turn: Turn, kind = "claude"): Outcome | undefined {
       const missing = turn.errorKind ? turn.errorKind === "not-found"
         : /ENOENT|command not found|not found in PATH|spawn \S+ ENOENT|is not recognized/i.test(text);
       const login = turn.errorKind ? turn.errorKind === "not-logged-in"
-        : /not logged in|please log ?in|\/login|unauthori[sz]ed|authentication|invalid api key/i.test(text);
+        : /not logged in|please log ?in|\/login|codex login|unauthori[sz]ed|authentication|invalid api key/i.test(text);
+      // Codex logs in with `codex login`; Claude Code with `/login` inside `claude`.
       if (missing) {
-        return { kind: "missing", message: `${product} was not found. Install it, run \`${cli}\` once in a terminal, then \`/login\`.` };
+        return { kind: "missing", message: kind === "codex"
+          ? `${product} was not found. Install it, then run \`codex login\` in a terminal.`
+          : `${product} was not found. Install it, run \`${cli}\` once in a terminal, then \`/login\`.` };
       }
       if (login) {
-        return { kind: "login", message: `${name} is not logged in. Run \`${cli}\` in a terminal, then \`/login\`.` };
+        return { kind: "login", message: kind === "codex"
+          ? `${name} is not logged in. Run \`codex login\` in a terminal.`
+          : `${name} is not logged in. Run \`${cli}\` in a terminal, then \`/login\`.` };
       }
       return { kind: "error", message: `${name} stopped with an error.`, ...(detail ? { detail } : {}) };
     }
