@@ -3,16 +3,30 @@
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>chen-er notebook</title></head>
 <body>
   <header class="header">
-    <h1 id="title">chen-er</h1><span id="path" class="path"></span>
-    <label class="engine">Engine <select id="engine"><option>simple</option><option>layered</option><option>stress</option></select></label>
-    <span id="quality" class="quality">Quality pending</span>
-    <span id="status" role="status" aria-live="polite">connecting</span>
-    <button id="undo" disabled title="Undo (⌘/Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (⌘/Ctrl+Shift+Z)">Redo</button>
-    <button id="fit" title="Fit (F)">Fit</button>
-    <details class="actions"><summary>Export</summary><div class="menu">
-      <a href="/api/export.svg" download>Export SVG</a><a href="/api/export.png?scale=2" download>Export PNG</a>
-      <button id="relayout-mobile" class="mobile-only">Re-layout</button><button id="reset-mobile" class="mobile-only">Reset pins</button><button id="theme">Dark desk</button>
-    </div></details><button id="relayout" class="desktop-only" title="Lay the whole diagram out again; pins are kept">Re-layout</button><button id="reset" class="desktop-only">Reset pins</button>
+    <div class="model-heading"><h1 id="title">chen-er</h1><span id="path" class="path"></span></div>
+    <div class="header-state"><span id="quality" class="quality">Quality pending</span><span id="status" role="status" aria-live="polite"><span class="status-full">connecting</span><span class="status-short" aria-hidden="true">offline</span></span></div>
+    <div class="header-controls">
+      <div class="history-pair" role="group" aria-label="Layout history">
+        <button id="undo" class="icon-button" disabled aria-label="Undo (⌘/Ctrl+Z)" title="Undo (⌘/Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 6 6v3"/></svg></button>
+        <button id="redo" class="icon-button" disabled aria-label="Redo (⌘/Ctrl+Shift+Z)" title="Redo (⌘/Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 5 5-5 5M20 10H10a6 6 0 0 0-6 6v3"/></svg></button>
+      </div>
+      <div id="desktop-actions" class="action-group">
+        <details id="layout-menu" class="actions"><summary>Layout <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><div id="layout-items" class="menu">
+          <label class="engine" for="engine">Engine <select id="engine"><option>simple</option><option>layered</option><option>stress</option></select></label>
+          <button id="relayout" title="Lay the whole diagram out again; pins are kept">Re-layout</button><button id="reset">Reset pins</button>
+        </div></details>
+        <button id="fit" title="Fit (F)">Fit</button>
+        <button id="theme" class="icon-button" aria-label="Switch to dark desk" title="Switch to dark desk">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/></svg>
+          <span class="theme-label mobile-only">Switch to dark desk</span>
+        </button>
+      </div>
+      <details id="export-menu" class="actions export-actions"><summary>Export <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><div id="export-items" class="menu">
+        <a href="/api/export.svg" download>Export SVG</a><a href="/api/export.png?scale=2" download>Export PNG</a>
+      </div></details>
+      <details id="more-menu" class="actions mobile-only"><summary>More <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></summary><div id="more-items" class="menu"></div></details>
+    </div>
   </header>
   <main class="workspace">
     <section id="canvas" class="canvas" tabindex="0" aria-label="Diagram. F fits, plus and minus zoom, 0 resets zoom. Arrow keys pan. Select a node and use arrow keys to move it; Alt disables snap. Delete unpins.">
@@ -29,20 +43,27 @@
         </div>
       </div>
       <p id="placeholder">Loading the model…</p>
-      <div class="zoom-controls"><button id="minus" aria-label="Zoom out">−</button><output id="zoom">100%</output><button id="plus" aria-label="Zoom in">+</button><button id="actual" title="100% (0)">100%</button></div>
+      <div class="zoom-controls" role="group" aria-label="Zoom controls">
+        <button id="minus" class="icon-button" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button id="actual" title="Reset to 100% (0)" aria-label="Reset to 100%"><span id="zoom">100%</span></button>
+        <button id="plus" class="icon-button" aria-label="Zoom in" title="Zoom in (+)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
+        <button id="zoom-fit" class="icon-button" aria-label="Fit to sheet" title="Fit to sheet (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>
+      </div>
     </section>
     <aside id="notes" class="notes" aria-label="Model findings">
-      <button id="drawer" class="drawer" aria-label="Resize notes drawer. Arrow keys change its height.">Findings</button>
-      <div id="tabs" class="tabs" role="tablist" aria-label="Notes column" hidden>
-        <button id="tab-notes" role="tab" aria-selected="true" aria-controls="findings">Notes</button>
-        <button id="tab-agent" role="tab" aria-selected="false" aria-controls="agent" tabindex="-1">Agent <span id="tab-agent-state" class="tab-state" hidden></span></button>
+      <div class="notes-heading">
+        <button id="drawer" class="drawer" aria-label="Resize notes drawer. Arrow keys change its height."><span aria-hidden="true"></span></button>
+        <div id="tabs" class="tabs" role="tablist" aria-label="Notes column" hidden>
+          <button id="tab-notes" role="tab" aria-selected="true" aria-controls="findings">Notes</button>
+          <button id="tab-agent" role="tab" aria-selected="false" aria-controls="agent" tabindex="-1">Agent <span id="tab-agent-state" class="tab-state" hidden></span></button>
+        </div>
       </div>
       <div id="findings" class="findings"><p>Waiting for findings…</p></div>
       <section id="agent" class="agent" role="tabpanel" aria-labelledby="tab-agent" hidden>
-        <p id="agent-context" class="agent-context"></p>
         <div id="agent-empty" class="agent-empty">
+          <p id="agent-context" class="agent-context"></p>
           <p id="agent-empty-lead">Ask the agent for a model change in plain words. It edits the YAML file and the drawing updates here.</p>
-          <p class="agent-try">Try</p>
+          <p class="agent-examples-lead">For example:</p>
           <ul id="agent-examples" class="examples"></ul>
         </div>
         <div id="agent-thread" class="agent-thread"></div>

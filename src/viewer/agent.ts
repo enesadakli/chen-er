@@ -108,7 +108,8 @@ export class AgentPanel {
     if (!res.ok) { this.say(`Cannot load the agent thread (HTTP ${res.status}).`); return; }
     const info = await res.json() as AgentInfo;
     this.kind = info.kind || "claude";
-    this.context.textContent = `‎${info.cwd}‎`; this.context.title = `${agentName(this.kind)} works in ${info.cwd}`;
+    this.context.replaceChildren(`${agentName(this.kind)} works in `, el("span", "basename", info.cwd.split("/").filter(Boolean).at(-1) ?? info.cwd));
+    this.context.title = info.cwd;
     this.input.placeholder = `Ask ${agentName(this.kind)} to change the model`;
     element("agent-empty-lead").textContent = `Ask ${agentName(this.kind)} for a model change in plain words. It edits the YAML file and the drawing updates here.`;
     this.thread = loadThread(info);
@@ -247,8 +248,10 @@ export class AgentPanel {
     for (const id of this.chips) {
       const chip = el("span", "chip");
       const label = labelFor(id, this.labels);
-      chip.append(el("span", "chip-mark", "▸"), el("span", "chip-label", label));
-      const remove = el("button", "chip-remove", "×");
+      const mark = el("span", "chip-mark"); mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+      chip.append(mark, el("span", "chip-label", label));
+      const remove = el("button", "chip-remove");
+      remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
       remove.type = "button"; remove.setAttribute("aria-label", `Remove ${label} from the request`);
       remove.addEventListener("click", () => {
         this.dismissed = id; this.drawChips();
@@ -304,7 +307,12 @@ export class AgentPanel {
     ask.append(text, time); article.append(ask);
     if (turn.selection.length) {
       const context = el("p", "turn-context");
-      context.textContent = turn.selection.map((id) => `▸ ${labelFor(id, this.labels)}`).join("  ");
+      for (const id of turn.selection) {
+        const item = el("span", "turn-context-item");
+        const mark = el("span", "chip-mark");
+        mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+        item.append(mark, labelFor(id, this.labels)); context.append(item);
+      }
       context.setAttribute("aria-label", `Context: ${turn.selection.map((id) => labelFor(id, this.labels)).join(", ")}`);
       article.append(context);
     }

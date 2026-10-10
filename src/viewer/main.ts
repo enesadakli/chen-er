@@ -15,6 +15,8 @@ let selected: number | undefined;
 let connected = false;
 let pendingWrites = 0;
 let anchor: Box | undefined;
+let firstSheet = true;
+let drawerResized = false;
 const actions = element("node-actions");
 function positionActions() {
   if (actions.hidden || !anchor) return;
@@ -34,12 +36,18 @@ function nodeActions(id?: string, box?: Box, dragging = false) {
 }
 function historyControls() {
   const busy = pendingWrites > 0 || !!state?.computing;
-  for (const id of ["reset", "reset-mobile", "relayout", "relayout-mobile", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
+  for (const id of ["reset", "relayout", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
   element<HTMLSelectElement>("engine").disabled = busy;
   element<HTMLButtonElement>("undo").disabled = busy || !state?.history.canUndo;
   element<HTMLButtonElement>("redo").disabled = busy || !state?.history.canRedo;
 }
-function status(text: string) { element("status").textContent = text; }
+function status(text: string) {
+  const short = /saving|computing/i.test(text) ? "saving" : /conflict/i.test(text) ? "conflict" : /fail|cannot|fix/i.test(text) ? "error" : /disconnect|connecting|reconnect/i.test(text) ? "offline" : "live";
+  const node = element("status");
+  node.querySelector<HTMLElement>(".status-full")!.textContent = text;
+  node.querySelector<HTMLElement>(".status-short")!.textContent = short;
+  node.dataset.state = short; node.title = text;
+}
 function choose(number: number) {
   selected = number; notes.select(number); canvas.highlight(number, true, true);
 }
@@ -57,8 +65,8 @@ function apply(next: ViewerState) {
   state = next; list = findings(next.diagnostics);
   selected = previous ? list.find((f) => f.rule === previous.rule && f.path === previous.path && f.message === previous.message)?.number : undefined;
   element("title").textContent = next.title; document.title = `${next.title} · chen-er`;
-  // LRM marks keep slashes in place inside the right-to-left box used for left-side truncation.
-  element("path").textContent = `\u200E${next.modelPath}\u200E`; element("path").title = next.modelPath;
+  element("path").textContent = next.modelPath.split("/").filter(Boolean).at(-1) ?? next.modelPath; element("path").title = next.modelPath;
+  element("title").title = next.title;
   element<HTMLSelectElement>("engine").value = next.engine;
   const q = next.quality;
   element("quality").textContent = q?.implemented ? `${q.overlaps} overlaps · ${q.edgeCrossings} crossings` : "Quality not measured";
@@ -66,6 +74,16 @@ function apply(next: ViewerState) {
   notes.show(list, next.yaml, selected);
   const labels = new Map<string, string>([...(next.diagram?.nodes ?? []).map((n) => [n.id, n.label] as const), ...next.selection.owners.map((o) => [o.id, o.label] as const)]);
   canvas.show(next, list); if (selected !== undefined || previous) canvas.highlight(selected, true);
+  if (firstSheet && next.svg && next.diagram) {
+    firstSheet = false;
+    if (matchMedia("(max-width: 900px)").matches && !drawerResized) {
+      const viewport = element("canvas"), sheet = element("sheet");
+      const height = document.querySelector<HTMLElement>(".workspace")!.clientHeight;
+      const paperHeight = (viewport.clientWidth - 24) * sheet.offsetHeight / Math.max(sheet.offsetWidth, 1) + 24;
+      drawerHeight(Math.max(height * .4, Math.min(height * .6, height - paperHeight)));
+      canvas.fit();
+    }
+  }
   agent.diagram(labels);
   if (next.computing) status("Computing layout…");
   else if (!pendingWrites) status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
@@ -90,7 +108,7 @@ async function write(path: string, method: string, value?: unknown): Promise<boo
       }
       throw new Error(error.error);
     }
-    apply(await res.json() as ViewerState); status("Saved"); element("status").title = "";
+    apply(await res.json() as ViewerState); status("Saved");
     return true;
   } catch (error) {
     const message = (error as Error).message;
@@ -123,17 +141,22 @@ void fetch("/api/state").then(async (res) => {
   apply(await res.json() as ViewerState);
 }).catch((error: unknown) => { if (!state) status(`Cannot load model: ${(error as Error).message}`); });
 window.addEventListener("pagehide", () => { events?.close(); clearTimeout(retry); });
-element("fit").addEventListener("click", () => canvas.fit());
+for (const id of ["fit", "zoom-fit"]) element(id).addEventListener("click", () => canvas.fit());
 element("plus").addEventListener("click", () => canvas.zoom(1.2));
 element("minus").addEventListener("click", () => canvas.zoom(1 / 1.2));
 element("actual").addEventListener("click", () => canvas.actual());
-for (const id of ["reset", "reset-mobile"]) element(id).addEventListener("click", () => { void write("/api/pins", "DELETE"); });
-for (const id of ["relayout", "relayout-mobile"]) element(id).addEventListener("click", () => { void write("/api/relayout", "POST"); });
+element("reset").addEventListener("click", () => { void write("/api/pins", "DELETE"); });
+element("relayout").addEventListener("click", () => { void write("/api/relayout", "POST"); });
 element<HTMLSelectElement>("engine").addEventListener("change", (e) => { void write("/api/engine", "POST", { engine: (e.target as HTMLSelectElement).value }); });
 const dark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-function themeLabel() { element("theme").textContent = dark() ? "Light desk" : "Dark desk"; }
+function themeLabel() {
+  const theme = element("theme"), label = dark() ? "Switch to light desk" : "Switch to dark desk";
+  theme.dataset.dark = String(dark()); theme.setAttribute("aria-label", label); theme.title = label;
+  theme.querySelector<HTMLElement>(".theme-label")!.textContent = label;
+}
 try { const stored = localStorage.getItem("chen-theme"); if (stored === "dark" || stored === "light") document.documentElement.dataset.theme = stored; } catch { /* Storage may be disabled by the browser. */ }
 themeLabel();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themeLabel);
 element("theme").addEventListener("click", () => {
   const next = dark() ? "light" : "dark"; document.documentElement.dataset.theme = next; themeLabel();
   try { localStorage.setItem("chen-theme", next); } catch { /* The current session still keeps its theme. */ }
@@ -146,9 +169,10 @@ window.addEventListener("keydown", (e) => {
     if (state?.history[direction === "undo" ? "canUndo" : "canRedo"]) void write(`/api/history/${direction}`, "POST");
     return;
   }
+  if (e.key === "Escape" && closeMenus()) { e.preventDefault(); e.stopPropagation(); return; }
   if (e.key === "Escape") actions.hidden = true;
   if (e.ctrlKey || e.metaKey || e.altKey || editing) return;
-  if (e.key === "Escape") { selected = undefined; notes.select(); canvas.clear(); document.querySelector<HTMLDetailsElement>(".actions")!.open = false; return; }
+  if (e.key === "Escape") { selected = undefined; notes.select(); canvas.clear(); return; }
   if (e.target instanceof Element && e.target.closest("button, a, summary") && [" ", "Enter"].includes(e.key)) return;
   switch (e.key.toLowerCase()) {
     case "f": e.preventDefault(); canvas.fit(); break;
@@ -170,15 +194,50 @@ function drawerHeight(height: number) {
   const workspace = document.querySelector<HTMLElement>(".workspace")!.clientHeight;
   document.documentElement.style.setProperty("--drawer-height", `${Math.max(80, Math.min(workspace - 120, height))}px`);
 }
-drawer.addEventListener("pointerdown", (e) => { drawerStart = { y: e.clientY, height: element("notes").clientHeight }; drawer.setPointerCapture(e.pointerId); });
+drawer.addEventListener("pointerdown", (e) => { drawerResized = true; drawerStart = { y: e.clientY, height: element("notes").clientHeight }; drawer.setPointerCapture(e.pointerId); });
 drawer.addEventListener("pointermove", (e) => { if (drawerStart) drawerHeight(drawerStart.height + drawerStart.y - e.clientY); });
 drawer.addEventListener("pointerup", () => { drawerStart = undefined; });
 drawer.addEventListener("pointercancel", () => { drawerStart = undefined; });
 drawer.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); drawerHeight(element("notes").clientHeight + (e.key === "ArrowUp" ? 24 : -24)); }
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); drawerResized = true; drawerHeight(element("notes").clientHeight + (e.key === "ArrowUp" ? 24 : -24)); }
 });
 
 for (const direction of ["undo", "redo"]) element(direction).addEventListener("click", () => { void write(`/api/history/${direction}`, "POST"); });
 element("node-focus").addEventListener("click", () => canvas.focusSelection());
 element("close-actions").addEventListener("click", () => { actions.hidden = true; canvas.closeActions(); });
 new ResizeObserver(positionActions).observe(element("canvas"));
+
+// Move the same controls into the narrow header; listeners and ids stay attached.
+const menus = [...document.querySelectorAll<HTMLDetailsElement>(".header .actions")];
+function closeMenus(except?: HTMLDetailsElement, restoreFocus = true) {
+  let closed = false;
+  for (const menu of menus) if (menu.open && menu !== except) {
+    menu.open = false; closed = true;
+    if (restoreFocus) menu.querySelector<HTMLElement>("summary")!.focus();
+  }
+  return closed;
+}
+for (const menu of menus) {
+  menu.querySelector("summary")!.addEventListener("click", () => { if (!menu.open) closeMenus(menu, false); });
+  menu.querySelector(".menu")!.addEventListener("click", (e) => {
+    if (e.target instanceof Element && e.target.closest("button, a") && !e.target.closest("select")) closeMenus();
+  });
+}
+document.addEventListener("click", (e) => {
+  if (e.target instanceof Node) for (const menu of menus) if (menu.open && !menu.contains(e.target)) {
+    menu.open = false; menu.querySelector<HTMLElement>("summary")!.focus();
+  }
+});
+const narrow = matchMedia("(max-width: 900px)");
+function headerLayout() {
+  closeMenus(undefined, false);
+  const layout = element("layout-items"), exports = element("export-items"), more = element("more-items"), desktop = element("desktop-actions");
+  if (narrow.matches) {
+    more.append(element("engine").closest("label")!, element("relayout"), element("reset"), element("theme"), ...exports.querySelectorAll("a"));
+  } else {
+    layout.append(element("engine").closest("label")!, element("relayout"), element("reset"));
+    desktop.append(element("theme"));
+    exports.append(...more.querySelectorAll("a"));
+  }
+}
+headerLayout(); narrow.addEventListener("change", headerLayout);

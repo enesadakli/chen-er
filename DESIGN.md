@@ -29,19 +29,42 @@ because the figure is black ink on white and must look the same as the export.
 - Page header title: model title at 15px/600; nothing larger anywhere in the UI.
 
 ## Layout
-- Header strip (44px): model title · file path (mono, truncates from the left) · engine select · quality summary
-  ("0 overlaps · 3 crossings") · live status ("updated 12:04:31") · Fit · Export ▾ (SVG, PNG) · Reset pins.
+- Header strip (44px): model title (15px/600) and file basename (12px mono graphite, full path in `title`);
+  quiet quality summary and live status; joined Undo/Redo icons; Layout menu (Engine, Re-layout, Reset pins);
+  ghost Fit; sun/moon theme icon; filled Export menu (SVG, PNG). Actions use 8px gaps within groups and 16px
+  between groups. Status retains its live region and pencil underline.
 - Sheet (canvas) fills the rest; notes column (320px) right of the margin rule.
-- ≤ 900px wide: notes column becomes a bottom drawer (40% height, draggable), header collapses secondary actions
-  into an overflow menu. Never horizontal page scroll.
+- ≤ 900px wide: title takes at most 40% of the header; live status is an 8px dot and a short word with full text
+  available to assistive technology and in `title`. Undo/Redo stay visible; Layout, theme and exports share one
+  More menu. Fit remains in the zoom strip. Notes become a bottom drawer (initially 40–60% height to match
+  the sheet aspect ratio, draggable): one sticky heading combines a centred 32×4px grab bar with the Notes | Agent tabs when enabled. The grab bar supports
+  arrow-key resizing. First load fits the sheet with 12px canvas padding. Never horizontal page scroll.
 
 ## Components
-- Finding card (margin note): number + glyph + severity word, message, hint in graphite, "line 14" link (mono).
-  Selected card expands to show the YAML excerpt (±3 lines, line numbers, target line marked with a pencil bar).
+- Finding card (margin note): 18px number circle + glyph + 12px/600 graphite severity word, ink message below,
+  hint in graphite, "line 14" link (mono). Selected card expands to show the YAML excerpt (±3 lines, line
+  numbers, target line marked with a pencil bar). Identity never depends on color alone.
 - Drawing marks: small numbered circle (16px) at the element's top-right, same color/glyph as its card.
 - Pin mark: 6px graphite tick at a pinned node's top-left; pinned nodes also get a dotted outline on hover.
-- Buttons: 28px high, 1px graphite rule, 4px radius, no fills except the primary Export (ink fill, sheet text).
-- Engine select: native `<select>`. Menus: native-feeling, keyboard reachable.
+- Buttons: 28px high, 4px radius, ghost at rest; hover uses 9% ink/chrome ink and active 14%. A visible focus
+  ring remains for keyboard navigation. Outlined controls are reserved for the history pair, native engine
+  select, paper textarea, Send and Undo agent change. History icons share one border with a 1px divider.
+- Export is the only primary button: ink fill and sheet text on a light desk; sheet fill and ink text on a
+  dark desk. Icons and menu chevrons are inline SVG, 24 viewBox, 1.5 stroke, round caps/joins, currentColor,
+  rendered at 18–20px; native header disclosure markers are hidden.
+- Layout, Export and More menus share full-width 28px rows without underlines, 4px radius, 1px chrome rule and
+  a soft `0 6px 20px rgb(0 0 0 / .18)` shadow. Light menus are sheet-colored; dark menus use the desk. Engine
+  is a labelled native `<select>`. Menus are keyboard reachable, close on Escape or outside click and return
+  focus to their summary.
+- Node toolbar: sheet panel with a 1px major-grid rule, 4px radius, the same soft shadow, 4px padding and 2px
+  gaps. Name is 12px/600, at most 160px with ellipsis; Focus/Close are 28px ghost icons. Prefer 8px above the
+  node and clamp to the canvas. Pointer selection has no browser ring; keyboard focus keeps a graphite ring
+  alongside the selection halo.
+- Zoom strip: ghost minus, current percentage, plus, a hairline divider and Fit-to-sheet icon. Percentage
+  resets to 100% (`0`). One outer 1px graphite rule, sheet background, 4px radius and the same soft shadow.
+- Agent empty state shows the working directory once as a quiet "Claude works in <basename>" sentence (the
+  configured agent name is used; full path in `title`), followed by its explanation and "For example:" links.
+  Composer keeps the paper textarea, with a 12px graphite key hint and outlined Send aligned to its right edge.
 
 ## Motion
 - Live update: crossfade 120ms; the changed status chip gets a 600ms pencil-stroke underline. No other ambient motion.

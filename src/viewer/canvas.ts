@@ -57,7 +57,9 @@ export class NotebookCanvas {
   private diagramPoint(p: Point): Point { return { x: (p.x - this.offset.x) / this.scale, y: (p.y - this.offset.y) / this.scale }; }
   private transform() {
     this.sheet.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.scale})`;
-    document.querySelector<HTMLOutputElement>("#zoom")!.value = `${Math.round(this.scale * 100)}%`;
+    const percent = `${Math.round(this.scale * 100)}%`;
+    document.querySelector<HTMLElement>("#zoom")!.textContent = percent;
+    document.querySelector<HTMLButtonElement>("#actual")!.setAttribute("aria-label", `Zoom ${percent}. Reset to 100% (0)`);
     if (this.actionsOpen) this.actionPosition();
   }
   zoom(factor: number, around = { x: this.canvas.clientWidth / 2, y: this.canvas.clientHeight / 2 }) {
@@ -72,7 +74,8 @@ export class NotebookCanvas {
     if (!diagram) return;
     const figure = this.figure.querySelector("svg");
     const b = box ?? { x: 0, y: 0, w: diagram.width, h: Number(figure?.getAttribute("height") ?? diagram.height) };
-    this.scale = Math.max(.1, Math.min(box ? 2 : 1.5, (this.canvas.clientWidth - 48) / Math.max(b.w, 80), (this.canvas.clientHeight - 48) / Math.max(b.h, 80)));
+    const padding = matchMedia("(max-width: 900px)").matches ? 24 : 48;
+    this.scale = Math.max(.1, Math.min(box ? 2 : 1.5, (this.canvas.clientWidth - padding) / Math.max(b.w, 80), (this.canvas.clientHeight - padding) / Math.max(b.h, 80)));
     const c = center(b);
     this.offset = { x: this.canvas.clientWidth / 2 - c.x * this.scale, y: this.canvas.clientHeight / 2 - c.y * this.scale };
     this.transform();
