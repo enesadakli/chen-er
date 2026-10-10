@@ -1,4 +1,5 @@
 import type { DEdge, DLabel, DNode, LayoutResult } from "../geometry.js";
+import { interMetrics } from "../text/metrics.js";
 import { style } from "../style.js";
 
 /**
@@ -34,7 +35,9 @@ export function finalize(input: {
   for (const l of input.labels) (l.box.x += dx), (l.box.y += dy);
   for (const e of input.edges) e.points = e.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 
-  const width = Math.max(2 * style.margin, Number.isFinite(maxX) ? Math.ceil(maxX + dx + style.margin - origin.x) : 0);
+  const titleWidth = !boxes.length && !points.length && input.title
+    ? Math.ceil(interMetrics.width(input.title, style.title.fontSize, "bold")) + 2 * style.margin : 0;
+  const width = Math.max(titleWidth, 2 * style.margin, Number.isFinite(maxX) ? Math.ceil(maxX + dx + style.margin - origin.x) : 0);
   const height = Math.max(top + style.margin, Number.isFinite(maxY) ? Math.ceil(maxY + dy + style.margin - origin.y) : 0);
   return {
     diagram: {

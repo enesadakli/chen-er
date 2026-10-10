@@ -41,7 +41,9 @@ program.command("schema").description("print the model JSON Schema")
 program.command("init").description("write a commented starter model")
   .argument("[file]", "output model path", "model.er.yaml")
   .option("--force", "overwrite an existing file")
-  .action((file: string, options: { force?: boolean }) => print(initCommand(file, options)));
+  .option("--empty", "start with no entities or relationships")
+  .option("--title <text>", "set the model title")
+  .action((file: string, options: { force?: boolean; empty?: boolean; title?: string }) => print(initCommand(file, options)));
 program.command("rules").description("list lint rules")
   .action(() => print(rulesCommand()));
 

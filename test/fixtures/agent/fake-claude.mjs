@@ -35,7 +35,8 @@ if (prompt.includes("```chen-trace") && mode !== "slow" && mode !== "stubborn") 
   const ids = [...prompt.split("Requirements to apply now")[1].split("\n\n")[0].matchAll(/^(r\d+) \(R\d+\): /gm)].map((m) => m[1]);
   if (model && mode !== "noedit") {
     const text = readFileSync(model, "utf8");
-    if (!text.includes("BirthDate")) writeFileSync(model, text.replace(/^(    attrs:\n)/m, "$1      - BirthDate\n"));
+    if (mode === "empty") writeFileSync(model, text.replace("entities: {}", "entities:\n  MEMBER:\n    attrs: [MemberId, BirthDate]\n    keys: [[MemberId]]"));
+    else if (!text.includes("BirthDate")) writeFileSync(model, text.replace(/^(    attrs:\n)/m, "$1      - BirthDate\n"));
   }
   const trace = process.env.FAKE_AGENT_TRACE ?? JSON.stringify(Object.fromEntries(ids.map((id, i) => [id, i === 0
     ? { elements: ["A:MEMBER.BirthDate", "MEMBER", "E:GHOST"], why: "MEMBER records the birth date." }

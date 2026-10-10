@@ -101,9 +101,9 @@ export function schemaCommand(): CommandResult {
   }
 }
 
-export function initCommand(file = "model.er.yaml", options: { force?: boolean } = {}): CommandResult {
+export function initCommand(file = "model.er.yaml", options: { force?: boolean; empty?: boolean; title?: string } = {}): CommandResult {
   try {
-    initFile(file, options.force);
+    initFile(file, options.force, options);
     return { exitCode: 0, stdout: file, stderr: "" };
   } catch (error) {
     return failure(error);

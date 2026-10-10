@@ -125,6 +125,10 @@ npx chen lint model.er.yaml
 npx chen render model.er.yaml --png
 ```
 
+To start from your own requirements, use `npx chen init model.er.yaml --empty --title "University"`.
+This creates a valid title-only model; add requirements in the viewer and use **Apply to model** with `chen serve --agent`.
+Without `--empty`, init keeps the Course enrollment example. `--title <text>` works with either starter.
+
 From a checkout, install the checkout's dependencies with `npm ci`, then the one-command render above runs without a build. This README documents source and built-checkout usage; npm publication is pending the [packaging checklist](docs/npm-readiness.md).
 
 To use the built CLI:
@@ -138,7 +142,7 @@ The package declares the executable name `chen`. In the following commands, use 
 
 | Command | Result |
 | --- | --- |
-| `chen init model.er.yaml` | Create a starter model; refuses to overwrite unless `--force` is supplied. |
+| `chen init model.er.yaml` | Create a starter model (`--empty` for a blank model, `--title <text>` to name it); refuses to overwrite unless `--force` is supplied. |
 | `chen lint model.er.yaml` | Check parsing and model rules; `--json` returns machine-readable diagnostics. |
 | `chen render model.er.yaml --png --report` | Write SVG/PNG and print overlap, crossing and compactness measurements. |
 | `chen render model.er.yaml --engine stress --fresh` | Choose another engine and ignore saved positions; pins still apply. |

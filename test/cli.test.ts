@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { initCommand, lintCommand, renderCommand, rulesCommand, schemaCommand } from "../src/cli/commands.js";
-import { layoutPathFor, lintText, quality, readPins, renderText, writePins } from "../src/app/render.js";
+import { STARTER_MODEL, layoutPathFor, lintText, quality, readPins, renderText, writePins } from "../src/app/render.js";
 import { LINT_DISCLAIMER, RULES } from "../src/core/lint/index.js";
 
 let dir: string;
@@ -60,6 +60,36 @@ describe("CLI commands and app services", () => {
     expect(initCommand(model, { force: true }).exitCode).toBe(0);
     expect(lintCommand(model).exitCode).toBe(0);
     expect(readFileSync(model, "utf8")).toContain("# Chen ER model");
+  });
+
+  it("creates an empty model through the CLI, safely quotes titles and renders the full title", async () => {
+    const title = 'University: "Courses"\n# Still a title';
+    const run = spawnSync(process.execPath, ["--import", "tsx", "src/cli/index.ts", "init", model, "--empty", "--title", title, "--force"], { encoding: "utf8" });
+    expect(run.status).toBe(0);
+    const source = readFileSync(model, "utf8");
+    expect(source).toMatch(/^# Chen ER model, version 1\./);
+    expect(source).toContain("entities: {}\nrelationships: {}\nnotes: []\n");
+    const checked = lintText(source);
+    expect(checked.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(checked.model).toMatchObject({ title, entities: [], relationships: [], notes: [] });
+    for (const engine of ["simple", "layered", "stress"] as const) {
+      const rendered = await renderText(source, { engine });
+      expect(rendered.diagram).toMatchObject({ title, nodes: [], edges: [], labels: [] });
+      expect(rendered.diagram!.width).toBeGreaterThan(200);
+      expect(rendered.svg).toContain('data-id="title"');
+      expect(rendered.svg).not.toContain('class="er-entity"');
+    }
+    expect((await renderCommand(model, { png: true })).exitCode).toBe(0);
+    expect(initCommand(model, { empty: true }).exitCode).toBe(2);
+    expect(readFileSync(model, "utf8")).toBe(source);
+  });
+
+  it("defaults the empty title and preserves the original example without --empty", () => {
+    expect(readFileSync(model, "utf8")).toBe(STARTER_MODEL);
+    expect(initCommand(model, { empty: true, force: true }).exitCode).toBe(0);
+    expect(lintText(readFileSync(model, "utf8")).model!.title).toBe("Untitled model");
+    expect(initCommand(model, { title: "Custom $&", force: true }).exitCode).toBe(0);
+    expect(readFileSync(model, "utf8")).toBe(STARTER_MODEL.replace("title: Course enrollment", () => 'title: "Custom $&"'));
   });
 
   it("prints a runtime JSON Schema and the rule table", () => {

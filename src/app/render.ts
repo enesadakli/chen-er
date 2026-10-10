@@ -226,6 +226,19 @@ relationships:
 notes: []
 `;
 
-export function initFile(path = "model.er.yaml", force = false): void {
-  writeFileSync(path, STARTER_MODEL, { flag: force ? "w" : "wx" });
+export interface InitOptions { empty?: boolean; title?: string }
+
+export function initFile(path = "model.er.yaml", force = false, options: InitOptions = {}): void {
+  // JSON string literals are also YAML scalars; quotes and newlines stay inside the title.
+  const title = JSON.stringify(options.title ?? "Untitled model");
+  const source = options.empty
+    ? `# Chen ER model, version 1. Run chen lint before rendering.
+version: 1
+title: ${title}
+entities: {}
+relationships: {}
+notes: []
+`
+    : options.title === undefined ? STARTER_MODEL : STARTER_MODEL.replace("title: Course enrollment", () => `title: ${title}`);
+  writeFileSync(path, source, { flag: force ? "w" : "wx" });
 }

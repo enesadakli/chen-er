@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentInfo, Turn } from "../src/app/agent.js";
 import { agentStatePathFor } from "../src/app/agent-store.js";
 import type { RequirementsView } from "../src/app/requirements.js";
+import { initFile, lintText } from "../src/app/render.js";
 import { serve } from "../src/app/serve.js";
 import { parseRequirements, textHash } from "../src/core/requirements.js";
 
@@ -162,6 +163,29 @@ describe("requirements apply", () => {
     await start();
     expect((await api("/api/agent/requirements/apply", { method: "POST", body: "{}" }, "")).status).toBe(403);
     expect((await view()).agent).toBe("claude");
+  });
+
+  it("serves an empty init and fills it through Requirements Apply", async () => {
+    initFile(model, true, { empty: true, title: "Club" });
+    const emptySource = readFileSync(model, "utf8");
+    process.env.FAKE_AGENT_MODE = "empty";
+    await start();
+    const before = await (await api("/api/state")).json();
+    expect(before.diagram).toMatchObject({ title: "Club", nodes: [], edges: [], labels: [] });
+    expect(before.svg).toContain('data-id="title"');
+    expect(before.diagnostics.filter((d: { severity: string }) => d.severity === "error")).toEqual([]);
+    const current = await (await save([{ id: "r1", text: "Members have an id and a birth date." }], (await view()).revision)).json() as RequirementsView;
+    expect((await apply(current.revision)).status).toBe(202);
+    const turn = (await settled()).turns.at(-1)!;
+    expect(turn.status).toBe("ok");
+    expect(turn.changes!.added).toEqual(expect.arrayContaining(["E:MEMBER", "A:MEMBER.MemberId", "A:MEMBER.BirthDate"]));
+    await eventually(async () => (await view()).items[0]!.applied !== undefined);
+    expect((await view()).items[0]!.trace).toEqual(["A:MEMBER.BirthDate", "E:MEMBER"]);
+    expect(lintText(readFileSync(model, "utf8")).diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    const after = await (await api("/api/state")).json();
+    expect(after.diagram.nodes.map((n: { id: string }) => n.id)).toContain("E:MEMBER");
+    expect((await api(`/api/agent/turns/${turn.id}/undo`, { method: "POST" })).status).toBe(200);
+    expect(readFileSync(model, "utf8")).toBe(emptySource);
   });
 
   it("applies only new and changed lines, validates the trace and records it per line", async () => {

@@ -8,6 +8,17 @@ which builds or changes the ER model. Under each requirement the viewer then sho
 it, so the reasoning the teacher grades (requirements → entities → relationships → constraints) stays visible and
 traceable.
 
+## Start from requirements
+
+```sh
+chen init university.er.yaml --empty --title "University"
+chen serve university.er.yaml --agent claude
+```
+
+The empty model has only the title, empty entities and relationships, and no notes. It lints and renders before
+anything is added. Open **Requirements**, enter the task's sentences, then **Apply to model** to fill the model.
+Use `--agent codex` instead if preferred. Omitting `--empty` keeps the example starter.
+
 ## Principles
 
 - The viewer still never writes the model. It writes two files next to it: the layout file and
