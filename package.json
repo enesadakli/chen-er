@@ -1,6 +1,6 @@
 {
-  "name": "chen-er",
-  "version": "0.3.0",
+  "name": "chen-erd",
+  "version": "0.4.0",
   "description": "Agent-first Chen ER diagrams: write the model in YAML, get a laid-out diagram and course-aware lint.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && vite build",
@@ -50,6 +50,7 @@
   },
   "bin": {
     "chen": "./bin/chen.js",
+    "chen-erd": "./bin/chen.js",
     "chen-er-mcp": "./bin/chen-mcp.js"
   },
   "engines": {
