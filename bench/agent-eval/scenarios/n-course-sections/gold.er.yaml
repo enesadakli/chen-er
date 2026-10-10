@@ -1,0 +1,73 @@
+version: 1
+title: Course sections
+entities:
+  COURSE:
+    attrs:
+      - CourseCode
+      - Title
+    keys:
+      - - CourseCode
+  SECTION:
+    weak: true
+    attrs:
+      - SectionNo
+      - Semester
+    partialKey:
+      - SectionNo
+      - Semester
+  PROFESSOR:
+    attrs:
+      - ProfessorNo
+      - Name
+    keys:
+      - - ProfessorNo
+  STUDENT:
+    attrs:
+      - StudentNo
+      - Name
+    keys:
+      - - StudentNo
+  DEPARTMENT:
+    attrs:
+      - DepartmentCode
+      - Name
+    keys:
+      - - DepartmentCode
+relationships:
+  HAS_SECTION:
+    ends:
+      - entity: COURSE
+        card: 0..N
+      - entity: SECTION
+        card: 1..1
+    identifies: SECTION
+  TEACHES:
+    ends:
+      - entity: PROFESSOR
+        card: 0..N
+      - entity: SECTION
+        card: 1..1
+  TAKES:
+    ends:
+      - entity: STUDENT
+        card: 0..N
+      - entity: SECTION
+        card: 0..N
+    attrs:
+      - Grade
+  REQUIRES:
+    ends:
+      - entity: COURSE
+        card: 0..N
+        role: course
+        id: course
+      - entity: COURSE
+        card: 0..N
+        role: prerequisite
+        id: prerequisite
+  CHAIRS:
+    ends:
+      - entity: DEPARTMENT
+        card: 1..1
+      - entity: PROFESSOR
+        card: 0..1

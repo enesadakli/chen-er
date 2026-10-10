@@ -1,0 +1,84 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "entity",
+      "why": "Rentals have their own numbered records.",
+      "entity": "RENTAL"
+    },
+    {
+      "id": "c2",
+      "kind": "key",
+      "why": "Rental number independently identifies a rental.",
+      "entity": "RENTAL",
+      "attrs": [
+        "RentalNo"
+      ]
+    },
+    {
+      "id": "c3",
+      "kind": "weak",
+      "why": "Payment numbers are local to a rental.",
+      "entity": "PAYMENT",
+      "owner": "RENTAL"
+    },
+    {
+      "id": "c4",
+      "kind": "multivalued",
+      "why": "A car offers several named options.",
+      "attribute": "CAR.InsuranceOptions",
+      "variants": [
+        "primary"
+      ]
+    },
+    {
+      "id": "c5",
+      "kind": "entity",
+      "why": "Named options can also be kept as separate records.",
+      "entity": "INSURANCE_OPTION",
+      "variants": [
+        "alt-option-entity"
+      ]
+    },
+    {
+      "id": "c6",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "KEPT_AT",
+      "entity": "CAR",
+      "card": "1..1"
+    },
+    {
+      "id": "c7",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "RENTS",
+      "entity": "RENTAL",
+      "card": "1..1"
+    },
+    {
+      "id": "c8",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "FOR_CAR",
+      "entity": "RENTAL",
+      "card": "1..1"
+    },
+    {
+      "id": "c9",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "HAS_PAYMENT",
+      "entity": "PAYMENT",
+      "card": "1..1"
+    },
+    {
+      "id": "c10",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "HAS_PAYMENT",
+      "entity": "RENTAL",
+      "card": "0..N"
+    }
+  ]
+}

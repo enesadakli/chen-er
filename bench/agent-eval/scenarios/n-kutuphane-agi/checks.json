@@ -1,0 +1,72 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "weak",
+      "why": "Demirbaş numarası yalnız şube içinde ayırt edicidir.",
+      "entity": "KOPYA",
+      "owner": "ŞUBE"
+    },
+    {
+      "id": "c2",
+      "kind": "multivalued",
+      "why": "Üyenin bütün telefon numaraları tutulur.",
+      "attribute": "ÜYE.Telefonlar"
+    },
+    {
+      "id": "c3",
+      "kind": "relationshipAttribute",
+      "why": "Ödünç tarihi kopya ile onu alan üyeye aittir.",
+      "relationship": "ÖDÜNÇ",
+      "attribute": "ÖdünçTarihi"
+    },
+    {
+      "id": "c4",
+      "kind": "recursive",
+      "why": "Üyeler başka üyeleri referans gösterir.",
+      "relationship": "REFERANS"
+    },
+    {
+      "id": "c5",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "BULUNDURUR",
+      "entity": "KOPYA",
+      "card": "1..1"
+    },
+    {
+      "id": "c6",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "AİTTİR",
+      "entity": "KOPYA",
+      "card": "1..1"
+    },
+    {
+      "id": "c7",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "ÖDÜNÇ",
+      "entity": "KOPYA",
+      "card": "0..1"
+    },
+    {
+      "id": "c8",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "REFERANS",
+      "entity": "ÜYE",
+      "card": "0..1",
+      "role": "gösteren"
+    },
+    {
+      "id": "c9",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "REFERANS",
+      "entity": "ÜYE",
+      "card": "0..N",
+      "role": "gösterilen"
+    }
+  ]
+}

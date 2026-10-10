@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "ternary",
+      "why": "Delivery must retain supplier, part and project together.",
+      "relationship": "DELIVERS"
+    },
+    {
+      "id": "c2",
+      "kind": "relationshipAttribute",
+      "why": "Quantity depends on the complete delivery combination.",
+      "relationship": "DELIVERS",
+      "attribute": "Quantity"
+    },
+    {
+      "id": "c3",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "STORES",
+      "entity": "PART",
+      "card": "1..1"
+    },
+    {
+      "id": "c4",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "STORES",
+      "entity": "WAREHOUSE",
+      "card": "0..N"
+    },
+    {
+      "id": "c5",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "DELIVERS",
+      "entity": "SUPPLIER",
+      "card": "0..N"
+    },
+    {
+      "id": "c6",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "DELIVERS",
+      "entity": "PROJECT",
+      "card": "0..N"
+    }
+  ]
+}

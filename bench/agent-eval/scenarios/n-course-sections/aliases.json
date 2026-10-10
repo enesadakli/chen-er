@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "COURSE": [
+      "Subject",
+      "Module"
+    ],
+    "SECTION": [
+      "CourseSection",
+      "ClassOffering",
+      "Offering"
+    ],
+    "PROFESSOR": [
+      "Lecturer",
+      "Instructor"
+    ],
+    "STUDENT": [
+      "Learner",
+      "Pupil"
+    ],
+    "DEPARTMENT": [
+      "AcademicDepartment",
+      "Faculty"
+    ]
+  },
+  "attributes": {
+    "COURSE.CourseCode": [
+      "CourseId",
+      "ModuleCode"
+    ],
+    "COURSE.Title": [
+      "CourseTitle",
+      "Name"
+    ],
+    "SECTION.SectionNo": [
+      "SectionNumber",
+      "Number"
+    ],
+    "SECTION.Semester": [
+      "Term",
+      "AcademicTerm"
+    ],
+    "PROFESSOR.ProfessorNo": [
+      "ProfessorId",
+      "InstructorNumber"
+    ],
+    "PROFESSOR.Name": [
+      "ProfessorName",
+      "FullName"
+    ],
+    "STUDENT.StudentNo": [
+      "StudentId",
+      "StudentNumber"
+    ],
+    "STUDENT.Name": [
+      "StudentName",
+      "FullName"
+    ],
+    "DEPARTMENT.DepartmentCode": [
+      "DepartmentId",
+      "DeptCode"
+    ],
+    "DEPARTMENT.Name": [
+      "DepartmentName",
+      "DeptName"
+    ],
+    "TAKES.Grade": [
+      "Mark",
+      "Result",
+      "FinalGrade"
+    ]
+  },
+  "relationships": {
+    "HAS_SECTION": [
+      "Offers",
+      "BelongsTo"
+    ],
+    "TEACHES": [
+      "Instructs",
+      "TaughtBy"
+    ],
+    "TAKES": [
+      "Enrolls",
+      "Enrollment"
+    ],
+    "REQUIRES": [
+      "Prerequisite",
+      "DependsOn"
+    ],
+    "CHAIRS": [
+      "Heads",
+      "ChairedBy"
+    ]
+  }
+}

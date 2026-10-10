@@ -1,6 +1,8 @@
 # Requirements → model evaluation
 
-Six course-level scenarios evaluate one fresh Requirements Apply against a reference Chen ER model. Five use English; `turkish-labels` uses Turkish and Unicode identifiers. The handwritten requirements follow [the Requirements file contract](../../docs/requirements.md) and contain no applied state. Gold models parse and have zero lint errors.
+Two sets of six course-level scenarios evaluate one fresh Requirements Apply against reference Chen ER models. The original **explicit** set names the modeling choices; the **natural** set uses homework prose and checks the decisions an agent must infer. Natural scenarios cover a vet clinic, project supplies, course sections, car rental, orders (`n-siparis`) and a library network (`n-kutuphane-agi`). The last two use Turkish; the other four use English. The handwritten requirements follow [the Requirements file contract](../../docs/requirements.md) and contain no applied state. Every gold variant parses and has zero lint errors.
+
+An optional `scenario.json` declares `{"set": "explicit" | "natural", "language": "en" | "tr"}`. Missing metadata means explicit/en, including the unchanged original scenarios. Language is recorded metadata, not a translation step.
 
 ## Run manually
 
@@ -8,13 +10,15 @@ From the checkout, with dependencies already installed and the selected CLI logg
 
 ```sh
 node_modules/.bin/tsx bench/agent-eval/run.ts --help
-node_modules/.bin/tsx bench/agent-eval/run.ts --agent claude
+node_modules/.bin/tsx bench/agent-eval/run.ts --agent claude --set natural
 node_modules/.bin/tsx bench/agent-eval/run.ts --agent codex --scenario hospital --scenario company --runs 3 --out /tmp/chen-eval
 ```
 
+`--set explicit|natural|all` defaults to `all` and intersects with any repeated `--scenario` selections. An unknown set or empty intersection fails before invoking a CLI.
+
 The runner calls real CLIs and can consume their subscription allowance. It is never invoked by the test suite or CI. It supplies no API keys and refuses the common API-key environment variables; authenticate with each CLI's own login. A failed or limited attempt is recorded once, without a benchmark retry. The production CLI arguments retain each CLI's own internal retry behavior.
 
-Each attempt gets a new temporary directory containing `model.er.requirements.md` and a model created with `initFile(..., {empty: true})`, exactly as `chen init --empty`. `createRequirements().plan()` calls the production `buildRequirementsPrompt`; `claudeArgs` or `codexArgs` and `lintCommandFor` construct the production command; `runAgent` runs one turn; the plan's `settle` validates requirement and element ids, extracts the trace, and atomically writes applied state. No gold model or aliases are copied into the temporary workspace. The CLI's working directory is that workspace, and no previous session is resumed.
+Each attempt gets a new temporary directory containing `model.er.requirements.md` and a model created with `initFile(..., {empty: true})`, exactly as `chen init --empty`. `createRequirements().plan()` calls the production `buildRequirementsPrompt`; `claudeArgs` or `codexArgs` and `lintCommandFor` construct the production command; `runAgent` runs one turn; the plan's `settle` validates requirement and element ids, extracts the trace, and atomically writes applied state. No gold models, metadata, decision checks or aliases are copied into the temporary workspace. The CLI's working directory is that workspace, and no previous session is resumed.
 
 The default output is `bench/agent-eval/results/<UTC date-time>/`, ignored by the adjacent `.gitignore`. Existing attempt directories are refused. Temporary workspaces are removed after artifact capture. SIGINT/SIGTERM cancels the active turn, saves it and stops the batch.
 
@@ -24,12 +28,12 @@ Each `<agent>-<scenario>-<run>/` contains:
 - `reply.txt`: the original final reply, including its trace block.
 - `model.er.yaml` and `model.er.requirements.md`: final file contents.
 - `score.json`: the scorer report, or `null` for an unparseable model.
-- `run.json`: status, CLI status, start/finish timestamps, wall time in milliseconds, numeric usage fields, session id, parse diagnostics, errors and score.
+- `run.json`: scenario set/language, whether checks exist, status, CLI status, start/finish timestamps, wall time in milliseconds, numeric usage fields, session id, parse diagnostics, errors and score.
 - `turn.json`: the settled production turn, with validated trace metadata; `null` if setup failed before planning.
 
 Usage is captured from the CLI's terminal JSON events while delegating stream parsing to the production parser. Numeric leaves under `usage`/`modelUsage` and exposed cost, duration and turn-count fields are retained with their original dotted paths. Missing usage is `null`; no estimates are made and credentials are never recorded. CLI-success with an unparseable final model becomes evaluation `error`, while `cliStatus` remains `ok`. A trace settlement failure is recorded separately, matching the viewer's behavior of preserving the CLI outcome.
 
-`summary.md` is updated after every attempt. Its metric columns are arithmetic means over **all attempted runs**, with failed/limited/cancelled/unparseable attempts contributing zero. A valid partial model from a failed attempt still has an individual score for inspection. Time is the mean wall time over all attempts. The runs column shows successful/attempted counts. Exit status is 0 for a successful batch, 1 for any failed attempt/setup error, and 130 after interruption.
+`summary.md` is updated after every attempt. Its metric columns are arithmetic means over **all attempted runs**, with failed/limited/cancelled/unparseable attempts contributing zero. A valid partial model from a failed attempt still has an individual score for inspection. Time is the mean wall time over all attempts. The runs column shows successful/attempted counts. `Set` identifies the scenario set; `Variant` is the most common selected gold variant among parseable attempts, breaking ties by primary then lexical variant name (or `—` if none). `Decisions` is mean decision accuracy with the same zero contribution for failed attempts, or `—` when the scenario has no checks. A second table lists every failed decision check per run, including checks from parseable failed attempts, with scenario, run, check id, kind and reason. Exit status is 0 for a successful batch, 1 for any failed attempt/setup error, and 130 after interruption.
 
 The runner directly drives the requirements controller and process runner. It does not instantiate the viewer's HTTP routes, event transport, `createAgent` undo/history/change measurement, or layout-write restoration. Those are the integration gaps; prompt construction, CLI arguments, parsing, trace validation and requirements writes are shared production code. CLI user configuration, default model/version and production prompt changes can change results; keep those fixed when comparing batches. This is a repeatable procedure, not a guarantee of identical stochastic replies.
 
@@ -39,7 +43,10 @@ The runner directly drives the requirements controller and process runner. It do
 
 ```ts
 scoreModels(gold: NModel, candidate: NModel, aliases?: Aliases,
-            requirements?: RequirementsDoc | string): ScoreReport
+            requirements?: RequirementsDoc | string, checks?: ChecksDocument,
+            goldVariant?: GoldVariantName): ScoreReport
+scoreVariants(variants: readonly GoldVariant[], candidate: NModel, aliases?: Aliases,
+              requirements?: RequirementsDoc | string, checks?: ChecksDocument): ScoreReport
 normalizeName(name: string): string
 precisionRecallF1(gold: number, candidate: number, matched: number): PRF
 ```
@@ -48,7 +55,7 @@ Pass models normalized with `parseModel` from `src/core/normalize.ts`; parse fai
 
 Matching is deterministic:
 
-1. Names are Unicode-normalized, case-insensitive and underscore/whitespace-insensitive. Accents remain significant. Entity matching traverses gold ids lexically and greedily selects a unique candidate, preferring normalized equality to an alias, then lexical candidate id.
+1. Names are Unicode-normalized, case-insensitive and underscore/whitespace-insensitive. Accents remain significant. Entity matching first traverses gold ids lexically and greedily selects a unique candidate, preferring normalized equality to an alias, then lexical candidate id. For remaining entities, flattened normalized attribute-name sets use gold attribute aliases. A structural pair qualifies with Jaccard similarity ≥ 0.5 and at least two shared names, or with an equal nonempty key attribute-name set (including partial keys). Qualifying pairs are consumed greedily by descending Jaccard, then gold id, then candidate id. Empty keys cannot create a match. Each entity match records `matchedBy: "name" | "alias" | "structure"`. Similar generic attributes can produce ambiguous structural matches; this fallback is evidence of similarity, not proof of equivalence.
 2. Relationships require an equal **multiset** of matched participant entities, preserving repeated recursive participants. Names do not gate matching. Within that participant set, name/alias agreement wins, followed by recursive attribute-name overlap, then lexical id.
 3. Attributes match only within matched owners and matched composite parents, by name/alias. Every composite parent and every nested part counts as one attribute. Moving parts to top level does not match them. Derived/multivalued flags are assessed in `attributeProperties`, separately from attribute-name F1.
 4. Ends pair by matched entity. Recursive ends prefer equal roles, then equal stable id suffixes, then candidate end index. Cardinality values never influence pairing. Renamed roles and ids therefore fall back to order; the metric cannot infer their meaning.
@@ -89,21 +96,59 @@ Degree errors are diagnostic possible replacements: an unmatched relationship of
 
 `structure.lintErrorCount` counts production lint diagnostics of severity `error`. `trace.coverage` is the fraction of requirements containing at least one trace id live in the candidate, or `null` when no requirements are supplied. It measures linkage, not whether the rationale or linked elements correctly implement the requirement. Derived/multivalued property accuracy, lint and trace are supplementary metrics.
 
-The requested overall formula is:
+## Gold variants and decision checks
+
+A scenario supplies `gold.er.yaml` as `primary` and may supply `gold.alt-<name>.er.yaml` for genuinely acceptable alternative designs. `scoreVariants` scores the candidate against each variant with the same aliases, requirements and checks, returning the report with the highest `overall`. Ties prefer primary, then lexical variant name. `goldVariant` records `primary` or `alt-<name>`. Car rental accepts either a multivalued insurance-options attribute or an option entity shared by cars (`alt-option-entity`). Only declared variants are accepted; arbitrary equivalent conceptual models are outside matching.
+
+Natural scenarios must supply nonempty `checks.json`:
+
+```json
+{
+  "checks": [
+    {"id": "c1", "kind": "weak", "entity": "PET", "owner": "OWNER", "why": "Pet names are unique only within their owner."},
+    {"id": "c2", "kind": "multivalued", "attribute": "CAR.InsuranceOptions", "variants": ["primary"], "why": "A car offers several named options."}
+  ]
+}
+```
+
+These examples illustrate checks from different scenarios. All references are exact **gold** names for the selected variant, mapped through the scorer's existing entity, relationship and attribute matches. Attribute paths are `OWNER.Attr[.Part]`; `relationshipAttribute` also accepts a bare attribute name scoped to its `relationship`. Key `attrs` are names within the given entity. Check ids must be unique; `why` is one line. An optional `variants` list restricts the check to those variants; excluded checks do not contribute to totals. Missing referenced candidate matches fail. The loader validates metadata, check shapes, variant names and gold references before any run.
+
+| Kind | Fields beyond id/kind/why/variants | Passing decision |
+| --- | --- | --- |
+| `weak` | `entity`, `owner` | Matched entity is weak, has a valid nonempty partial key and an identifying connection to the matched owner. |
+| `ternary` | `relationship` | Some candidate relationship has exactly the three matched gold participants. |
+| `recursive` | `relationship` | Matched relationship has two ends on the same matched entity. |
+| `multivalued`, `derived` | `attribute` | Matched attribute has the requested flag. |
+| `composite` | `attribute`, optional `minParts` (default 2) | Matched attribute has at least that many immediate parts. |
+| `relationshipAttribute` | `relationship`, `attribute` | Attribute is on the matched relationship and its name/alias is absent from all participant entities. |
+| `entity` | `entity` | Gold entity matches a candidate entity. |
+| `cardinality` | `relationship`, `entity`, `card`, optional `role` | Paired end has the exact normalized min/max. Use a gold role to distinguish recursive ends. |
+| `key` | `entity`, `attrs` | Matched entity is strong and has a candidate key equal to the matched attribute set. Other candidate keys are allowed by this decision check. |
+
+`decisions` is `{correct, total, accuracy, failed: [{id, kind, why, reason}]}`, or `null` without checks. Each applicable check contributes one vote; an empty applicable set has accuracy 1. `keys.accuracy` still compares the entire gold key design, including exact partial keys, independently of the decision checks.
+
+Without checks (the original explicit set), the formula remains:
 
 ```text
 overall = (entity F1 + relationship F1 + attribute F1
            + key accuracy + cardinality accuracy) / 5
 ```
 
-This formula intentionally excludes property flags, structure and trace. A high overall score alone does not prove full requirement correctness; inspect those supplementary metrics and details as well. Notes, display labels, attribute types, ordering constraints and equivalent alternative conceptual models are outside matching. In particular, these golds choose weak sections, relationship-based current loans, and entity-based reservations explicitly in their requirements.
+With checks (the natural set), the formula is:
+
+```text
+overall = (entity F1 + relationship F1 + attribute F1
+           + key accuracy + cardinality accuracy + decisions.accuracy) / 6
+```
+
+The explicit formula remains comparable with previous results. Natural decision checks bring selected property and structure choices into `overall`; the full `attributeProperties`, lint and trace metrics remain supplementary. A high overall score does not prove every requirement is correct. Notes, display labels, types and ordering constraints are outside matching. Keep the set and formula fixed when comparing scores.
 
 ## Add a scenario
 
-1. Create `scenarios/<name>/requirements.md`: 6–14 numbered lines, one testable modeling fact per line, with both ends' participation limits stated in words. Include explicit keys, weak ownership/partial keys, role names for recursion, and attribute structure where needed. Use the format in `docs/requirements.md`; omit applied hashes and traces.
-2. Add `gold.er.yaml`, reflecting every line. Validate it with `node_modules/.bin/tsx src/cli/index.ts lint <gold>` and require zero errors.
-3. Optionally add reviewed aliases. Keep synonyms narrow enough that different concepts cannot merge.
-4. Update the intentional six-scenario roster and self-score cases in the tests when expanding the set.
-5. Run `npx tsc --noEmit` and `npx vitest run`. `bench` is already included in this checkout's TypeScript configuration. No package script or dependency change is needed.
+1. Create `scenarios/<name>/requirements.md` using the documented numbered format, without applied hashes or traces. Explicit scenarios have 6–14 items; natural scenarios have 8–14 homework-prose items. State every identifier scope and every end's minimum and maximum in words; do not rely on domain assumptions.
+2. Natural prose must contain no modeling vocabulary: English whole words `entity`, `entities`, `attribute(s)`, `weak`, `key(s)`, `partial`, `ternary`, `binary`, `multivalued`, `multi-valued`, `derived`, `composite`, `cardinality`, `participation`, `relationship(s)`, `identifying`; Turkish `varlık`, `nitelik`, `zayıf`, `anahtar`, `kısmi`, `üçlü`, `ikili`, `çok değerli`, `türetilmiş`, `bileşik`, `kardinalite`, `katılım`, `ilişki` (including every suffix). No all-caps words of three or more letters, snake_case or CamelCase identifiers.
+3. Add `scenario.json` for a natural scenario and its language. Add `gold.er.yaml` reflecting every fact, and optional reviewed alternative gold files. Require zero parse/lint errors for every variant.
+4. Add natural `checks.json` for the modeling decisions and 3–5 important cardinality ends. Scope variant-specific checks explicitly. Add 2–4 plausible aliases for every entity and ambiguously named attributes; scope synonyms to avoid merging different concepts.
+5. Extend the intentional roster, self-scoring and mutation tests in `test/agent-eval-*.test.ts`. Run `npx tsc --noEmit` and `npx vitest run`. No package script or dependency change is needed.
 
-Only the scorer and scenario validation are tested. The runner is never executed against agents in tests.
+Tests validate scoring, all fixtures, metadata/set filtering and summaries. The runner is never executed against agents in tests.

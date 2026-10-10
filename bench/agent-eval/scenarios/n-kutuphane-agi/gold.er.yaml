@@ -1,0 +1,62 @@
+version: 1
+title: Kütüphane ağı
+entities:
+  ŞUBE:
+    attrs:
+      - ŞubeKodu
+      - Ad
+    keys:
+      - - ŞubeKodu
+  KİTAP:
+    attrs:
+      - KitapNo
+      - Başlık
+      - Yazar
+    keys:
+      - - KitapNo
+  KOPYA:
+    weak: true
+    attrs:
+      - DemirbaşNo
+    partialKey:
+      - DemirbaşNo
+  ÜYE:
+    attrs:
+      - ÜyeNo
+      - Ad
+      - name: Telefonlar
+        multivalued: true
+    keys:
+      - - ÜyeNo
+relationships:
+  BULUNDURUR:
+    ends:
+      - entity: ŞUBE
+        card: 0..N
+      - entity: KOPYA
+        card: 1..1
+    identifies: KOPYA
+  AİTTİR:
+    ends:
+      - entity: KOPYA
+        card: 1..1
+      - entity: KİTAP
+        card: 0..N
+  ÖDÜNÇ:
+    ends:
+      - entity: KOPYA
+        card: 0..1
+      - entity: ÜYE
+        card: 0..N
+    attrs:
+      - ÖdünçTarihi
+  REFERANS:
+    ends:
+      - entity: ÜYE
+        card: 0..1
+        role: gösteren
+        id: gösteren
+      - entity: ÜYE
+        card: 0..N
+        role: gösterilen
+        id: gösterilen

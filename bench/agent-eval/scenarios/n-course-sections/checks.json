@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "id": "c1",
+      "kind": "weak",
+      "why": "Section identity requires its course, number and semester.",
+      "entity": "SECTION",
+      "owner": "COURSE"
+    },
+    {
+      "id": "c2",
+      "kind": "relationshipAttribute",
+      "why": "Grade belongs to the student taking a section.",
+      "relationship": "TAKES",
+      "attribute": "Grade"
+    },
+    {
+      "id": "c3",
+      "kind": "recursive",
+      "why": "Prerequisites connect courses to other courses.",
+      "relationship": "REQUIRES"
+    },
+    {
+      "id": "c4",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "HAS_SECTION",
+      "entity": "SECTION",
+      "card": "1..1"
+    },
+    {
+      "id": "c5",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "TEACHES",
+      "entity": "SECTION",
+      "card": "1..1"
+    },
+    {
+      "id": "c6",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "CHAIRS",
+      "entity": "DEPARTMENT",
+      "card": "1..1"
+    },
+    {
+      "id": "c7",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "CHAIRS",
+      "entity": "PROFESSOR",
+      "card": "0..1"
+    },
+    {
+      "id": "c8",
+      "kind": "cardinality",
+      "why": "The stated limit must hold at this end.",
+      "relationship": "REQUIRES",
+      "entity": "COURSE",
+      "card": "0..N",
+      "role": "prerequisite"
+    }
+  ]
+}
