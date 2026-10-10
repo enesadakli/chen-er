@@ -1,105 +1,117 @@
-# npm readiness
+# chen-er 0.4.0 package verification
 
-Checked on Node.js 24.21.0 / npm 11.19.0. No publication or login was performed. No dependency or package manifest changes were made.
+Checked on 2026-10-10 with Node.js 24.21.0 and npm 11.19.0. The npm package
+is `chen-erd`; the project, repository and MCP client key remain `chen-er`.
+The manifest declares version 0.4.0 and three commands: `chen` and `chen-erd`
+(both `bin/chen.js`), and `chen-er-mcp` (`bin/chen-mcp.js`).
 
-## Dry-run result
+The tarball builds and its contents pass the packaging checks. Release
+verification is incomplete: the clean install was blocked by registry DNS,
+and the CLI still prints 0.1.0. No publication, login, tag, dependency or
+manifest change was performed in this lane.
 
-`npm pack --dry-run` before building listed 9 files (339,023 bytes packed): license, README, package manifest, `bin/chen.js`, three font/license assets, JSON Schema and the repository skill. `dist` did not exist, so the executable's import of `dist/cli/index.js` would fail.
+## Pack listing
 
-After `npm run build`, the dry run listed 99 files, 741,678 bytes packed / 1,658,849 bytes unpacked:
+`npm run build` succeeded, then `npm pack --json --cache <temporary-cache>
+--pack-destination <temporary-directory>` produced `chen-erd-0.4.0.tgz`.
+The candidate has 166 files, approximately 1.21 MB packed / 2.52 MB unpacked
+(decimal MB; documentation edits can change the exact byte counts).
 
-| Area | Files |
-| --- | ---: |
-| `dist` | 90 |
-| `assets` | 3 |
-| `bin` | 1 |
-| `schema` | 1 |
-| `skills` | 1 |
-| README, license, package manifest | 3 |
+| Area | Files | Contents |
+| --- | ---: | --- |
+| `dist` | 128 | Compiled CLI, MCP, application/core modules, declarations and viewer assets |
+| `docs` | 25 | Reference, reports, mapping examples, release history and diagram images |
+| `assets` | 3 | Bundled Inter fonts and license |
+| `bin` | 2 | CLI and MCP launchers |
+| `examples` | 3 | Top-level public `.er.yaml` models |
+| `schema` | 1 | JSON Schema |
+| `skills` | 1 | ER diagram workflow |
+| Root | 3 | README, LICENSE and package.json |
 
-`dist` includes compiled application/core/CLI/MCP JavaScript and declarations, plus five viewer files (HTML, CSS, JavaScript and two fonts). `dist/cli/index.js` is present. Documentation images, the model reference and example YAML files are currently excluded. README links to those files therefore need the allowlist changes below for a self-contained package. These byte counts describe this checkout after building, not a future release.
+The listing contains no `test/`, `bench/`, `src/`, `.github/`, results or
+`*.er.agent.json`; private examples are absent. All three bin targets exist.
+Both README image references resolve inside the extracted package:
+`docs/company-project.png` and `docs/ternary.png`.
 
-The sandbox could not write the default npm cache, so the successful command used a temporary cache:
+## Verification transcript
+
+Temporary root: `/private/tmp/chen-erd-verify.7gCZ2h`.
+
+| Command/check | Observed result |
+| --- | --- |
+| `npm run build` | Exit 0; TypeScript compilation and Vite viewer build succeeded |
+| `npm pack --json --cache <tmp>/cache --pack-destination <tmp>` | Exit 0; `chen-erd-0.4.0.tgz`, 166 files |
+| Fresh directory: `npm init -y` | Exit 0 |
+| `npm install <tmp>/chen-erd-0.4.0.tgz --cache <tmp>/cache --fetch-retries=0 --fetch-timeout=15000 --no-audit --no-fund` | Exit 1; `ENOTFOUND registry.npmjs.org` fetching `@modelcontextprotocol/sdk` |
+| Tarball exclusions and README images | Passed |
+| `node bin/chen.js --version` in the built checkout | Exit 0, prints `0.1.0` |
+| `npx tsc --noEmit` | Exit 0 |
+| `npx vitest run` | Exit 0; 54 files passed, 801 tests passed, 3 skipped (804 total) |
+
+The first sandboxed build and test attempts failed with `EPERM` writing Vite's
+config cache under the shared `node_modules` symlink. Both succeeded when rerun
+with the required cache access. Dependencies were not installed in this worktree.
+
+Per the lane's network-block rule, installation testing stopped at step 3a.
+The following checks were **not run from a fresh tarball install**:
+
+- `npx chen --version` and `npx chen-erd --version` (expected 0.4.0).
+- `npx chen render <copied example>` (expected SVG).
+- `npx chen report <copied example>` (expected Markdown and sibling SVG).
+- MCP stdio `initialize` and `tools/list`, including the exact command
+  `npx -y -p chen-erd chen-er-mcp`.
+
+The five expected MCP tools are `get_schema`, `lint_er`, `render_er`, `map_er`
+and `report_er`. Their registrations are present in source; this does not
+replace the pending installed-package handshake.
+
+## Remaining release checks
+
+The maintainer must replace the hard-coded `.version("0.1.0")` at
+`src/cli/index.ts:9` with the package version (0.4.0), rebuild and repeat both
+installed aliases. The compiled `dist/cli/index.js` contains the same stale
+literal. This lane owns documentation only, so it did not change source.
+`chen init` starter comments in `src/app/render.ts` contain no install hints
+and need no package-name change. No schema or geometry contract change is needed.
+
+On a machine with registry access (or a populated dependency cache), repeat the
+build/pack and clean install with a temporary npm cache, then run inside that
+fresh installation:
 
 ```sh
-npm pack --dry-run --json --cache /private/tmp/chen-er-lane-p-npm-cache
+npx chen --version
+npx chen-erd --version
+cp node_modules/chen-erd/examples/ternary.er.yaml model.er.yaml
+npx chen render model.er.yaml
+npx chen report model.er.yaml
 ```
 
-## Maintainer-owned package.json changes
+Verify the written SVG and report Markdown. To test the documented MCP command
+against that local tarball installation, save this as `verify-mcp.mjs` in the
+same temporary project and run `node verify-mcp.mjs`. The SDK client sends
+`initialize` during `connect`; `listTools` sends `tools/list`.
 
-Add these fields/script entries:
+```js
+import assert from "node:assert/strict";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-```json
-{
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/enesadakli/chen-er.git"
-  },
-  "homepage": "https://github.com/enesadakli/chen-er#readme",
-  "bugs": {"url": "https://github.com/enesadakli/chen-er/issues"},
-  "engines": {"node": ">=24"},
-  "scripts": {
-    "gen:docs": "tsx scripts/gen-docs.ts",
-    "prepublishOnly": "npm run build"
-  }
+const client = new Client({ name: "package-check", version: "1.0.0" });
+const transport = new StdioClientTransport({
+  command: "npx",
+  args: ["-y", "-p", "chen-erd", "chen-er-mcp"],
+});
+try {
+  await client.connect(transport);
+  const names = (await client.listTools()).tools.map(tool => tool.name).sort();
+  assert.deepEqual(names, ["get_schema", "lint_er", "map_er", "render_er", "report_er"]);
+  console.log("initialize: OK; tools/list:", names.join(", "));
+} finally {
+  await client.close();
 }
 ```
 
-Merge the scripts with the existing scripts rather than replacing them. Raising `engines.node` from `>=22` to `>=24` matches the documented and tested baseline; compatibility with Node 22 was not checked.
-
-Keep the existing executable mapping:
-
-```json
-{"bin": {"chen": "./bin/chen.js"}}
-```
-
-The executable has a Node shebang, is executable in the pack listing and loads the built CLI. No bin change is needed.
-
-Expand the existing `files` allowlist to:
-
-```json
-{
-  "files": [
-    "bin",
-    "dist",
-    "assets",
-    "schema",
-    "skills",
-    "docs",
-    "examples/*.er.yaml",
-    "README.md",
-    "LICENSE"
-  ]
-}
-```
-
-The example glob selects only top-level public YAML models. Keep the documentation generator as source-checkout tooling; it is not needed at runtime.
-
-## Clean tarball install (2026-10-09)
-
-Node.js 24.21.0 / npm 11.19.0. After `npm run build`, `npm pack` produced `chen-er-0.1.0.tgz`: 111 files, 1.1 MB packed (1,096,527 bytes), 2.1 MB unpacked. Nothing from `examples/private/`, `test/` or `src/` is in the tarball; shipped examples are the three top-level `examples/*.er.yaml`, plus `docs/` (images, model reference, lint example, this file), `assets`, `schema`, `skills`, `bin`, `dist`.
-
-The tarball was installed with `npm install <tgz>` into a fresh directory outside the repository (`npm init -y` first, temporary npm cache). Results with `npx chen`:
-
-| Check | Result |
-| --- | --- |
-| `--help`, `schema`, `rules` | pass |
-| `init demo.er.yaml`, `lint demo.er.yaml` | pass (exit 0) |
-| `render demo.er.yaml --png` | pass; SVG (3,477 bytes) and PNG (39,111 bytes) written |
-| `render node_modules/chen-er/examples/library.er.yaml -o lib.svg` | pass (10,934 bytes) |
-| `serve demo.er.yaml --port 5791` | pass; page `/` 200, `/api/state` 200 (JSON), `/api/export.svg` 200 |
-| MCP over stdio (`initialize`, `tools/list`) | pass; tools `get_schema`, `lint_er`, `render_er` |
-
-Findings: the README documented the MCP server only for a source checkout (`npx tsx src/mcp/server.ts`); the package had no installed entry point for it. `dist/mcp/server.js` starts only when it is the main module, so it cannot be used through a bin symlink. `bin/chen-mcp.js` was added; it calls `startServer()` directly and works from `node_modules/chen-er/bin/chen-mcp.js`. The README now documents install and MCP for the installed package. `bin/chen-mcp.js` was added after the tarball above was packed (the `bin` directory is in `files`, so it will ship); it was verified by copying it into the installed package, not through a bin entry.
-
-Optional maintainer change (package.json), to expose the server as a command (`npx -p chen-er chen-er-mcp`):
-
-```json
-{"bin": {"chen": "./bin/chen.js", "chen-er-mcp": "./bin/chen-mcp.js"}}
-```
-
-Not tested: installation from the registry, Node 22, Windows, `chen serve --open`, browser-side viewer interaction (pin dragging, export buttons) and the MCP `lint_er`/`render_er` calls from the installed package.
-
-## Before a release
-
-Build, run the required typecheck/tests, regenerate documentation and review the final pack listing. `prepublishOnly` runs for publication; `npm pack` itself still needs an explicit build. Confirm the README images, model reference and examples ship after applying the allowlist. The clean tarball installation is recorded above; repeat it for the final release candidate.
+Set `npm_config_cache` to the same temporary cache if needed. Confirm this
+runs against the installed `chen-erd@0.4.0`, then review the final pack listing.
+Registry installation, other operating systems and interactive viewer behavior
+remain outside this recorded verification.

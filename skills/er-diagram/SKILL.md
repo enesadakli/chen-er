@@ -9,6 +9,10 @@ Write `model.er.yaml`. Run `chen lint model.er.yaml`, fix errors, then run
 `chen render model.er.yaml --png --report`. Open the PNG and inspect labels,
 participation, crossings and attribute ownership. Rename or restructure ambiguous
 facts and repeat. Pins in `model.er.layout.json` are human-owned: the human corrects placement by dragging in the viewer. Do not write pins or soft positions.
+Install with `npm install -g chen-erd` (provides `chen`), or replace `chen`
+with `npx chen-erd` for one-off commands, for example
+`npx chen-erd render model.er.yaml`. Start MCP with
+`npx -y -p chen-erd chen-er-mcp`.
 With a source checkout, replace `chen` with `npx tsx src/cli/index.ts`.
 
 For relational design, run `chen map model.er.yaml --format md` after checking
