@@ -6,7 +6,7 @@
   --desk: #e7ecef; --chrome-ink: #1f2328; --chrome-rule: #6b7177; --chrome-muted: #6b7177; --menu-surface: var(--sheet); --primary-fill: var(--ink); --primary-text: var(--sheet); --focus: var(--graphite);
   --ui-shadow: 0 6px 20px rgb(0 0 0 / .18);
   --radius: 4px; --header-height: 44px; --notes-width: 320px; --drawer-height: 40%;
-  font: 13px/1.45 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--desk);
+  font: 13px/1.45 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--sheet);
   color-scheme: light;
 }
 :root[data-theme="dark"] { --desk: #14171a; --chrome-ink: #d7dce0; --chrome-rule: #2a3036; --chrome-muted: #a5adb4; --menu-surface: var(--desk); --primary-fill: var(--sheet); --primary-text: var(--ink); color-scheme: dark; }
@@ -22,7 +22,7 @@ button:hover, summary:hover { background: color-mix(in srgb, currentColor 9%, tr
 button:active, summary:active { background: color-mix(in srgb, currentColor 14%, transparent); }
 button:disabled { opacity: .5; cursor: default; background: transparent; }
 a { color: inherit; text-underline-offset: 3px; }
-.header { height: var(--header-height); padding: 8px 12px; display: flex; gap: 20px; align-items: center; color: var(--chrome-ink); border-bottom: 1px solid var(--chrome-rule); }
+.header { height: var(--header-height); padding: 8px 12px; display: flex; gap: 20px; align-items: center; background: var(--desk); color: var(--chrome-ink); border-bottom: 1px solid var(--chrome-rule); }
 .model-heading { display: flex; align-items: baseline; gap: 12px; min-width: 0; flex: 1; }
 h1 { font-size: 15px; font-weight: 600; margin: 0; max-width: 240px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .path { font: 12px ui-monospace, monospace; color: var(--chrome-muted); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -59,11 +59,24 @@ summary .chevron { width: 18px; height: 18px; }
 #theme[data-dark="true"] .sun { display: block; }
 #theme[data-dark="true"] .moon { display: none; }
 .workspace { display: flex; height: calc(100dvh - var(--header-height)); overflow: hidden; }
-.canvas { flex: 1; min-width: 0; overflow: hidden; position: relative; touch-action: none; }
-.sheet { position: absolute; top: 0; left: 0; background: var(--sheet); transform-origin: 0 0; }
+.canvas {
+  --minor-alpha: 100%; --major-alpha: 100%;
+  --minor-line: color-mix(in srgb, var(--grid) var(--minor-alpha), transparent);
+  --major-line: color-mix(in srgb, var(--grid-major) var(--major-alpha), transparent);
+  flex: 1; min-width: 0; overflow: hidden; position: relative; touch-action: none; color-scheme: light;
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(to right, var(--major-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--major-line) 1px, transparent 1px),
+    linear-gradient(to right, var(--minor-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--minor-line) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-position: 24px 24px;
+}
+.sheet { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 .figure, .overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
 .figure > svg { display: block; }
-.figure > svg > rect:first-child { fill: var(--sheet); }
+.figure > svg > rect:first-child { fill: transparent; }
 .figure { transition: opacity 120ms ease-out; }
 .figure.stale { opacity: .35; }
 .figure.updating { opacity: 0; }
