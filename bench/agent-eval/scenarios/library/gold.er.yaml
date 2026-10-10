@@ -1,0 +1,13 @@
+version: 1
+title: Library
+entities:
+  BOOK: {attrs: [ISBN, Title], keys: [[ISBN]]}
+  COPY: {weak: true, attrs: [CopyNo, Condition], partialKey: [CopyNo]}
+  MEMBER: {attrs: [MemberId, Name], keys: [[MemberId]]}
+relationships:
+  HAS_COPY:
+    identifies: COPY
+    ends: [{entity: BOOK, card: '1..N'}, {entity: COPY, card: '1..1'}]
+  LOAN:
+    ends: [{entity: COPY, card: '0..1'}, {entity: MEMBER, card: '0..N'}]
+    attrs: [LoanDate]

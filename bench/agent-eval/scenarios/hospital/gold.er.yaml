@@ -1,0 +1,16 @@
+version: 1
+title: Hospital
+entities:
+  PATIENT: {attrs: [PatientId, Name], keys: [[PatientId]]}
+  DOCTOR: {attrs: [DoctorId, Name, Specialty], keys: [[DoctorId]]}
+  WARD: {attrs: [WardCode, Name], keys: [[WardCode]]}
+  ADMISSION: {attrs: [AdmissionId, AdmissionDate, DischargeDate], keys: [[AdmissionId]]}
+relationships:
+  ADMITTED:
+    ends: [{entity: PATIENT, card: '0..N'}, {entity: ADMISSION, card: '1..1'}]
+  ALLOCATED:
+    ends: [{entity: WARD, card: '0..N'}, {entity: ADMISSION, card: '1..1'}]
+  CARE_ASSIGNMENT:
+    ends: [{entity: PATIENT, card: '0..N'}, {entity: DOCTOR, card: '0..N'}, {entity: WARD, card: '0..N'}]
+    attrs: [CarePlan]
+    note: Authorization belongs to the complete triple; pairwise projections can invent unauthorized assignments.

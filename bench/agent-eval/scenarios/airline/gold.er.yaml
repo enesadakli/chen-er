@@ -1,0 +1,22 @@
+version: 1
+title: Airline
+entities:
+  AIRPORT: {attrs: [AirportCode, Name, City], keys: [[AirportCode]]}
+  FLIGHT: {attrs: [FlightNo, Airline, {name: LegCount, derived: true}], keys: [[FlightNo]]}
+  FLIGHT_LEG: {weak: true, attrs: [LegNo], partialKey: [LegNo]}
+  AIRPLANE: {attrs: [AirplaneId, Capacity], keys: [[AirplaneId]]}
+  RESERVATION:
+    attrs: [ReservationId, SeatNo, TravelDate, {name: PassengerName, parts: [FirstName, LastName]}]
+    keys: [[ReservationId]]
+relationships:
+  HAS_LEG:
+    identifies: FLIGHT_LEG
+    ends: [{entity: FLIGHT, card: '1..N'}, {entity: FLIGHT_LEG, card: '1..1'}]
+  DEPARTS_FROM:
+    ends: [{entity: FLIGHT_LEG, card: '1..1'}, {entity: AIRPORT, card: '0..N'}]
+  ARRIVES_AT:
+    ends: [{entity: FLIGHT_LEG, card: '1..1'}, {entity: AIRPORT, card: '0..N'}]
+  USES:
+    ends: [{entity: FLIGHT_LEG, card: '1..1'}, {entity: AIRPLANE, card: '0..N'}]
+  RESERVES:
+    ends: [{entity: RESERVATION, card: '1..1'}, {entity: FLIGHT_LEG, card: '0..N'}]

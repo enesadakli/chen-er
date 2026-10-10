@@ -1,0 +1,20 @@
+version: 1
+title: University
+entities:
+  STUDENT: {attrs: [StudentId, Name], keys: [[StudentId]]}
+  COURSE: {attrs: [CourseCode, Title, Credits], keys: [[CourseCode]]}
+  SECTION: {weak: true, attrs: [SectionNo, Room], partialKey: [SectionNo]}
+  INSTRUCTOR: {attrs: [InstructorId, Name], keys: [[InstructorId]]}
+relationships:
+  HAS_SECTION:
+    identifies: SECTION
+    ends: [{entity: COURSE, card: '0..N'}, {entity: SECTION, card: '1..1'}]
+  TEACHES:
+    ends: [{entity: INSTRUCTOR, card: '0..N'}, {entity: SECTION, card: '1..1'}]
+  ENROLLMENT:
+    ends: [{entity: STUDENT, card: '0..N'}, {entity: SECTION, card: '0..N'}]
+    attrs: [Grade]
+  PREREQUISITE:
+    ends:
+      - {entity: COURSE, id: dependent, role: dependent, card: '0..N'}
+      - {entity: COURSE, id: prerequisite, role: prerequisite, card: '0..N'}

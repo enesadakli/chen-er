@@ -1,0 +1,12 @@
+version: 1
+title: Mağaza
+entities:
+  MÜŞTERİ: {attrs: [MüşteriNo, Adı], keys: [[MüşteriNo]]}
+  ÜRÜN: {attrs: [ÜrünKodu, Açıklama, Fiyat], keys: [[ÜrünKodu]]}
+  SİPARİŞ: {attrs: [SiparişNo, Tarih], keys: [[SiparişNo]]}
+relationships:
+  VERİR:
+    ends: [{entity: MÜŞTERİ, card: '0..N'}, {entity: SİPARİŞ, card: '1..1'}]
+  İÇERİR:
+    ends: [{entity: SİPARİŞ, card: '1..N'}, {entity: ÜRÜN, card: '0..N'}]
+    attrs: [Adet]
