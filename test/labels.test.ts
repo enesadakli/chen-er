@@ -162,6 +162,17 @@ describe("entity-end label ownership", () => {
     expect(assessQuality(diagram([], [own, double], [bad])).labelOnAnyEdge).toBe(1);
   });
 
+  it("adds any-edge clearance coverage beyond label collisions and oval clearance", () => {
+    const own = edge();
+    const near = label({ x: 350, y: 224, w: 30, h: 18 });
+    const oval: DNode = { id: "oval", kind: "attribute", label: "Title", double: false, box: { x: 500, y: 230, w: 60, h: 30 } };
+    const spoke: DEdge = { id: "spoke", kind: "attribute", from: "owner", to: oval.id, double: false,
+      points: [{ x: 200, y: 243.5 }, { x: 500, y: 243.5 }] };
+    const q = assessQuality(diagram([oval], [own, spoke], [near]));
+    expect(q).toMatchObject({ labelOnOwnEdge: 0, labelCollisions: 0, spokeLabelViolations: 0, labelLoose: 0, labelOnAnyEdge: 1 });
+    expect(layoutScore(q)).toBe(Infinity);
+  });
+
   it("measures finite diagonal, horizontal, vertical and degenerate segments", () => {
     const b = { x: 10, y: 10, w: 10, h: 10 };
     expect(boxSegmentDistance(b, { x: 0, y: 0 }, { x: 30, y: 30 })).toBe(0);

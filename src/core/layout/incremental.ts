@@ -1,6 +1,8 @@
 import { boxAround, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Point } from "../geometry.js";
 import { flattenAttrs, type NAttribute, type NModel } from "../normalize.js";
 import { attributeSize, entitySize, relationshipSize } from "../style.js";
+import { assessQuality } from "../quality.js";
+import { boxGap, MIN_OVAL_LABEL_CLEARANCE } from "./semantic-clearance.js";
 import type { TextMetrics } from "../text/metrics.js";
 
 /**
@@ -11,7 +13,8 @@ import type { TextMetrics } from "../text/metrics.js";
  * - nodes the user moved (a real pin that differs from the soft position) keep their new pin,
  *   and their attributes are re-placed around them;
  * - nodes that now collide with a moved node are pushed out of the way, the shortest distance;
- * - nodes without a soft position (new in the model) are placed by the engine.
+ * - nodes without a soft position (new in the model) are placed by the engine;
+ * - soft attributes that block every readable label slot may be re-placed, keeping real pins exact.
  * Real pins always win. Temporary pins are not reported as pins.
  */
 const CLEARANCE = 36;
@@ -86,7 +89,28 @@ export async function incrementalLayout(
     fixed[id] = prev;
   }
 
-  const result = await engine(model, metrics, { ...options, pins: fixed, positions: undefined });
+  let result = await engine(model, metrics, { ...options, pins: fixed, positions: undefined });
+  // Saved attribute positions are soft: release only a blocking oval when fixed geometry has no label slot.
+  // Real pins and every entity/relationship position remain fixed during these retries.
+  let quality = assessQuality(result.diagram, pins, model);
+  if (quality.spokeLabelViolations) {
+    const ends = new Map(result.diagram.edges.filter((e) => e.kind === "end").map((e) => [e.id, e.to]));
+    const blockedOwners = new Set(result.diagram.labels.filter((l) => result.diagram.nodes.some((n) =>
+      n.kind === "attribute" && boxGap(n.box, l.box) < MIN_OVAL_LABEL_CLEARANCE)).map((l) => ends.get(l.edge)));
+    const hard = ["diagonalEnds", "overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "edgeCrossings", "spokeEdgeViolations", "hierarchyViolations"] as const;
+    for (const [id, owner] of owners) {
+      if (pins[id] || !fixed[id] || !blockedOwners.has(owner)) continue;
+      const released = { ...fixed };
+      delete released[id];
+      const candidate = await engine(model, metrics, { ...options, pins: released, positions: undefined });
+      const next = assessQuality(candidate.diagram, pins, model);
+      if (next.spokeLabelViolations >= quality.spokeLabelViolations || hard.some((key) => next[key] > quality[key])) continue;
+      delete fixed[id];
+      result = candidate;
+      quality = next;
+      if (!quality.spokeLabelViolations) break;
+    }
+  }
   for (const n of result.diagram.nodes) n.pinned = !!pins[n.id];
   result.diagnostics = result.diagnostics.filter((d) => d.rule !== "pin-conflict" || mentionsRealPin(d.message, pins));
   return result;

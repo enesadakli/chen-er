@@ -1,0 +1,55 @@
+# Starter model for the requirements tab.
+version: 1
+title: University
+entities:
+  DEPARTMENT:
+    attrs:
+      - Name
+    keys:
+      - [Name]
+  COURSE:
+    attrs:
+      - Code
+      - Title
+    keys:
+      - [Code]
+  STUDENT:
+    attrs:
+      - StudentId
+    keys:
+      - [StudentId]
+  INSTRUCTOR:
+    attrs:
+      - InstructorId
+      - Name
+    keys:
+      - [InstructorId]
+  DEAN:
+    attrs:
+      - DeanId
+    keys:
+      - [DeanId]
+relationships:
+  OFFERS:
+    ends:
+      - { entity: DEPARTMENT, card: "1..N" }
+      - { entity: COURSE, card: "1..1" }
+  ENROLLS:
+    ends:
+      - { entity: STUDENT, card: "1..N" }
+      - { entity: COURSE, card: "0..N" }
+    attrs:
+      - Grade
+      - Semester
+  TEACHES:
+    ends:
+      - { entity: INSTRUCTOR, card: "0..N" }
+      - { entity: COURSE, card: "1..1" }
+  ASSIGNS:
+    ends:
+      - { entity: DEAN, card: "0..N" }
+      - { entity: INSTRUCTOR, card: "1..1" }
+  OVERSEES:
+    ends:
+      - { entity: DEAN, card: "0..N" }
+      - { entity: DEPARTMENT, card: "1..1" }

@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "pins": {
+    "A:COURSE.Title": {
+      "x": 200,
+      "y": 392
+    },
+    "A:ENROLLS.Semester": {
+      "x": 264,
+      "y": 656
+    }
+  },
+  "positions": {
+    "A:COURSE.Code": {
+      "x": 81.5,
+      "y": 384
+    },
+    "A:COURSE.Title": {
+      "x": 200,
+      "y": 392
+    },
+    "A:DEAN.DeanId": {
+      "x": 1048,
+      "y": 501
+    },
+    "A:DEPARTMENT.Name": {
+      "x": 129.5,
+      "y": 97
+    },
+    "A:ENROLLS.Grade": {
+      "x": 73.5,
+      "y": 660
+    },
+    "A:ENROLLS.Semester": {
+      "x": 264,
+      "y": 656
+    },
+    "A:INSTRUCTOR.InstructorId": {
+      "x": 709,
+      "y": 456
+    },
+    "A:INSTRUCTOR.Name": {
+      "x": 699,
+      "y": 397
+    },
+    "A:STUDENT.StudentId": {
+      "x": 129.5,
+      "y": 809
+    },
+    "E:COURSE": {
+      "x": 129.5,
+      "y": 453
+    },
+    "E:DEAN": {
+      "x": 896,
+      "y": 488
+    },
+    "E:DEPARTMENT": {
+      "x": 129.5,
+      "y": 173
+    },
+    "E:INSTRUCTOR": {
+      "x": 536,
+      "y": 456
+    },
+    "E:STUDENT": {
+      "x": 129.5,
+      "y": 733
+    },
+    "R:ASSIGNS": {
+      "x": 792,
+      "y": 704
+    },
+    "R:ENROLLS": {
+      "x": 129.5,
+      "y": 593
+    },
+    "R:OFFERS": {
+      "x": 129.5,
+      "y": 313
+    },
+    "R:OVERSEES": {
+      "x": 448,
+      "y": 264
+    },
+    "R:TEACHES": {
+      "x": 480,
+      "y": 704
+    }
+  }
+}

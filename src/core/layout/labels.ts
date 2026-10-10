@@ -3,6 +3,7 @@ import type { NModel } from "../normalize.js";
 import { cardText, labelSize, style } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
 import { boxDistance, labelAmbiguityReasons, labelGeometry, labelIntersectsLines, labelLooseReasons, labelOnOwnEdge, linesBox, type LabelGeometry } from "./label-geometry.js";
+import { MIN_OVAL_LABEL_CLEARANCE } from "./semantic-clearance.js";
 import { boxShape, distance, drawnPaths, segments, shapesNear } from "./shapes.js";
 
 interface Slot {
@@ -27,7 +28,9 @@ export function placeLabels(model: NModel, nodes: DNode[], edges: DEdge[], metri
     const box = label.box, shape = boxShape(box);
     const expanded = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };
     // Valid ownership slots already clear shapes and other ends by at least four pixels.
-    return labelOnOwnEdge(box, edge, geometry) || edges.some((other) => other.id !== edge.id && (!ownershipClear || other.kind !== "end") && boxDistance(expanded, bounds.get(other.id)!) < 1e-6 && labelIntersectsLines(box, lines.get(other.id)!))
+    // Fixed ovals cannot move during spoke repair, including restored positions used as temporary pins.
+    return nodes.some((node) => node.kind === "attribute" && node.pinned && boxDistance(box, node.box) < MIN_OVAL_LABEL_CLEARANCE)
+      || labelOnOwnEdge(box, edge, geometry) || edges.some((other) => other.id !== edge.id && (!ownershipClear || other.kind !== "end") && boxDistance(expanded, bounds.get(other.id)!) < 1e-6 && labelIntersectsLines(box, lines.get(other.id)!))
       || (!ownershipClear && nodes.some((node) => shapesNear(shape, node, 2)));
   };
   const options = new Map<string, DLabel[]>();

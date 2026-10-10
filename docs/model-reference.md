@@ -67,4 +67,6 @@ A sibling `model.er.layout.json` stores an optional engine (`layered`, `stress`,
 
 Coordinates are node centers in pixels, with the origin at the top left and y increasing downward. Stable node ids are `E:<Entity>`, `R:<Relationship>` and `A:<Owner>.<attr>[.<part>]`. Relationship end ids are `<Relationship>#<id>` or `<Relationship>#<index>` when no explicit id is provided.
 
-Pins constrain placement. Saved positions guide incremental layout. CLI `--fresh` ignores positions while keeping pins; the viewer's Relayout does the same and saves the resulting positions. Diagnostics and quality reports still need human review.
+Pins constrain placement. Saved positions guide incremental layout. If restored attribute positions leave no readable
+participation/role label slot, only a blocking unpinned attribute position is released; real pins and restored
+entity/relationship positions remain exact. CLI `--fresh` ignores positions while keeping pins; the viewer's Relayout does the same and saves the resulting positions. Diagnostics and quality reports still need human review.
