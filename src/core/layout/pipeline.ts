@@ -15,7 +15,7 @@ import { endRouteMetrics, isZRoute, orthogonalPath } from "./semantic-edges.js";
 import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
 import { routeEdge } from "./route.js";
 import { distance } from "./shapes.js";
-import { chooseSpacing } from "./semantic-spacing.js";
+import { chooseSpacing, searchBudget } from "./semantic-spacing.js";
 
 export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine {
   return async (model, metrics, options) => {
@@ -122,7 +122,7 @@ function zRouteScore(result: LayoutResult, id: string, dx: number, dy: number, m
     + q.endBendsMax * 2 + q.endBendsMean * 2 + q.routeDetourMax * 4 + Math.max(0, q.endBendsMax - 2) * 1000;
 }
 
-/** Bound Z refinement to three diamonds and two full builds each; entity cells stay fixed. */
+/** Bound Z refinement to three diamonds (fewer on large models) and two full builds each; entity cells stay fixed. */
 function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
   let best = initial ?? build(clusters);
   const baseline = assessQuality(best.diagram, pins, model);
@@ -156,7 +156,7 @@ function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResu
   }
   const ranked = clusters.filter((c) => involved.has(c.node.id) && c.node.kind === "relationship" && !c.node.pinned)
     .sort((a, b) => (priority.get(b.node.id) ?? 0) - (priority.get(a.node.id) ?? 0) || a.node.id.localeCompare(b.node.id));
-  for (const c of ranked.slice(0, 3)) {
+  for (const c of ranked.slice(0, searchBudget(3, model))) {
     const original = { ...c.node.box };
     let chosen = original;
     const endMoves = best.diagram.edges.filter((e) => e.from === c.node.id && e.kind === "end" && (isZRoute(e.points) || !orthogonalPath(e.points))).flatMap((e) => {

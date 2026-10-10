@@ -31,6 +31,19 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   // routeDetourMax 1.1653 -> 1.3129 and attributeSpokeMax 1.0735 -> 1.5882.
   "campus": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.312937062937063, attributeSpokeMax: 1.588235294117647, emptyAreaRatio: 0.9206378769430194 },
   "university-curriculum": { zRoutes: 6, edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282, emptyAreaRatio: 0.923729974724041 },
+  // Large public stand-in for the private 26-entity stress model (26 entities, 36 relationships, 99 attributes).
+  // Baseline on 2026-10-10: 15.3 s, 5902x2166, longEdgeMax 14.8, meanEdgeRatio 4.21, aspect 2.72.
+  "transit-network": { zRoutes: 23, edgeCrossings: 33, endBendsMax: 4, routeDetourMax: 1.4473007712082262, attributeSpokeMax: 2.4699099166345944, emptyAreaRatio: 0.9480016750096972 },
+};
+
+/** Large models live apart from the general fixtures: they are guarded on hard metrics and their baselines only. */
+export const isLargeInput = (input: string): boolean => resolve(input).startsWith(resolve("bench/fixtures/large") + "/");
+/** One default-engine layout of a large fixture; the bench measures it, the test only with CHEN_PERF=1. */
+export const LARGE_LAYOUT_MS = 4000;
+// Known limitations of large models: one spoke beside a parallel end edge, a wide canvas and
+// unstable attribute edits (an extra attribute moved an entity by up to 169 px at the baseline).
+const largeSpokeLimits: Record<string, { spokeEdgeViolations: number; spokeLabelViolations: number }> = {
+  "transit-network": { spokeEdgeViolations: 1, spokeLabelViolations: 0 },
 };
 
 export type Quality = ReturnType<typeof assessQuality>;
@@ -82,18 +95,20 @@ export function guardFailures({ input, diagram, q, hierarchyMinimum, elapsed, st
   else for (const key of Object.keys(baseline) as RegressionMetric[]) if (q[key] > baseline[key] + 1e-6) failures.push(`${key} regressed: ${q[key]} > ${baseline[key]}`);
   if (resolve(input) === resolve("examples/company-project.er.yaml")
     && (diagram.width * diagram.height > 1633632 * 0.7 || q.plainSegmentRatio > 2 || q.endBendsMax > 1 || q.edgeCrossings)) failures.push("company-project compactness guard");
-  if (stabilityMax > 60 || stabilityMedian > 20) failures.push(`stability: max ${stabilityMax.toFixed(1)}, median ${stabilityMedian.toFixed(1)}`);
+  const large = isLargeInput(input), spokeLimits = largeSpokeLimits[base] ?? { spokeEdgeViolations: 0, spokeLabelViolations: 0 };
+  if (!large && (stabilityMax > 60 || stabilityMedian > 20)) failures.push(`stability: max ${stabilityMax.toFixed(1)}, median ${stabilityMedian.toFixed(1)}`);
   if (q.hierarchyViolations > hierarchyMinimum || q.diamondOffset > 0.2) failures.push(`hierarchy or diamond offset: ${q.hierarchyViolations} > ${hierarchyMinimum}, ${q.diamondOffset}`);
-  if (q.spokeEdgeViolations || q.spokeLabelViolations) failures.push(`attribute clearance: spoke/edge ${q.spokeEdgeClearance.toFixed(1)}px, oval/label ${q.spokeLabelClearance.toFixed(1)}px`);
+  if (q.spokeEdgeViolations > spokeLimits.spokeEdgeViolations || q.spokeLabelViolations > spokeLimits.spokeLabelViolations) failures.push(`attribute clearance: spoke/edge ${q.spokeEdgeClearance.toFixed(1)}px, oval/label ${q.spokeLabelClearance.toFixed(1)}px`);
   const hard = { diagonalEnds: q.diagonalEnds, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, labelOnOwnEdge: q.labelOnOwnEdge, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts };
   for (const [name, value] of Object.entries(hard)) if (value) failures.push(`${name}: ${value}`);
-  if ((input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failures.push(`shape: aspect ${q.aspect}, meanEdgeRatio ${q.meanEdgeRatio}`);
+  if (!large && (input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failures.push(`shape: aspect ${q.aspect}, meanEdgeRatio ${q.meanEdgeRatio}`);
+  if (large && elapsed >= LARGE_LAYOUT_MS) failures.push(`large model layout took ${elapsed.toFixed(0)} ms (limit ${LARGE_LAYOUT_MS})`);
   if (input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 2 || q.diamondOffset > 0.15 || q.axisAligned < 0.6 || q.routeDetourMax > 1.6 || q.routeDetourMean > 1.2 || q.endBendsMax > 2 || elapsed >= 2000)) failures.push("university acceptance");
   return failures;
 }
 
 /** Fixtures the guards apply to: bench fixtures and public examples, plus the private model when present. */
-export const guardInputs = (): string[] => ["bench/fixtures", "examples", "examples/private"].flatMap((dir) =>
+export const guardInputs = (): string[] => ["bench/fixtures", "examples", "examples/private", "bench/fixtures/large"].flatMap((dir) =>
   existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".er.yaml")).sort().map((file) => join(dir, file)) : [],
 );
 
@@ -112,7 +127,8 @@ async function main(): Promise<void> {
       const { diagram } = await layout(model, { engine, pins });
       const elapsed = performance.now() - start;
       const q = assessQuality(diagram, pins, model);
-      const stability = await stabilityOf(model, diagram, engine, pins);
+      // One extra layout per entity is too slow to repeat on large models; their stability is a known limitation.
+      const stability = isLargeInput(input) ? { max: NaN, median: NaN } : await stabilityOf(model, diagram, engine, pins);
       const stabilityMax = stability.max, stabilityMedian = stability.median;
       const directory = join("out/bench", engine);
       mkdirSync(directory, { recursive: true });
@@ -126,7 +142,7 @@ async function main(): Promise<void> {
         hierarchyViolations: q.hierarchyViolations, hierarchyMinimum, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts, diamondOffset: Number(q.diamondOffset.toFixed(3)), relatedDistance: Number(q.relatedDistance.toFixed(3)), proximityInversions: Number(q.proximityInversions.toFixed(3)), axisAligned: Number(q.axisAligned.toFixed(3)), centralityOffset: Number(q.centralityOffset.toFixed(3)), gridMisalignment: Number(q.gridMisalignment.toFixed(3)), attributeInwardRatio: Number(q.attributeInwardRatio.toFixed(3)),
         aspect: Number(q.aspect.toFixed(3)), edgeLength: Number(q.edgeLength.toFixed(1)), meanEdgeLength: Number(q.meanEdgeLength.toFixed(1)), meanEdgeRatio: Number(q.meanEdgeRatio.toFixed(3)), longestEdgeRatio: Number(q.longestEdgeRatio.toFixed(3)), longEdgeMax: Number(q.longEdgeMax.toFixed(3)), longEdgeMean: Number(q.longEdgeMean.toFixed(3)), spokeEdgeClearance: Number.isFinite(q.spokeEdgeClearance) ? Number(q.spokeEdgeClearance.toFixed(1)) : "-", spokeLabelClearance: Number.isFinite(q.spokeLabelClearance) ? Number(q.spokeLabelClearance.toFixed(1)) : "-", density: Number(q.density.toFixed(4)),
         emptyAreaRatio: Number(q.emptyAreaRatio.toFixed(4)), plainSegmentRatio: Number(q.plainSegmentRatio.toFixed(3)), attributeSpokeMax: Number(q.attributeSpokeMax.toFixed(3)), routeDetourMax: Number(q.routeDetourMax.toFixed(3)), routeDetourMean: Number(q.routeDetourMean.toFixed(3)), endBendsMax: q.endBendsMax, endBendsMean: Number(q.endBendsMean.toFixed(3)),
-        ms: Number(elapsed.toFixed(1)), stabilityMax: Number(stabilityMax.toFixed(1)), stabilityMedian: Number(stabilityMedian.toFixed(1)) });
+        ms: Number(elapsed.toFixed(1)), stabilityMax: Number.isFinite(stabilityMax) ? Number(stabilityMax.toFixed(1)) : "-", stabilityMedian: Number.isFinite(stabilityMedian) ? Number(stabilityMedian.toFixed(1)) : "-" });
       if (engine === DEFAULT_ENGINE) {
         for (const message of guardFailures({ input, diagram, q, hierarchyMinimum, elapsed, stabilityMax, stabilityMedian })) {
           console.error(`${input}: ${message}`);

@@ -1,7 +1,7 @@
 import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
 import { attributeAnchors } from "./attributes.js";
 import type { EndPort } from "./anchors.js";
-import { edgesOverlap, MIN_ROUTE_SEGMENT, visibleEdgePaths } from "./semantic-edges.js";
+import { MIN_ROUTE_SEGMENT, visibleEdgePaths } from "./semantic-edges.js";
 import { boxShape, distance, segmentIntersection, segmentThrough, segments } from "./shapes.js";
 
 export function straightSpoke(edge: DEdge, nodes: DNode[], radial = true): Point[] {
@@ -12,9 +12,15 @@ export function straightSpoke(edge: DEdge, nodes: DNode[], radial = true): Point
 /** Move free ovals to clear radial spokes rather than bending an attribute edge. */
 export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>, labels: DLabel[] = [], shorten = false): boolean {
   let moved = false;
+  // Ovals move by replacing their box, so one lookup serves the whole repair.
+  const byId = new Map<string, DNode>();
+  for (const n of nodes) if (!byId.has(n.id)) byId.set(n.id, n);
+  const spokeOf = (e: DEdge) => attributeAnchors(byId.get(e.from)!, byId.get(e.to)!, !shorten);
   for (const edge of edges.filter((e) => e.kind !== "end")) {
-    const parent = nodes.find((n) => n.id === edge.from)!, oval = nodes.find((n) => n.id === edge.to)!;
-    edge.points = straightSpoke(edge, nodes, !shorten);
+    const parent = byId.get(edge.from)!, oval = byId.get(edge.to)!;
+    // Nothing but this oval moves while its targets are tried, so the other routes are fixed.
+    let fixed: { lines: [Point, Point][]; end: boolean }[] | undefined, portAnchors: Point[] | undefined;
+    edge.points = spokeOf(edge);
     const originalClear = clear(oval, edge.points);
     if (oval.pinned || (originalClear && (!shorten || distance(edge.points[0]!, edge.points[1]!) <= oval.box.h * 2.5))) continue;
     const p = center(parent.box), original = center(oval.box), preferred = Math.atan2(original.y - p.y, original.x - p.x);
@@ -52,17 +58,22 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
       if (nodes.some((n) => n.id !== oval.id && intersects(candidate.box, n.box, 14))) return false;
       if (nodes.some((n) => n.id !== parent.id && n.id !== oval.id && segmentThrough(a, b, n))) return false;
       if (labels.some((l) => intersects(candidate.box, l.box, 3) || segmentThrough(a, b, boxShape({ x: l.box.x - 3, y: l.box.y - 3, w: l.box.w + 6, h: l.box.h + 6 })))) return false;
-      if ([...ports.entries()].some(([id, port]) => edges.find((e) => e.id === id)?.to === parent.id && distance(a, port.anchor) < 14)) return false;
-      const spoke = { ...edge, points };
-      for (const other of edges.filter((e) => e !== edge && e.from !== oval.id)) {
-        const updated = other.kind === "end" ? other : { ...other, points: straightSpoke(other, nodes, !shorten) };
-        if (edgesOverlap(spoke, updated)) return false;
-        if (shorten && updated.kind === "end" && visibleEdgePaths(updated).flatMap(segments).some(([p, q]) => segmentIntersection(a, b, p, q))) return false;
-        if (visibleEdgePaths(updated).flatMap(segments).some(([a, b]) => segmentThrough(a, b, boxShape({ x: candidate.box.x - 6, y: candidate.box.y - 6, w: candidate.box.w + 12, h: candidate.box.h + 12 })))) return false;
+      portAnchors ??= [...ports.entries()].filter(([id]) => edges.find((e) => e.id === id)?.to === parent.id).map(([, port]) => port.anchor);
+      if (portAnchors.some((anchor) => distance(a, anchor) < 14)) return false;
+      fixed ??= edges.filter((e) => e !== edge && e.from !== oval.id).map((other) => {
+        const updated = other.kind === "end" ? other : { ...other, points: spokeOf(other) };
+        return { lines: visibleEdgePaths(updated).flatMap(segments), end: updated.kind === "end" };
+      });
+      const spoke = visibleEdgePaths({ ...edge, points }).flatMap(segments);
+      const halo = boxShape({ x: candidate.box.x - 6, y: candidate.box.y - 6, w: candidate.box.w + 12, h: candidate.box.h + 12 });
+      for (const other of fixed) {
+        if (spoke.some(([p, q]) => other.lines.some(([r, s]) => segmentIntersection(p, q, r, s) === "overlap"))) return false;
+        if (shorten && other.end && other.lines.some(([p, q]) => segmentIntersection(a, b, p, q))) return false;
+        if (other.lines.some(([a, b]) => segmentThrough(a, b, halo))) return false;
       }
       return true;
     }
   }
-  for (const edge of edges.filter((e) => e.kind !== "end")) edge.points = straightSpoke(edge, nodes, !shorten);
+  for (const edge of edges.filter((e) => e.kind !== "end")) edge.points = spokeOf(edge);
   return moved;
 }

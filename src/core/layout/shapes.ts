@@ -35,6 +35,9 @@ export function pointInside(p: Point, node: Pick<DNode, "kind" | "box">, strict 
 }
 
 export function segmentIntersection(a: Point, b: Point, c: Point, d: Point): Point | "overlap" | undefined {
+  // Disjoint bounding boxes never meet; one pixel exceeds every EPS tolerance below.
+  if (Math.max(a.x, b.x) < Math.min(c.x, d.x) - 1 || Math.max(c.x, d.x) < Math.min(a.x, b.x) - 1
+    || Math.max(a.y, b.y) < Math.min(c.y, d.y) - 1 || Math.max(c.y, d.y) < Math.min(a.y, b.y) - 1) return undefined;
   const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
   const den = rx * sy - ry * sx;
   if (Math.abs(den) < EPS) {
@@ -54,6 +57,8 @@ export function segmentIntersection(a: Point, b: Point, c: Point, d: Point): Poi
 }
 
 export function segmentThrough(a: Point, b: Point, node: Pick<DNode, "kind" | "box">): boolean {
+  const box = node.box;
+  if (Math.max(a.x, b.x) < box.x - 1 || Math.min(a.x, b.x) > box.x + box.w + 1 || Math.max(a.y, b.y) < box.y - 1 || Math.min(a.y, b.y) > box.y + box.h + 1) return false;
   if (pointInside(a, node, true) || pointInside(b, node, true)) return true;
   if (node.kind === "attribute") {
     const c = center(node.box), rx = node.box.w / 2, ry = node.box.h / 2;

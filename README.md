@@ -171,7 +171,7 @@ npx vitest run
 
 ## Status and roadmap
 
-Version 0.3.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, the default `layered` engine with semantic placement (1:N hierarchy top-down, diamonds between their entities, participation labels on their own edge) plus `stress` and `simple` alternatives, saved pins and soft positions with stable re-layout, the local viewer, and three MCP tools. Automatic layout still needs visual review on large models: a 26-entity model takes about 20 seconds and has many edge crossings. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.3.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, the default `layered` engine with semantic placement (1:N hierarchy top-down, diamonds between their entities, participation labels on their own edge) plus `stress` and `simple` alternatives, saved pins and soft positions with stable re-layout, the local viewer, and three MCP tools. Automatic layout still needs visual review on large models: a 26-entity model takes about 20 seconds in 0.3.0 (about 2 seconds on the unreleased main branch) and has many edge crossings. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn. See [CHANGELOG.md](CHANGELOG.md).
 
 Next work: npm publication, faster and clearer layouts for large models (including subject-area diagrams), and EER rendering. These are planned areas, not supported features or release dates.
 

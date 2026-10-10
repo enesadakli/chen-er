@@ -24,6 +24,36 @@ All notable changes to chen-er are recorded here. The format follows
 - From a source checkout, the lint command given to the agent uses the
   checkout's own `node_modules/.bin/tsx` when present instead of `npx tsx`,
   which needs the network when run from another directory.
+- Faster layout of large models. Route, label and quality checks skip
+  geometry outside a candidate's bounds, placement scoring recounts only the
+  crossings of moved paths, and the spacing and Z-route searches try fewer
+  candidates once a model has more than 12 entities (a fixed share of the
+  model size, so the same input always gives the same drawing). A 26-entity,
+  36-relationship model now lays out in about 2 seconds instead of 20; the
+  drawings of models up to 12 entities are unchanged.
+- New public bench fixture `bench/fixtures/large/transit-network.er.yaml`
+  (26 entities, 36 relationships, 99 attributes) with a 4-second layout guard.
+- Viewer: grouped header (Undo/Redo pair, Layout menu, theme switch, one
+  filled Export), quieter node toolbar that is placed away from labels and
+  shapes, single zoom strip, and the whole canvas is endless graph paper with
+  corner marks showing the export area.
+
+### Fixed
+
+- Layouts with pins could push unpinned elements to negative coordinates,
+  where they were cut off in the viewer and in exported SVG/PNG. The diagram
+  now carries an `origin` and the SVG `viewBox` covers every element.
+
+### Known limitations
+
+- Large models are still hard to read in one figure. The 26-entity bench model
+  is 5902×2166 px with 33 edge crossings and 23 Z-shaped routes; its longest
+  end edge is about 15 entity widths. A private model of the same size still
+  has two participation labels that sit too close to a neighbouring end edge
+  (loose and ambiguous; one overlaps that edge) and two attribute clearance
+  misses. Adding
+  one attribute can move an entity by up to about 170 px. Splitting large
+  models into subject-area diagrams is planned.
 
 ## [0.3.0] - 2026-10-09
 

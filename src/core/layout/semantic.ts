@@ -31,6 +31,7 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
   const constrained = new Set(hierarchy.pairs.flatMap((p) => [p.parent, p.child]));
   const variants: SemanticPlacement[] = [];
   const sunk = hierarchy.cyclic.size ? undefined : sinkRanks(ids, hierarchy.ranks, hierarchy.pairs);
+  const scorer = skeletonScorer(model);
   for (let variant = 0; variant < (sunk ? 12 : 6); variant++) {
     const ranks = new Map(variant < 6 ? hierarchy.ranks : sunk!);
     // An unconstrained entity belongs beside its neighbours, not in an arbitrary root row.
@@ -51,7 +52,7 @@ export function semanticPlacements(model: NModel): SemanticPlacement[] {
       const slots = row.map((id) => columns.get(id)!).sort((a, b) => a - b);
       row.forEach((id, i) => columns.set(id, slots[i]!));
     }
-    const evaluate = () => skeletonScore(model, columns, ranks);
+    const evaluate = () => scorer(columns, ranks);
     let score = evaluate();
     for (let pass = 0; pass < 8; pass++) {
       let improved = false;
@@ -112,40 +113,65 @@ export function sinkRanks(ids: string[], ranks: Map<string, number>, pairs: { pa
   return ids.some((id) => result.get(id) !== ranks.get(id)) ? result : undefined;
 }
 
-function skeletonScore(model: NModel, columns: Map<string, number>, ranks: Map<string, number>): number {
-  const point = (name: string) => ({ x: columns.get(`E:${name}`) ?? 0, y: ranks.get(`E:${name}`) ?? 0 });
-  const entities = model.entities.map((e) => ({ id: e.id, ...point(e.name) }));
-  const paths: { from: string; to: string; a: Point; b: Point }[] = [];
-  const diamonds: { id: string; p: Point; ends: string[] }[] = [];
-  let score = 0;
-  for (const r of model.relationships) {
+/** Static parts of the skeleton score are built once; the returned scorer adds terms in a fixed order. */
+function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Map<string, number>) => number {
+  const relationships = model.relationships.map((r) => {
     const ends = [...new Set(r.ends.map((e) => e.entity))];
-    if (ends.length < 2) continue;
-    const points = ends.map(point);
-    const p = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
-    diamonds.push({ id: r.id, p, ends });
-    for (const end of ends) {
-      const q = point(end);
-      score += distance(p, q) ** 2 * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
-      paths.push({ from: r.id, to: `E:${end}`, a: p, b: q });
+    return { id: r.id, ends: ends.map((name) => `E:${name}`), key: ends.join(";") };
+  }).filter((r) => r.ends.length >= 2);
+  const entities = model.entities.map((e) => ({ key: `E:${e.name}`, degree: model.relationships.filter((r) => r.ends.some((end) => `E:${end.entity}` === e.id)).length }));
+  // Path pairs that may cross: different diamonds and different entities, in the original pair order.
+  const owners = relationships.flatMap((r) => r.ends.map((end) => ({ from: r.id, to: end })));
+  const pairs: [number, number][] = [];
+  for (let i = 0; i < owners.length; i++) for (let j = i + 1; j < owners.length; j++) {
+    if (owners[i]!.from !== owners[j]!.from && owners[i]!.to !== owners[j]!.to) pairs.push([i, j]);
+  }
+  // Diamonds that may crowd each other: ordered ids and different entity sets, in the original order.
+  const partners = relationships.map((d) => relationships.flatMap((other, j) => d.id < other.id && d.key !== other.key ? [j] : []));
+  // Successive calls move one or two entities, so pairs of unmoved paths reuse the previous result.
+  let previous: { a: Point; b: Point }[] | undefined, crossings = 0, epoch = 0;
+  const hits = new Uint8Array(pairs.length), seen = new Uint32Array(pairs.length);
+  const touching = owners.map(() => [] as number[]);
+  pairs.forEach(([i, j], k) => { touching[i]!.push(k); touching[j]!.push(k); });
+  return (columns, ranks) => {
+    const point = (key: string) => ({ x: columns.get(key) ?? 0, y: ranks.get(key) ?? 0 });
+    const positions = entities.map((e) => point(e.key));
+    const paths: { a: Point; b: Point }[] = [];
+    const diamonds: { id: string; p: Point; key: string }[] = [];
+    let score = 0;
+    for (const r of relationships) {
+      const points = r.ends.map(point);
+      const p = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
+      diamonds.push({ id: r.id, p, key: r.key });
+      r.ends.forEach((_, i) => {
+        const q = points[i]!;
+        score += distance(p, q) ** 2 * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
+        paths.push({ a: p, b: q });
+      });
     }
-  }
-  for (let i = 0; i < paths.length; i++) for (const b of paths.slice(i + 1)) {
-    const a = paths[i]!;
-    if (a.from === b.from || a.to === b.to) continue;
-    if (segmentIntersection(a.a, a.b, b.a, b.b)) score += 6;
-  }
-  for (const d of diamonds) {
-    for (const e of entities) if (distance(d.p, e) < 0.35) score += 40;
-    for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.ends.join(";") !== other.ends.join(";")) score += 10;
-  }
-  const cx = entities.reduce((s, e) => s + e.x, 0) / (entities.length || 1);
-  const cy = entities.reduce((s, e) => s + e.y, 0) / (entities.length || 1);
-  for (const e of entities) {
-    const degree = model.relationships.filter((r) => r.ends.some((end) => `E:${end.entity}` === e.id)).length;
-    score += degree * distance(e, { x: cx, y: cy }) * 0.15;
-  }
-  return score;
+    epoch++;
+    paths.forEach((path, i) => {
+      const old = previous?.[i];
+      if (old && old.a.x === path.a.x && old.a.y === path.a.y && old.b.x === path.b.x && old.b.y === path.b.y) return;
+      for (const k of touching[i]!) if (seen[k] !== epoch) {
+        seen[k] = epoch;
+        const [p, q] = pairs[k]!, hit = segmentIntersection(paths[p]!.a, paths[p]!.b, paths[q]!.a, paths[q]!.b) ? 1 : 0;
+        crossings += hit - hits[k]!;
+        hits[k] = hit;
+      }
+    });
+    previous = paths;
+    // Add one term per crossing, as a pairwise sum would.
+    for (let k = 0; k < crossings; k++) score += 6;
+    diamonds.forEach((d, i) => {
+      for (const e of positions) if (distance(d.p, e) < 0.35) score += 40;
+      for (const j of partners[i]!) if (distance(d.p, diamonds[j]!.p) < 0.3) score += 10;
+    });
+    const cx = positions.reduce((s, e) => s + e.x, 0) / (positions.length || 1);
+    const cy = positions.reduce((s, e) => s + e.y, 0) / (positions.length || 1);
+    entities.forEach((e, i) => { score += e.degree * distance(positions[i]!, { x: cx, y: cy }) * 0.15; });
+    return score;
+  };
 }
 
 export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = [], rowSpacing = spacing): void {

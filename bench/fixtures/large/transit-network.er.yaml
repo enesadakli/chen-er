@@ -1,0 +1,183 @@
+version: 1
+title: Regional transit network
+entities:
+  OPERATOR:
+    label: Transit Operator
+    attrs: [OperatorId, Name, LicenseNo, Founded]
+    keys: [[OperatorId], [LicenseNo]]
+  DEPOT:
+    attrs: [DepotId, DName, City, Capacity]
+    keys: [[DepotId]]
+  ROUTE:
+    attrs: [RouteNo, RName, Mode, Color]
+    keys: [[RouteNo]]
+  STOP:
+    attrs: [StopId, SName, {name: Location, parts: [Lat, Lon]}]
+    keys: [[StopId]]
+  PLATFORM:
+    weak: true
+    attrs: [PlatformNo, Level]
+    partialKey: [PlatformNo]
+  TRIP:
+    attrs: [TripId, Direction, Headway]
+    keys: [[TripId]]
+  TIMETABLE:
+    attrs: [TimetableId, ValidFrom, ValidTo]
+    keys: [[TimetableId]]
+  VEHICLE:
+    attrs: [FleetNo, Model, {name: Age, derived: true}]
+    keys: [[FleetNo]]
+  VEHICLE_TYPE:
+    label: Vehicle Type
+    attrs: [TypeCode, Seats, Fuel]
+    keys: [[TypeCode]]
+  DRIVER:
+    attrs: [DriverId, {name: Name, parts: [First, Last]}, BadgeNo]
+    keys: [[DriverId], [BadgeNo]]
+  SHIFT:
+    attrs: [ShiftId, Day, StartsAt, EndsAt]
+    keys: [[ShiftId]]
+  MAINTENANCE_JOB:
+    label: Maintenance Job
+    weak: true
+    attrs: [JobNo, OpenedAt, Cost]
+    partialKey: [JobNo]
+  WORKSHOP:
+    attrs: [WorkshopId, WName, WCity]
+    keys: [[WorkshopId]]
+  PART:
+    attrs: [PartNo, PName, UnitCost]
+    keys: [[PartNo]]
+  SUPPLIER:
+    attrs: [SupplierId, SupName, Country]
+    keys: [[SupplierId]]
+  PASSENGER:
+    attrs: [PassengerId, {name: Name, parts: [First, Last]}, Email, {name: Phones, multivalued: true}]
+    keys: [[PassengerId], [Email]]
+  FARE_CARD:
+    label: Fare Card
+    attrs: [CardNo, Balance, IssuedAt, CardStatus]
+    keys: [[CardNo]]
+  FARE_PRODUCT:
+    label: Fare Product
+    attrs: [ProductCode, PName, Price]
+    keys: [[ProductCode]]
+  TAP:
+    weak: true
+    attrs: [TapNo, TappedAt, Fare]
+    partialKey: [TapNo]
+  ZONE:
+    attrs: [ZoneId, ZName, FareBand]
+    keys: [[ZoneId]]
+  INCIDENT:
+    attrs: [IncidentId, ReportedAt, Severity, Summary]
+    keys: [[IncidentId]]
+  COMPLAINT:
+    attrs: [ComplaintId, Subject, OpenedAt, Status]
+    keys: [[ComplaintId]]
+  STAFF:
+    attrs: [StaffId, SName, Role, HiredOn]
+    keys: [[StaffId]]
+  DEPARTMENT:
+    attrs: [DeptId, DeptName, Budget]
+    keys: [[DeptId]]
+  ADVERTISER:
+    attrs: [AdvertiserId, AName, Contact]
+    keys: [[AdvertiserId]]
+  CAMPAIGN:
+    attrs: [CampaignId, Budget, StartsAt, EndsAt]
+    keys: [[CampaignId]]
+relationships:
+  RUNS_ROUTE:
+    ends: [{entity: OPERATOR, card: "1..N"}, {entity: ROUTE, card: "1..1"}]
+  OWNS_DEPOT:
+    ends: [{entity: OPERATOR, card: "1..N"}, {entity: DEPOT, card: "1..1"}]
+  SERVES:
+    ends: [{entity: ROUTE, card: "1..N"}, {entity: STOP, card: "0..N"}]
+    attrs: [Sequence]
+  HAS_PLATFORM:
+    identifies: PLATFORM
+    ends: [{entity: STOP, card: "1..N"}, {entity: PLATFORM, card: "1..1"}]
+  SCHEDULES:
+    ends: [{entity: TIMETABLE, card: "0..N"}, {entity: TRIP, card: "1..1"}]
+  TRIP_ON:
+    ends: [{entity: TRIP, card: "1..1"}, {entity: ROUTE, card: "0..N"}]
+  ASSIGNED:
+    ends:
+      - {entity: TRIP, card: "0..N"}
+      - {entity: VEHICLE, card: "0..N"}
+      - {entity: DRIVER, card: "0..N"}
+    attrs: [ServiceDate]
+  OF_TYPE:
+    ends: [{entity: VEHICLE, card: "1..1"}, {entity: VEHICLE_TYPE, card: "0..N"}]
+  BASED_AT:
+    ends: [{entity: VEHICLE, card: "1..1"}, {entity: DEPOT, card: "0..N"}]
+  EMPLOYS:
+    ends: [{entity: OPERATOR, card: "1..N"}, {entity: DRIVER, card: "1..1"}]
+  WORKS_SHIFT:
+    ends: [{entity: DRIVER, card: "0..N"}, {entity: SHIFT, card: "0..N"}]
+  NEEDS:
+    identifies: MAINTENANCE_JOB
+    ends: [{entity: VEHICLE, card: "0..N"}, {entity: MAINTENANCE_JOB, card: "1..1"}]
+  DONE_AT:
+    ends: [{entity: MAINTENANCE_JOB, card: "1..1"}, {entity: WORKSHOP, card: "0..N"}]
+  USES_PART:
+    ends: [{entity: MAINTENANCE_JOB, card: "0..N"}, {entity: PART, card: "0..N"}]
+    attrs: [Qty]
+  SUPPLIES:
+    ends:
+      - {entity: SUPPLIER, card: "0..N"}
+      - {entity: PART, card: "0..N"}
+      - {entity: WORKSHOP, card: "0..N"}
+    attrs: [UnitPrice]
+  HOLDS:
+    ends: [{entity: PASSENGER, card: "0..N"}, {entity: FARE_CARD, card: "1..1"}]
+  LOADS:
+    ends: [{entity: FARE_CARD, card: "0..N"}, {entity: FARE_PRODUCT, card: "0..N"}]
+    attrs: [LoadedAt]
+  RECORDS:
+    identifies: TAP
+    ends: [{entity: FARE_CARD, card: "0..N"}, {entity: TAP, card: "1..1"}]
+  TAPPED_AT:
+    ends: [{entity: TAP, card: "1..1"}, {entity: STOP, card: "0..N"}]
+  IN_ZONE:
+    ends: [{entity: STOP, card: "1..1"}, {entity: ZONE, card: "1..N"}]
+  VALID_IN:
+    ends: [{entity: FARE_PRODUCT, card: "0..N"}, {entity: ZONE, card: "1..N"}]
+  ADJACENT_TO:
+    ends:
+      - {id: inner, entity: ZONE, role: inner, card: "0..N"}
+      - {id: outer, entity: ZONE, role: outer, card: "0..N"}
+  INVOLVES:
+    ends: [{entity: INCIDENT, card: "0..1"}, {entity: VEHICLE, card: "0..N"}]
+  OCCURS_AT:
+    ends: [{entity: INCIDENT, card: "1..1"}, {entity: STOP, card: "0..N"}]
+  FILES:
+    ends: [{entity: PASSENGER, card: "0..N"}, {entity: COMPLAINT, card: "1..1"}]
+  ABOUT_TRIP:
+    ends: [{entity: COMPLAINT, card: "0..1"}, {entity: TRIP, card: "0..N"}]
+  HANDLES:
+    ends: [{entity: STAFF, card: "0..N"}, {entity: COMPLAINT, card: "0..1"}]
+  WORKS_IN:
+    ends: [{entity: STAFF, card: "1..1"}, {entity: DEPARTMENT, card: "1..N"}]
+  SUPERVISES:
+    ends:
+      - {id: supervisor, entity: STAFF, role: supervisor, card: "0..N"}
+      - {id: report, entity: STAFF, role: report, card: "0..1"}
+  RUNS_DEPT:
+    ends: [{entity: OPERATOR, card: "1..N"}, {entity: DEPARTMENT, card: "1..1"}]
+  MANAGES_DEPOT:
+    ends: [{entity: STAFF, card: "0..1"}, {entity: DEPOT, card: "1..1"}]
+  FUNDS:
+    ends: [{entity: ADVERTISER, card: "1..N"}, {entity: CAMPAIGN, card: "1..1"}]
+  DISPLAYED_ON:
+    ends: [{entity: CAMPAIGN, card: "0..N"}, {entity: VEHICLE, card: "0..N"}]
+    attrs: [Panels]
+  SHOWN_AT:
+    ends: [{entity: CAMPAIGN, card: "0..N"}, {entity: STOP, card: "0..N"}]
+  REPORTS:
+    ends: [{entity: DRIVER, card: "0..N"}, {entity: INCIDENT, card: "1..1"}]
+  COVERS:
+    ends: [{entity: SHIFT, card: "1..1"}, {entity: DEPOT, card: "0..N"}]
+notes:
+  - Synthetic bench fixture for large-model layout performance; the domain is simplified.
