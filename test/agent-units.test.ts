@@ -99,14 +99,14 @@ describe("agent prompt and command", () => {
     expect(prompt).toContain("Model file: /m/My Model.er.yaml\nSelected elements:\nE:STUDENT (STUDENT)\nA:STUDENT.Name (Name)\nR:GONE\nRules:");
     expect(prompt).toContain("run `node /r/bin/chen.js lint '/m/My Model.er.yaml'` and fix any errors");
     expect(prompt).toContain("Keep its comments and formatting.");
-    expect(prompt).toContain("\n- Never edit *.er.layout.json or *.er.agent.json files.\n");
+    expect(prompt).toContain("\n- Never edit *.er.layout.json, *.er.agent.json or *.er.requirements.md files.\n");
     expect(prompt).toContain("Reply with one or two plain sentences");
     expect(prompt).toContain("\n- Do not create or update notes, memory, receipts or logs outside the model file.\n");
     expect(buildPrompt({ modelPath: "/m", lintCommand: "x", selection: [], text: "t" })).toContain("Selected elements:\n(none)\n");
     const lint = "npx tsx '/r x/src/cli/index.ts' lint";
-    expect(allowedTools(lint)).toEqual(["Bash(npx tsx '/r x/src/cli/index.ts' lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er"]);
+    expect(allowedTools(lint)).toEqual(["Bash(npx tsx '/r x/src/cli/index.ts' lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "mcp__chen-er__get_schema"]);
     expect(claudeArgs("P", "/m", "node /r/bin/chen.js lint", "s1")).toEqual(["-p", "P", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
-      "--allowedTools", "Bash(node /r/bin/chen.js lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "--add-dir", "/m", "--resume", "s1"]);
+      "--allowedTools", "Bash(node /r/bin/chen.js lint:*)", "mcp__chen-er__lint_er", "mcp__chen-er__render_er", "mcp__chen-er__get_schema", "--add-dir", "/m", "--resume", "s1"]);
     expect(claudeArgs("P", "/m", "x")).not.toContain("--resume");
   });
 

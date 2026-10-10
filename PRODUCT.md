@@ -34,9 +34,13 @@ tools never check. Notation matches the textbook exactly: Chen shapes with (min,
 - `chen serve model.er.yaml` opens a local viewer; used both as a side window next to an agent's terminal
   (glance, live reload, occasional drag) and full screen when polishing a diagram for submission (drag, export).
 - The YAML is edited only by the agent or a text editor; the viewer does not edit the model. It writes only
-  the layout file (`model.er.layout.json`): pins and accepted positions.
+  the layout file (`model.er.layout.json`: pins and accepted positions) and the requirements file
+  (`model.er.requirements.md`: the student's requirement sentences and their trace to model elements).
 - With `--agent`, the notes column gains an Agent tab: the student asks for model changes in plain language, the
   agent edits the YAML, and the diagram reloads, without switching to a terminal.
+- The Requirements tab holds the task's requirements, one sentence per line. With `--agent`, Apply has the agent build
+  the model from new and changed lines and links each requirement to the elements that implement it (see
+  docs/requirements.md), so the reasoning stays traceable for grading.
 - Output goes into lecture notes (Obsidian), homework PDFs and printed reports.
 
 ## Capabilities and Constraints

@@ -17,6 +17,7 @@ import { selectionMetadata, type SelectionMetadata } from "../viewer/selection.j
 import { AgentError, createAgent, parseTurnRequest, type AgentController, type AgentKind, type Turn } from "./agent.js";
 import { lintCommandFor } from "./agent-prompt.js";
 import { agentStatePathFor } from "./agent-store.js";
+import { createRequirements, requirementsPathFor, RequirementsError, type RequirementsView } from "./requirements.js";
 
 export interface ViewerDiagnostic extends Diagnostic { target?: string }
 export interface ViewerState {
@@ -255,13 +256,20 @@ export async function serve(model: string, options: ServeOptions = {}) {
     writeLayout({ pins: parsed.pins, ...(parsed.engine ? { engine: parsed.engine } : {}) });
   }
   const token = options.agent ? randomBytes(32).toString("base64url") : undefined;
+  const lintCommand = options.agent?.lintCommand ?? lintCommandFor(process.argv[1], root);
+  const requirementsPath = requirementsPathFor(modelPath);
+  if ([modelPath, pinsPath].includes(requirementsPath)) throw new Error("Model and requirements paths must differ.");
+  const requirements = createRequirements({
+    path: requirementsPath, modelPath, agent: options.agent?.kind ?? null, lintCommand, serial,
+    emit: (view: RequirementsView) => { for (const client of clients) client.write(`event: requirements\ndata: ${JSON.stringify(view)}\n\n`); },
+  });
   const agent: AgentController | undefined = options.agent && agentCwd ? createAgent({
     kind: options.agent.kind,
     cwd: agentCwd,
     modelPath,
     layoutPath: pinsPath,
     bin: options.agent.bin ?? process.env.CHEN_AGENT_BIN ?? options.agent.kind,
-    lintCommand: options.agent.lintCommand ?? lintCommandFor(process.argv[1], root),
+    lintCommand,
     killAfterMs: options.agent.killAfterMs,
     ...(options.agent.persist !== false ? { statePath: agentStatePathFor(modelPath) } : {}),
     emit: (turn: Turn) => { for (const client of clients) client.write(`event: agent-turn\ndata: ${JSON.stringify(turn)}\n\n`); },
@@ -269,6 +277,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
     writeLayout: (expected, next) => serial(async () => { guardLayoutPath(); replaceBytes(pinsPath, expected, next); }),
     isServerLayout: (bytes) => bytes !== null && lastWrite !== undefined && bytes.toString("utf8") === lastWrite,
     afterTurn: (modelChanged) => { if (modelChanged && !closed) void serial(() => refresh()).catch(() => undefined); },
+    onUndo: (turn) => requirements.undo(turn),
   }) : undefined;
   if (agent) agentRunning = () => agent.info().running !== null;
   const tokenMatches = (value: string | string[] | undefined): boolean => {
@@ -285,6 +294,12 @@ export async function serve(model: string, options: ServeOptions = {}) {
     if (req.method === "POST" && path === "/api/agent/turns") {
       const turnId = agent.start(parseTurnRequest(await body(req)));
       return json(res, 202, { turnId });
+    }
+    if (req.method === "POST" && path === "/api/agent/requirements/apply") {
+      const value = Number(req.headers["content-length"]) > 0 || !!req.headers["transfer-encoding"] ? await body(req) : {};
+      if (agent.info().running) throw new HttpError(409, "A turn is already running.");
+      const { text, plan } = requirements.plan(value);
+      return json(res, 202, { turnId: agent.start({ text, selection: [] }, plan) });
     }
     const match = /^\/api\/agent\/turns\/([\w-]{1,64})\/(cancel|undo)$/.exec(path);
     if (req.method === "POST" && match) {
@@ -315,6 +330,8 @@ export async function serve(model: string, options: ServeOptions = {}) {
       const url = new URL(req.url ?? "/", origin);
       const path = url.pathname;
       if (req.method === "GET" && path === "/api/state") { await queue; return json(res, 200, state); }
+      if (req.method === "GET" && path === "/api/requirements") { await queue; return json(res, 200, requirements.view()); }
+      if (req.method === "PUT" && path === "/api/requirements") return json(res, 200, await requirements.save(await body(req)));
       if (req.method === "GET" && path === "/api/events") {
         res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
         res.write(`retry: 1000\nevent: state\ndata: ${JSON.stringify(state)}\n\n`);
@@ -419,7 +436,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
       res.writeHead(200, { "Content-Type": types[extname(file)] ?? "application/octet-stream" });
       res.end(readFileSync(file));
     })().catch((error: unknown) => {
-      if (!res.headersSent) json(res, error instanceof HttpError || error instanceof GuardError || error instanceof AgentError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
+      if (!res.headersSent) json(res, error instanceof HttpError || error instanceof GuardError || error instanceof AgentError || error instanceof RequirementsError ? error.status : 500, { error: error instanceof Error ? error.message : String(error) });
       else res.end();
     });
   });
@@ -432,7 +449,14 @@ export async function serve(model: string, options: ServeOptions = {}) {
     clearTimeout(debounce);
     debounce = setTimeout(() => { if (!closed) void check().catch(() => undefined); }, 100);
   };
+  // The requirements file only needs re-reading (and announcing), never a layout.
+  let requirementsDebounce: ReturnType<typeof setTimeout> | undefined;
+  const scheduleRequirements = () => {
+    clearTimeout(requirementsDebounce);
+    requirementsDebounce = setTimeout(() => { if (!closed) void serial(async () => requirements.check()).catch(() => undefined); }, 100);
+  };
   const watcher: FSWatcher | undefined = options.watch === false ? undefined : watch(dirname(modelPath), (_event, filename) => {
+    if (filename?.toString() === basename(requirementsPath)) { scheduleRequirements(); return; }
     if (filename && ![basename(modelPath), basename(pinsPath)].includes(filename.toString())) return;
     if (filename?.toString() === basename(pinsPath) && lastWrite !== undefined) {
       try { if (readFileSync(pinsPath, "utf8") === lastWrite) return; } catch { /* deleted: check */ }
@@ -445,7 +469,10 @@ export async function serve(model: string, options: ServeOptions = {}) {
   };
   const stamps = () => `${stamp(modelPath)}|${stamp(pinsPath)}`;
   let polled = ""; // The first tick always compares bytes, covering edits made while the server started.
+  let polledRequirements = "";
   const poll = setInterval(() => {
+    const requirementsStamp = stamp(requirementsPath);
+    if (requirementsStamp !== polledRequirements) { polledRequirements = requirementsStamp; scheduleRequirements(); }
     const now = stamps();
     if (now === polled) return;
     polled = now;
@@ -456,7 +483,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
   heartbeat.unref();
   try {
     await new Promise<void>((done, reject) => { server.once("error", reject); server.listen(port, "127.0.0.1", () => { server.off("error", reject); done(); }); });
-  } catch (error) { watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearInterval(heartbeat); throw error; }
+  } catch (error) { watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearTimeout(requirementsDebounce); clearInterval(heartbeat); throw error; }
   const address = server.address();
   const url = `http://127.0.0.1:${typeof address === "object" && address ? address.port : port}`;
   // With the agent panel, the page reads the one-time token from `t` and removes it from the address bar.
@@ -469,7 +496,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
   return { server, url, pageUrl, token, async close() {
     closed = true;
     await agent?.close();
-    watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearInterval(heartbeat);
+    watcher?.close(); clearInterval(poll); clearTimeout(debounce); clearTimeout(requirementsDebounce); clearInterval(heartbeat);
     await queue;
     for (const client of clients) client.end();
     const closing = new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done()));

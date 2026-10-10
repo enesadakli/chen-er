@@ -7,6 +7,18 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Added
 
+- Requirements tab in `chen serve`: write the requirements one sentence per line
+  (Enter opens the next line, Backspace on an empty line removes it, a pasted
+  list becomes lines). They autosave to `<model>.er.requirements.md`, a
+  Markdown list that reads well in Obsidian and in a PDF; ids, applied hashes
+  and traces stay in HTML comments. With `--agent`, **Apply to model** sends
+  only new and changed lines (the whole list as context) to Claude or Codex,
+  validates the returned `chen-trace` block against the model and shows under
+  each requirement the elements that implement it, as links to the drawing.
+  Requirements nothing implements are marked `△ not covered` and listed in
+  Notes. Undoing an apply turn also restores the lines' earlier state. See
+  docs/requirements.md.
+
 - `chen serve --agent codex`: the agent panel runs the local Codex CLI headless
   (`codex exec --json`, workspace-write sandbox limited to the agent's working
   directory and the model's directory, `resume` for follow-up requests) with
@@ -20,7 +32,11 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Changed
 
-- The agent prompt also forbids editing `*.er.agent.json` files.
+- The agent prompt also forbids editing `*.er.agent.json` and
+  `*.er.requirements.md` files; Claude turns may also call the read-only
+  chen-er MCP `get_schema`.
+- The notes column always shows its tabs (Notes | Requirements, plus Agent with
+  `--agent`).
 - From a source checkout, the lint command given to the agent uses the
   checkout's own `node_modules/.bin/tsx` when present instead of `npx tsx`,
   which needs the network when run from another directory.

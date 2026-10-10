@@ -46,7 +46,7 @@ ink on white and must look the same as the export. Four graphite corner marks sh
 - ≤ 900px wide: title takes at most 40% of the header; live status is an 8px dot and a short word with full text
   available to assistive technology and in `title`. Undo/Redo stay visible; Layout, theme and exports share one
   More menu. Fit remains in the zoom strip. Notes become a bottom drawer (initially 40–60% height to match
-  the sheet aspect ratio, draggable): one sticky heading combines a centred 32×4px grab bar with the Notes | Agent tabs when enabled. The grab bar supports
+  the sheet aspect ratio, draggable): one sticky heading combines a centred 32×4px grab bar with the Notes | Requirements | Agent tabs (Agent only when enabled). The grab bar supports
   arrow-key resizing. First load fits the sheet with 12px canvas padding. Never horizontal page scroll.
 
 ## Components
@@ -57,7 +57,7 @@ ink on white and must look the same as the export. Four graphite corner marks sh
 - Pin mark: 6px graphite tick at a pinned node's top-left; pinned nodes also get a dotted outline on hover.
 - Buttons: 28px high, 4px radius, ghost at rest; hover uses 9% ink/chrome ink and active 14%. A visible focus
   ring remains for keyboard navigation. Outlined controls are reserved for the history pair, native engine
-  select, paper textarea, Send and Undo agent change. History icons share one border with a 1px divider.
+  select, paper textarea, Send, Apply to model and Undo agent change. History icons share one border with a 1px divider.
 - Export is the only primary button: ink fill and sheet text on a light desk; sheet fill and ink text on a
   dark desk. Icons and menu chevrons are inline SVG, 24 viewBox, 1.5 stroke, round caps/joins, currentColor,
   rendered at 18–20px; native header disclosure markers are hidden.
@@ -100,11 +100,11 @@ Computing, saved, conflict and failure states remain visible in the status strip
 ## Agent panel
 
 Only with `chen serve --agent` (contract: docs/agent-panel.md). Without it, `GET /api/agent` answers 404 and the
-notes column looks exactly as before.
+Agent tab is hidden; Notes and Requirements stay.
 
-- **Tabs.** The notes column becomes a tablist, **Notes | Agent**: plain words on the sheet, graphite when idle,
-  ink 600 with a 2px ink underline when selected, one `--grid-major` rule under the row. Arrow keys, Home and End
-  move between tabs. The Agent tab carries a small graphite suffix: `· working` while a turn runs, `· new` when a
+- **Tabs.** The notes column is a tablist, **Notes | Requirements | Agent**: plain words on the sheet, graphite when
+  idle, ink 600 with a 2px ink underline when selected, one `--grid-major` rule under the row. Arrow keys, Home and End
+  move between the visible tabs. Requirements carries `· applying` while an apply turn runs. The Agent tab carries a small graphite suffix: `· working` while a turn runs, `· new` when a
   turn finished while Notes was open. At ≤ 900px the tabs sit under the drawer handle, inside the drawer.
 - **Thread as margin notes.** Each turn is a note separated by the same `--grid-major` rule as findings. The
   request is ink (500), with its time in mono graphite on the right and its context below in mono graphite
@@ -132,3 +132,32 @@ notes column looks exactly as before.
   stopped mid-turn shows the server's notice in place of "Cancelled."
 - **Keys.** `/` opens the Agent tab and focuses the input from anywhere outside a text field; Enter sends,
   Shift+Enter adds a line; Escape cancels a running turn while the Agent tab is open.
+
+## Requirements tab
+
+Contract: docs/requirements.md. Always present; Apply needs `chen serve --agent`.
+
+- **Lines on ruled paper.** The tab opens with the file name (`club.er.requirements.md`, 12px mono graphite) and a
+  quiet save word (`editing`, `saving…`, `saved`; red pencil when not saved). Each requirement is one numbered pencil
+  line: `R1` in 12px mono graphite in a narrow gutter, the sentence in ink 13px directly on the paper, a 1px `--grid`
+  rule under each line like ruled notebook paper. No boxes, cards, fills or shadows; the focused line gets a 1px
+  graphite rule around the text (4px radius) as its focus mark. The last line is always empty, numbered faintly with
+  the next R-number, placeholder "Next requirement" (the first one shows an example sentence).
+- **State under each line**, 12px: `new` and `changed since the last apply` in graphite; `Claude is applying this
+  line…` in ink while its turn runs. An applied line shows a mono graphite `→` and the implementing element names as
+  ink links with graphite underlines (`COURSE, OFFERS, Title (COURSE)`); a link selects the element and fits its
+  neighbourhood on the drawing, exactly like the agent change note. An element removed later is graphite and struck
+  through. The rationale follows in graphite. A line nothing implements reads `△ not covered` in the red pencil, with
+  the reason; the glyph and the words carry the meaning, never the colour alone.
+- **Apply bar.** Sticky at the bottom of the column on the sheet, above a `--grid-major` rule: a graphite summary
+  (`2 new · 1 changed`, `4 applied · 1 not covered`) and the outlined 28px **Apply to model**, disabled while nothing
+  is pending or another request runs. While it runs, one line `Claude is applying R2, R4… 12 s · Agent tab` with a
+  Cancel button. After it, one graphite sentence (`Applied R2, R4.`); problems (no trace, errors, limits) in the red
+  pencil. Without `--agent` the button is replaced by one sentence: start `chen serve` with `--agent claude` or
+  `--agent codex`.
+- **Conflict.** When the file changed outside the viewer while lines were unsaved, a red-pencil sentence with ✕ says
+  so and offers two text buttons: **Load the file** and **Keep these lines**.
+- **Notes.** Each not-covered line adds an info finding (graphite •) "Requirement R4 is not reflected in the model."
+- **Keys.** Enter opens the next line (splits at the caret); Backspace on an empty line removes it and returns to the
+  previous one; ArrowUp/ArrowDown move between lines; a pasted list becomes lines. Everything is reachable with Tab;
+  each textarea is labelled by its R-number and described by its state line.

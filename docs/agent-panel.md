@@ -44,17 +44,20 @@ chen serve model.er.yaml --agent claude|codex [--agent-cwd <dir>]
 
 - Command (overridable for tests with env `CHEN_AGENT_BIN`, default `claude`; the same variable overrides `codex`):
   `claude -p <prompt> --output-format stream-json --verbose --permission-mode acceptEdits
-  --allowedTools 'Bash(<chen lint command>:*)' mcp__chen-er__lint_er mcp__chen-er__render_er --add-dir <modelDir>
+  --allowedTools 'Bash(<chen lint command>:*)' mcp__chen-er__lint_er mcp__chen-er__render_er mcp__chen-er__get_schema
+  --add-dir <modelDir>
   [--resume <sessionId>]`, cwd = `--agent-cwd`. The child inherits the server's environment variables.
 - `acceptEdits` covers file edits only; without `--allowedTools` a headless turn stalls waiting for permission to
   run the lint command or the chen-er MCP tools. The pre-approved set is exactly what the prompt asks for: the
-  lint command (same string as in the prompt, any trailing arguments) and the chen-er MCP `lint_er`/`render_er`.
+  lint command (same string as in the prompt, any trailing arguments) and the chen-er MCP `lint_er`/`render_er`, plus
+  the read-only `get_schema`.
 - The session id comes from the stream (`session_id` field of the init/result events) and is reused with
   `--resume` for the next turn, so the conversation continues. It is stored with the thread (see Persistence).
 - Prompt = short fixed preamble + user text. Preamble (English, terse): the absolute model path; the selected
   elements as `id (label)` lines; rules: edit only that YAML file; keep comments and formatting; run
   `<chen lint command> <model path>` after editing and fix errors; never edit `*.er.layout.json`; do not create or
-  update notes, memory, receipts or logs outside the model file; never edit `*.er.layout.json` or `*.er.agent.json`;
+  update notes, memory, receipts or logs outside the model file; never edit `*.er.layout.json`, `*.er.agent.json` or
+  `*.er.requirements.md`;
   reply with one or two plain sentences describing what changed. `<chen lint command>` is how this server itself was
   started (e.g. `node <repo>/bin/chen.js`, or for a source checkout `<repo>/node_modules/.bin/tsx
   <repo>/src/cli/index.ts`, falling back to `npx tsx` when the checkout has no tsx; `npx` would otherwise try the
@@ -150,7 +153,9 @@ diagram), but agent events are only emitted when the panel is enabled.
 
 ## Panel (viewer)
 
-- Notes column gets two tabs: **Notes** (existing findings) and **Agent**. Tabs are hidden without `--agent`.
+- Notes column tabs: **Notes** (existing findings), **Requirements** (docs/requirements.md) and **Agent**. The Agent tab
+  is hidden without `--agent`. Requirements apply turns (`POST /api/agent/requirements/apply`) appear in the thread like
+  any other turn, with the same change note and undo.
   At <= 900 px the tabs live in the existing bottom drawer.
 - Thread written like pencil notes in the margin: user lines in ink, agent lines in graphite; no bubbles, avatars,
   color blocks or gradients. Each finished turn ends with a change note: `+ BirthDate (STUDENT)`, `~ ENROLLS`,

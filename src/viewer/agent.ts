@@ -3,6 +3,7 @@ import {
   loadThread, MAX_TEXT, outcome, selectionChips, takeToken, undoableTurn,
   type AgentInfo, type ThreadState, type Turn,
 } from "./agent-logic.js";
+import type { NotesTabs } from "./tabs.js";
 
 const TOKEN_KEY = "chen-agent-token";
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -43,10 +44,7 @@ export class AgentPanel {
   private ticker?: ReturnType<typeof setInterval>;
   private sending = false;
   private unread = false;
-  private tablist = element("tabs");
-  private tabs = [element<HTMLButtonElement>("tab-notes"), element<HTMLButtonElement>("tab-agent")];
   private panel = element("agent");
-  private notesPanel = element("findings");
   private list = element("agent-thread");
   private empty = element("agent-empty");
   private input = element<HTMLTextAreaElement>("agent-input");
@@ -56,16 +54,15 @@ export class AgentPanel {
   private live = element("agent-live");
   private context = element("agent-context");
 
-  constructor(private host: AgentHost) {
+  /** Called after every change of the thread (the Requirements tab follows apply turns). */
+  onThread: (thread: ThreadState, kind: string) => void = () => {};
+
+  constructor(private host: AgentHost, private tabs: NotesTabs) {
     this.token = this.readToken();
     this.input.maxLength = MAX_TEXT;
-    this.tabs.forEach((tab, index) => {
-      tab.addEventListener("click", () => this.activate(index));
-      tab.addEventListener("keydown", (e) => {
-        const next = e.key === "ArrowRight" ? index + 1 : e.key === "ArrowLeft" ? index - 1 : e.key === "Home" ? 0 : e.key === "End" ? this.tabs.length - 1 : undefined;
-        if (next === undefined) return;
-        e.preventDefault(); const target = (next + this.tabs.length) % this.tabs.length; this.activate(target); this.tabs[target]!.focus();
-      });
+    tabs.onChange((name) => {
+      if (name === "agent") { this.unread = false; if (this.thread.turns.length) this.scrollToEnd(true); }
+      this.tabState();
     });
     this.input.addEventListener("keydown", (e) => {
       if (composerKey(e) !== "send") return;
@@ -91,7 +88,9 @@ export class AgentPanel {
     return token;
   }
 
-  private request(path: string, init: RequestInit = {}) {
+  get available() { return this.enabled; }
+  get agentKind() { return this.kind; }
+  request(path: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);
     if (this.token) headers.set("X-Chen-Token", this.token);
     if (init.body) headers.set("Content-Type", "application/json");
@@ -128,7 +127,7 @@ export class AgentPanel {
       this.host.flash(flashIds(now));
       const result = outcome(now, this.kind);
       this.live.textContent = `${agentName(this.kind)} finished. ${now.reply ?? ""} ${result?.message ?? ""}`.trim();
-      if (this.active() !== 1) this.unread = true;
+      if (this.tabs.active() !== "agent") this.unread = true;
     }
     this.render();
   }
@@ -147,26 +146,10 @@ export class AgentPanel {
   private setEnabled(on: boolean) {
     if (this.enabled === on) return;
     this.enabled = on;
-    this.tablist.hidden = !on;
-    const notes = element("notes");
-    if (on) {
-      notes.setAttribute("aria-label", "Notes and agent");
-      this.notesPanel.setAttribute("role", "tabpanel"); this.notesPanel.setAttribute("aria-labelledby", "tab-notes");
-      this.activate(this.active());
-    } else {
-      notes.setAttribute("aria-label", "Model findings");
-      this.notesPanel.removeAttribute("role"); this.notesPanel.removeAttribute("aria-labelledby");
-      this.notesPanel.hidden = false; this.panel.hidden = true;
-    }
+    this.tabs.available("agent", on);
+    this.onThread(this.thread, this.kind);
   }
-  private active() { return this.tabs[1]!.getAttribute("aria-selected") === "true" ? 1 : 0; }
-  private activate(index: number) {
-    this.tabs.forEach((tab, i) => { tab.setAttribute("aria-selected", String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
-    this.notesPanel.hidden = index !== 0; this.panel.hidden = index !== 1;
-    if (index === 1) { this.unread = false; if (this.thread.turns.length) this.scrollToEnd(true); }
-    this.tabState();
-  }
-  showNotes() { this.activate(0); }
+  showNotes() { this.tabs.show("notes"); }
   private tabState() {
     const state = element("tab-agent-state");
     state.textContent = this.thread.running ? "working" : this.unread ? "new" : "";
@@ -178,9 +161,9 @@ export class AgentPanel {
     const editing = e.target instanceof Element && !!e.target.closest("select, input, textarea, [contenteditable=true]");
     if (e.key === "/" && !editing) {
       e.preventDefault(); e.stopPropagation();
-      if (this.active() !== 1) this.activate(1);
+      if (this.tabs.active() !== "agent") this.tabs.show("agent");
       this.input.focus();
-    } else if (e.key === "Escape" && this.thread.running && this.active() === 1) {
+    } else if (e.key === "Escape" && this.thread.running && this.tabs.active() === "agent") {
       e.preventDefault(); e.stopPropagation(); void this.cancel(this.thread.running);
     }
   }
@@ -220,6 +203,7 @@ export class AgentPanel {
     }
   }
 
+  cancelTurn(id: string) { return this.cancel(id); }
   private async cancel(id: string) {
     try {
       const res = await this.request(`/api/agent/turns/${encodeURIComponent(id)}/cancel`, { method: "POST" });
@@ -289,6 +273,7 @@ export class AgentPanel {
     if (this.thread.running) this.ticker = setInterval(() => this.tick(), 1000);
     this.controls(); this.tabState();
     if (nearEnd) this.scrollToEnd(true);
+    this.onThread(this.thread, this.kind);
   }
 
   private tick() {
@@ -362,7 +347,7 @@ export class AgentPanel {
       p.append(...code(result.message));
       if (result.kind === "parse") {
         const show = el("button", "link-button", "Show findings"); show.type = "button"; show.dataset.focus = "findings";
-        show.addEventListener("click", () => { this.showNotes(); this.tabs[0]!.focus(); });
+        show.addEventListener("click", () => { this.showNotes(); this.tabs.focus("notes"); });
         p.append(" ", show);
       }
       article.append(p);

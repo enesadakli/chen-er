@@ -190,6 +190,43 @@ summary .chevron { width: 18px; height: 18px; }
 .agent-notice { margin: 6px 0 0; font-size: 12px; }
 .overlay .agent-flashes { animation: agent-flash 3s ease-out forwards; }
 @keyframes agent-flash { 0%, 50% { opacity: 1; } to { opacity: 0; } }
+/* Requirements: numbered pencil lines on ruled paper. No boxes around the lines; the focused line gets a 1px graphite rule. */
+.requirements { padding: 12px 20px 0; }
+.req-heading { margin: 0; font-size: 12px; color: var(--graphite); display: flex; gap: 8px; align-items: baseline; }
+.req-heading .basename { font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+.req-save.problem, .req-conflict, .req-uncovered, .req-result.problem { color: var(--error); }
+.req-lead { margin: 12px 0 0; max-width: 40ch; color: var(--graphite); }
+.req-conflict { font-size: 12px; margin-top: 8px; }
+.req-conflict p { margin: 4px 0; }
+.req-conflict .link-button { color: var(--ink); font-size: 12px; }
+.req-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.req { display: grid; grid-template-columns: 4.5ch minmax(0, 1fr); column-gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--grid); }
+.req-number { font: 12px/19px ui-monospace, monospace; color: var(--graphite); padding-top: 2px; cursor: text; }
+.req.is-empty .req-number { opacity: .6; }
+.req-body { min-width: 0; }
+.req-text { display: block; width: calc(100% + 4px); margin: 0 0 0 -4px; padding: 2px 4px; resize: none; overflow: hidden; border: 0; border-radius: var(--radius); background: transparent; font: inherit; line-height: 1.45; color: var(--ink); caret-color: var(--ink); }
+.req-text::placeholder { color: var(--graphite); opacity: .8; }
+.req-text:focus-visible, .req-text:focus { outline: 1px solid var(--graphite); outline-offset: 0; }
+.req-meta p { margin: 2px 0 0; font-size: 12px; color: var(--graphite); overflow-wrap: anywhere; }
+.req-meta .req-uncovered { color: var(--error); }
+.req-uncovered .glyph { margin-right: 2px; }
+.req-meta .req-trace { color: var(--ink); font-size: 13px; }
+.req-arrow { margin-right: 4px; font: 12px ui-monospace, monospace; color: var(--graphite); }
+.req-trace a { text-decoration-color: var(--graphite); }
+.req-trace a:hover { text-decoration-color: var(--ink); }
+.req-gone { color: var(--graphite); text-decoration: line-through; }
+.req.is-applying .req-state { color: var(--ink); }
+.req-apply { position: sticky; bottom: 0; margin-top: 4px; padding: 10px 0 14px; background: var(--sheet); border-top: 1px solid var(--grid-major); }
+.req-apply p { margin: 6px 0 0; font-size: 12px; color: var(--graphite); overflow-wrap: anywhere; }
+.req-apply-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.req-summary { min-width: 0; font-size: 12px; color: var(--graphite); }
+#req-apply { margin-left: auto; border: 1px solid var(--graphite); }
+.req-off code { font: 12px ui-monospace, monospace; color: var(--ink); }
+.req-apply .req-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; }
+.req-progress .elapsed { min-width: 4ch; }
+.req-progress .link-button { font-size: 12px; }
+.req-progress .req-cancel { margin-left: auto; font-size: 13px; }
+.req-apply .req-result.problem, .req-apply .req-notice { color: var(--error); }
 @media (min-width: 901px) and (max-width: 1200px) { .header { gap: 12px; } .model-heading { flex-direction: column; gap: 0; } .header-state { gap: 8px; } h1 { max-width: 180px; } }
 @media (max-width: 900px) {
   .quality, .path, #desktop-actions, #export-menu { display: none; }
