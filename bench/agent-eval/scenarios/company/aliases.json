@@ -1,0 +1,5 @@
+{
+  "entities": {"EMPLOYEE": ["STAFF", "WORKER"], "DEPARTMENT": ["DEPT"]},
+  "relationships": {"WORKS_FOR": ["EMPLOYED_BY"], "SUPERVISION": ["SUPERVISES"], "WORKS_ON": ["ASSIGNED_TO"]},
+  "attributes": {"EMPLOYEE.EmployeeId": ["StaffId", "WorkerId"], "Hours": ["WeeklyHours"]}
+}

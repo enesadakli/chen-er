@@ -1,0 +1,27 @@
+version: 1
+title: Company
+entities:
+  EMPLOYEE: {attrs: [EmployeeId, Name, BirthDate, Salary], keys: [[EmployeeId]]}
+  DEPARTMENT:
+    attrs: [DepartmentNo, DepartmentName, {name: Locations, multivalued: true}]
+    keys: [[DepartmentNo], [DepartmentName]]
+  PROJECT: {attrs: [ProjectNo, ProjectName, Location], keys: [[ProjectNo]]}
+  DEPENDENT: {weak: true, attrs: [DependentName, BirthDate, Kinship], partialKey: [DependentName]}
+relationships:
+  WORKS_FOR:
+    ends: [{entity: EMPLOYEE, card: '1..1'}, {entity: DEPARTMENT, card: '1..N'}]
+  CONTROLS:
+    ends: [{entity: DEPARTMENT, card: '0..N'}, {entity: PROJECT, card: '1..1'}]
+  HAS_DEPENDENT:
+    identifies: DEPENDENT
+    ends: [{entity: EMPLOYEE, card: '0..N'}, {entity: DEPENDENT, card: '1..1'}]
+  MANAGES:
+    ends: [{entity: EMPLOYEE, card: '0..1'}, {entity: DEPARTMENT, card: '1..1'}]
+    attrs: [StartDate]
+  SUPERVISION:
+    ends:
+      - {entity: EMPLOYEE, id: subordinate, role: subordinate, card: '0..1'}
+      - {entity: EMPLOYEE, id: supervisor, role: supervisor, card: '0..N'}
+  WORKS_ON:
+    ends: [{entity: EMPLOYEE, card: '0..N'}, {entity: PROJECT, card: '1..N'}]
+    attrs: [Hours]
