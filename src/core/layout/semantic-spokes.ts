@@ -1,3 +1,4 @@
+import { labelIntersectsLines } from "./label-geometry.js";
 import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
 import { attributeAnchors } from "./attributes.js";
 import type { EndPort } from "./anchors.js";
@@ -57,7 +58,7 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
       if (distance(a, b) < MIN_ROUTE_SEGMENT) return false;
       if (nodes.some((n) => n.id !== oval.id && intersects(candidate.box, n.box, 14))) return false;
       if (nodes.some((n) => n.id !== parent.id && n.id !== oval.id && segmentThrough(a, b, n))) return false;
-      if (labels.some((l) => intersects(candidate.box, l.box, 3) || segmentThrough(a, b, boxShape({ x: l.box.x - 3, y: l.box.y - 3, w: l.box.w + 6, h: l.box.h + 6 })))) return false;
+      if (labels.some((l) => intersects(candidate.box, l.box, 3) || labelIntersectsLines(l.box, [[a, b]], 3))) return false;
       portAnchors ??= [...ports.entries()].filter(([id]) => edges.find((e) => e.id === id)?.to === parent.id).map(([, port]) => port.anchor);
       if (portAnchors.some((anchor) => distance(a, anchor) < 14)) return false;
       fixed ??= edges.filter((e) => e !== edge && e.from !== oval.id).map((other) => {

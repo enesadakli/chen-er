@@ -19,7 +19,7 @@ const model = normalize({ version: 1, entities: { HUB: {} }, relationships: { LI
 
 function repaired(edges: DEdge[], nodes = [entity]): DLabel[] {
   const labels = placeLabels(model, nodes, edges, interMetrics);
-  expect(assessQuality(diagram(nodes, edges, labels))).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelAmbiguity: 0, labelCollisions: 0 });
+  expect(assessQuality(diagram(nodes, edges, labels))).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelOnAnyEdge: 0, labelAmbiguity: 0, labelCollisions: 0 });
   return labels;
 }
 
@@ -137,6 +137,31 @@ describe("entity-end label ownership", () => {
     expect(assessQuality(diagram([], [own], [bad])).labelOnOwnEdge).toBe(1);
     repaired([own]);
   });
+  it("changes a label slot when its preferred box is crossed by an attribute spoke", () => {
+    const own = edge();
+    const preferred = placeLabels(model, [entity], [own], interMetrics)[0]!;
+    const x = preferred.box.x + preferred.box.w / 2;
+    const spoke: DEdge = { id: "spoke", kind: "attribute", from: entity.id, to: "oval", double: false,
+      points: [{ x, y: preferred.box.y - 20 }, { x, y: preferred.box.y + preferred.box.h + 20 }] };
+    expect(assessQuality(diagram([entity], [own, spoke], [preferred])).labelOnAnyEdge).toBe(1);
+    const placed = placeLabels(model, [entity], [own, spoke], interMetrics);
+    expect(placed[0]!.box).not.toEqual(preferred.box);
+    expect(assessQuality(diagram([entity], [own, spoke], placed)).labelOnAnyEdge).toBe(0);
+  });
+
+  it.each(["cardinality", "role"] as const)("counts %s crossed by any end, attribute or part line once", (kind) => {
+    const own = edge();
+    const bad = { ...label({ x: 330, y: 224, w: 30, h: 18 }), kind };
+    const foreign = (kind: DEdge["kind"], id: string): DEdge => ({ ...edge(id, [{ x: 340, y: 210 }, { x: 340, y: 260 }]), kind });
+    const q = assessQuality(diagram([], [own, foreign("end", "other"), foreign("attribute", "spoke"), foreign("part", "part")], [bad]));
+    expect(q.labelOnOwnEdge).toBe(0);
+    expect(q.labelOnAnyEdge).toBe(1);
+    expect(q.issues.find((i) => i.kind === "label-on-any-edge")!.ids).toEqual([bad.id, "other", "spoke", "part"]);
+    expect(layoutScore(q)).toBe(Infinity);
+    const double = { ...foreign("end", "double"), double: true, points: [{ x: 364, y: 210 }, { x: 364, y: 260 }] };
+    expect(assessQuality(diagram([], [own, double], [bad])).labelOnAnyEdge).toBe(1);
+  });
+
   it("measures finite diagonal, horizontal, vertical and degenerate segments", () => {
     const b = { x: 10, y: 10, w: 10, h: 10 };
     expect(boxSegmentDistance(b, { x: 0, y: 0 }, { x: 30, y: 30 })).toBe(0);
@@ -157,6 +182,36 @@ it.each(fixtures)("keeps hard label and geometry metrics at zero for %s", async 
   const { diagram } = await layout(parsed.model!, { pins });
   const q = assessQuality(diagram, pins, parsed.model!);
   expect(q.issues.filter((issue) => issue.kind === "label-loose")).toEqual([]);
-  expect(q).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelAmbiguity: 0, labelCollisions: 0, overlaps: 0, shapeCrossings: 0, pinDrift: 0,
+  expect(q).toMatchObject({ labelLoose: 0, labelOnOwnEdge: 0, labelOnAnyEdge: 0, labelAmbiguity: 0, labelCollisions: 0, overlaps: 0, shapeCrossings: 0, pinDrift: 0,
     attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0 });
+}, 30000);
+
+const university = `version: 1
+title: University
+entities:
+  DEPARTMENT: { attrs: [Name], keys: [[Name]] }
+  COURSE: { attrs: [Code, Title], keys: [[Code]] }
+  STUDENT: { attrs: [StudentId], keys: [[StudentId]] }
+relationships:
+  OFFERS:
+    ends: [ { entity: DEPARTMENT, card: 1..N }, { entity: COURSE, card: 1..1 } ]
+  ENROLLS:
+    ends: [ { entity: STUDENT, card: 1..N }, { entity: COURSE, card: 0..N } ]
+    attrs: [Grade, Semester]
+`;
+
+it("keeps University participation labels clear of attribute spokes", async () => {
+  const model = parseModel(university).model!;
+  const { diagram } = await layout(model);
+  expect(assessQuality(diagram, {}, model)).toMatchObject({ labelOnAnyEdge: 0, labelOnOwnEdge: 0, labelCollisions: 0, labelLoose: 0 });
+  const course = diagram.labels.find((l) => l.edge === "edge:OFFERS#1")!;
+  const spoke = diagram.edges.find((e) => e.id === "edge:A:COURSE.Title")!;
+  expect(spoke.points).toHaveLength(2);
+  expect(boxSegmentDistance(course.box, spoke.points[0]!, spoke.points[1]!)).toBeGreaterThan(2);
+});
+
+it("keeps transit participation labels clear of all edges and spokes", async () => {
+  const model = parseModel(readFileSync("bench/fixtures/large/transit-network.er.yaml", "utf8")).model!;
+  const { diagram } = await layout(model);
+  expect(assessQuality(diagram, {}, model).labelOnAnyEdge).toBe(0);
 }, 30000);

@@ -26,11 +26,15 @@ export function boxSegmentDistance(box: Box, a: Point, b: Point): number {
     cornerDistance(right, bottom), cornerDistance(box.x, bottom)));
 }
 
+/** Inclusive rectangle clearance against any drawn line, including attribute and part spokes. */
+export function labelIntersectsLines(box: Box, lines: readonly [Point, Point][], gap = 2): boolean {
+  const expanded = { x: box.x - gap, y: box.y - gap, w: box.w + gap * 2, h: box.h + gap * 2 };
+  return lines.some(([a, b]) => boxSegmentDistance(expanded, a, b) < 1e-7);
+}
+
 /** Include every drawn segment, including both lines of total participation. */
 export function labelOnOwnEdge(box: Box, edge: DEdge, geometry?: LabelGeometry): boolean {
-  const expanded = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };
-  return (geometry?.lines.get(edge.id) ?? drawnPaths(edge).flatMap(segments))
-    .some(([a, b]) => boxSegmentDistance(expanded, a, b) < 1e-7);
+  return labelIntersectsLines(box, geometry?.lines.get(edge.id) ?? drawnPaths(edge).flatMap(segments));
 }
 
 export function labelAmbiguityReasons(box: Box, edge: DEdge, edges: DEdge[], geometry?: LabelGeometry): string[] {

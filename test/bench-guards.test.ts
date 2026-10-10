@@ -47,6 +47,17 @@ describe("bench regression guards", () => {
     expect(guardFailures({ input: "examples/library.er.yaml", diagram, q, hierarchyMinimum: 0, elapsed: 0, stabilityMax: 0, stabilityMedian: 0 })).toContain("labelOnOwnEdge: 1");
   });
 
+  it("rejects a label crossed by an attribute spoke independently of its own edge", () => {
+    const diagram: Diagram = { width: 400, height: 400, nodes: [], edges: [
+      { id: "end", from: "R", to: "E", kind: "end", double: false, points: [{ x: 100, y: 100 }, { x: 200, y: 100 }] },
+      { id: "spoke", from: "E", to: "A", kind: "attribute", double: false, points: [{ x: 170, y: 104 }, { x: 170, y: 140 }] },
+    ], labels: [{ id: "label", edge: "end", kind: "cardinality", text: "(1,1)", box: { x: 160, y: 104, w: 30, h: 18 } }],
+      notes: [], meta: { engine: DEFAULT_ENGINE } };
+    const q = assessQuality(diagram);
+    expect(q.labelOnOwnEdge).toBe(0);
+    expect(guardFailures({ input: "examples/library.er.yaml", diagram, q, hierarchyMinimum: 0, elapsed: 0, stabilityMax: 0, stabilityMedian: 0 })).toContain("labelOnAnyEdge: 1");
+  });
+
   for (const input of inputs) it(input, async () => {
     expect(await failuresOf(input)).toEqual([]);
   }, 180000);

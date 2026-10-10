@@ -1,3 +1,4 @@
+import { labelIntersectsLines } from "./label-geometry.js";
 import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
 import type { NAttribute } from "../normalize.js";
 import { attributeSize } from "../style.js";
@@ -69,7 +70,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
     const others = [...nodes, ...pendingNodes].filter((n) => n.id !== node.id);
     if (others.some((n) => intersects(box, n.box, 14)) || labels.some((l) => intersects(box, l.box, 8))) return false;
     if (others.some((n) => n.id !== parent.id && segmentThrough(a, b, boxShape(n.box)))) return false;
-    if (labels.some((l) => segmentThrough(a, b, boxShape({ x: l.box.x - 5, y: l.box.y - 5, w: l.box.w + 10, h: l.box.h + 10 })))) return false;
+    if (labels.some((l) => labelIntersectsLines(l.box, [[a, b]], 5))) return false;
     if (portAnchors.some((port) => port.owner === parent.id && distance(a, port.anchor) < 14)) return false;
     if (skeleton.some(([p, q]) => segmentThrough(p, q, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(a, b, p, q))) return false;
     const pool = new Map<string, DNode>();

@@ -2,12 +2,12 @@ import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
 import { clearanceQuality, type ClearanceQuality } from "./layout/semantic-clearance.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
-import { labelAmbiguityReasons, labelGeometry, labelLooseReasons, labelOnOwnEdge, linesBox } from "./layout/label-geometry.js";
+import { labelAmbiguityReasons, labelGeometry, labelIntersectsLines, labelLooseReasons, labelOnOwnEdge, linesBox } from "./layout/label-geometry.js";
 import { center, intersects, type Diagram, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
-  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "label-loose" | "label-on-own-edge" | "edge-crossing" | "pin-drift" | "out-of-canvas";
+  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "label-loose" | "label-on-own-edge" | "label-on-any-edge" | "edge-crossing" | "pin-drift" | "out-of-canvas";
   ids: string[];
   message: string;
 }
@@ -22,6 +22,8 @@ export interface QualityReport extends SemanticQuality, EdgeQuality, ClearanceQu
   labelLoose: number;
   /** Labels whose box inflated by 2px intersects their own drawn end edge; hard target zero. */
   labelOnOwnEdge: number;
+  /** Participation/role labels within 2px of any drawn edge; each label counts once, hard target zero. */
+  labelOnAnyEdge: number;
   edgeCrossings: number;
   pinDrift: number;
   aspect: number;
@@ -52,6 +54,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const paths = new Map(edges.map((e) => [e.id, drawnPaths(e)]));
   const labelContext = labelGeometry(nodes, edges, paths);
   const lines = new Map(edges.map((e) => [e.id, paths.get(e.id)!.flatMap(segments)]));
+  const lineBounds = new Map([...lines].map(([id, ls]) => [id, linesBox(ls)]));
   for (const e of edges) for (const n of nodes) {
     if (n.id !== e.from && n.id !== e.to && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, n))) add("shape-crossing", [e.id, n.id]);
   }
@@ -59,6 +62,8 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     const l = labels[i]!, shape = boxShape(l.box);
     const own = edges.find((e) => e.id === l.edge && e.kind === "end");
     if (own) {
+      const crossed = edges.filter((e) => intersects(l.box, lineBounds.get(e.id)!, 2.01) && labelIntersectsLines(l.box, lines.get(e.id)!));
+      if (crossed.length) add("label-on-any-edge", [l.id, ...crossed.map((e) => e.id)]);
       if (labelOnOwnEdge(l.box, own, labelContext)) add("label-on-own-edge", [l.id, own.id]);
       const loose = labelLooseReasons(l, own, labelContext, labels);
       if (loose.length) issues.push({ kind: "label-loose", ids: [l.id, own.id], message: `label-loose: ${l.id}: ${loose.join("; ")}` });
@@ -70,7 +75,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     for (const e of edges) if (e.id !== l.edge && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, shape))) add("label-collision", [l.id, e.id]);
   }
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const bounds = new Map([...lines].map(([id, ls]) => [id, linesBox(ls)]));
+  const bounds = lineBounds;
   for (let i = 0; i < edges.length; i++) for (const other of edges.slice(i + 1)) {
     const e = edges[i]!;
     // Segments more than a pixel apart never intersect.
@@ -102,7 +107,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { ...edgeQuality(diagram), ...clearanceQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), labelOnOwnEdge: count("label-on-own-edge"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { ...edgeQuality(diagram), ...clearanceQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), labelOnOwnEdge: count("label-on-own-edge"), labelOnAnyEdge: count("label-on-any-edge"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,
