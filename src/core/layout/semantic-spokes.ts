@@ -12,11 +12,15 @@ export function straightSpoke(edge: DEdge, nodes: DNode[], radial = true): Point
 /** Move free ovals to clear radial spokes rather than bending an attribute edge. */
 export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>, labels: DLabel[] = [], shorten = false): boolean {
   let moved = false;
+  // Ovals move by replacing their box, so one lookup serves the whole repair.
+  const byId = new Map<string, DNode>();
+  for (const n of nodes) if (!byId.has(n.id)) byId.set(n.id, n);
+  const spokeOf = (e: DEdge) => attributeAnchors(byId.get(e.from)!, byId.get(e.to)!, !shorten);
   for (const edge of edges.filter((e) => e.kind !== "end")) {
-    const parent = nodes.find((n) => n.id === edge.from)!, oval = nodes.find((n) => n.id === edge.to)!;
+    const parent = byId.get(edge.from)!, oval = byId.get(edge.to)!;
     // Nothing but this oval moves while its targets are tried, so the other routes are fixed.
     let fixed: { lines: [Point, Point][]; end: boolean }[] | undefined, portAnchors: Point[] | undefined;
-    edge.points = straightSpoke(edge, nodes, !shorten);
+    edge.points = spokeOf(edge);
     const originalClear = clear(oval, edge.points);
     if (oval.pinned || (originalClear && (!shorten || distance(edge.points[0]!, edge.points[1]!) <= oval.box.h * 2.5))) continue;
     const p = center(parent.box), original = center(oval.box), preferred = Math.atan2(original.y - p.y, original.x - p.x);
@@ -57,7 +61,7 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
       portAnchors ??= [...ports.entries()].filter(([id]) => edges.find((e) => e.id === id)?.to === parent.id).map(([, port]) => port.anchor);
       if (portAnchors.some((anchor) => distance(a, anchor) < 14)) return false;
       fixed ??= edges.filter((e) => e !== edge && e.from !== oval.id).map((other) => {
-        const updated = other.kind === "end" ? other : { ...other, points: straightSpoke(other, nodes, !shorten) };
+        const updated = other.kind === "end" ? other : { ...other, points: spokeOf(other) };
         return { lines: visibleEdgePaths(updated).flatMap(segments), end: updated.kind === "end" };
       });
       const spoke = visibleEdgePaths({ ...edge, points }).flatMap(segments);
@@ -70,6 +74,6 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
       return true;
     }
   }
-  for (const edge of edges.filter((e) => e.kind !== "end")) edge.points = straightSpoke(edge, nodes, !shorten);
+  for (const edge of edges.filter((e) => e.kind !== "end")) edge.points = spokeOf(edge);
   return moved;
 }

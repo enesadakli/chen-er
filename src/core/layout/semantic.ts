@@ -126,9 +126,13 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
   for (let i = 0; i < owners.length; i++) for (let j = i + 1; j < owners.length; j++) {
     if (owners[i]!.from !== owners[j]!.from && owners[i]!.to !== owners[j]!.to) pairs.push([i, j]);
   }
+  // Diamonds that may crowd each other: ordered ids and different entity sets, in the original order.
+  const partners = relationships.map((d) => relationships.flatMap((other, j) => d.id < other.id && d.key !== other.key ? [j] : []));
   // Successive calls move one or two entities, so pairs of unmoved paths reuse the previous result.
-  let previous: { a: Point; b: Point }[] | undefined;
-  const hits = new Uint8Array(pairs.length);
+  let previous: { a: Point; b: Point }[] | undefined, crossings = 0, epoch = 0;
+  const hits = new Uint8Array(pairs.length), seen = new Uint32Array(pairs.length);
+  const touching = owners.map(() => [] as number[]);
+  pairs.forEach(([i, j], k) => { touching[i]!.push(k); touching[j]!.push(k); });
   return (columns, ranks) => {
     const point = (key: string) => ({ x: columns.get(key) ?? 0, y: ranks.get(key) ?? 0 });
     const positions = entities.map((e) => point(e.key));
@@ -145,22 +149,24 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
         paths.push({ a: p, b: q });
       });
     }
-    const moved = paths.map((path, i) => {
+    epoch++;
+    paths.forEach((path, i) => {
       const old = previous?.[i];
-      return !old || old.a.x !== path.a.x || old.a.y !== path.a.y || old.b.x !== path.b.x || old.b.y !== path.b.y;
-    });
-    let crossings = 0;
-    pairs.forEach(([i, j], k) => {
-      if (moved[i] || moved[j]) hits[k] = segmentIntersection(paths[i]!.a, paths[i]!.b, paths[j]!.a, paths[j]!.b) ? 1 : 0;
-      crossings += hits[k]!;
+      if (old && old.a.x === path.a.x && old.a.y === path.a.y && old.b.x === path.b.x && old.b.y === path.b.y) return;
+      for (const k of touching[i]!) if (seen[k] !== epoch) {
+        seen[k] = epoch;
+        const [p, q] = pairs[k]!, hit = segmentIntersection(paths[p]!.a, paths[p]!.b, paths[q]!.a, paths[q]!.b) ? 1 : 0;
+        crossings += hit - hits[k]!;
+        hits[k] = hit;
+      }
     });
     previous = paths;
     // Add one term per crossing, as a pairwise sum would.
     for (let k = 0; k < crossings; k++) score += 6;
-    for (const d of diamonds) {
+    diamonds.forEach((d, i) => {
       for (const e of positions) if (distance(d.p, e) < 0.35) score += 40;
-      for (const other of diamonds) if (d.id < other.id && distance(d.p, other.p) < 0.3 && d.key !== other.key) score += 10;
-    }
+      for (const j of partners[i]!) if (distance(d.p, diamonds[j]!.p) < 0.3) score += 10;
+    });
     const cx = positions.reduce((s, e) => s + e.x, 0) / (positions.length || 1);
     const cy = positions.reduce((s, e) => s + e.y, 0) / (positions.length || 1);
     entities.forEach((e, i) => { score += e.degree * distance(positions[i]!, { x: cx, y: cy }) * 0.15; });

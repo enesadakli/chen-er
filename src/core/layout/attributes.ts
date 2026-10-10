@@ -15,6 +15,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
   const entities = nodes.filter((n) => n.kind === "entity").map((n) => center(n.box));
   const centroid = { x: entities.reduce((s, p) => s + p.x, 0) / (entities.length || 1), y: entities.reduce((s, p) => s + p.y, 0) / (entities.length || 1) };
   const skeleton = edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points));
+  const portAnchors = [...endPorts.entries()].map(([id, port]) => ({ owner: edges.find((e) => e.id === id)?.to, anchor: port.anchor }));
   for (const c of clusters) {
     const p = center(c.node.box), outward = p.x === centroid.x && p.y === centroid.y ? -Math.PI / 2 : Math.atan2(p.y - centroid.y, p.x - centroid.x);
     const chosen: number[] = [];
@@ -69,10 +70,12 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
     if (others.some((n) => intersects(box, n.box, 14)) || labels.some((l) => intersects(box, l.box, 8))) return false;
     if (others.some((n) => n.id !== parent.id && segmentThrough(a, b, boxShape(n.box)))) return false;
     if (labels.some((l) => segmentThrough(a, b, boxShape({ x: l.box.x - 5, y: l.box.y - 5, w: l.box.w + 10, h: l.box.h + 10 })))) return false;
-    if ([...endPorts.entries()].some(([id, port]) => edges.find((e) => e.id === id)?.to === parent.id && distance(a, port.anchor) < 14)) return false;
+    if (portAnchors.some((port) => port.owner === parent.id && distance(a, port.anchor) < 14)) return false;
     if (skeleton.some(([p, q]) => segmentThrough(p, q, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(a, b, p, q))) return false;
+    const pool = new Map<string, DNode>();
+    for (const n of [...nodes, ...pendingNodes]) if (!pool.has(n.id)) pool.set(n.id, n);
     return ![...edges, ...pendingEdges].filter((e) => e.kind !== "end").some((other) => {
-      const from = [...nodes, ...pendingNodes].find((n) => n.id === other.from)!, to = [...nodes, ...pendingNodes].find((n) => n.id === other.to)!;
+      const from = pool.get(other.from)!, to = pool.get(other.to)!;
       const [p, q] = attributeAnchors(from, to);
       return segmentThrough(p, q, boxShape(box)) || (other.from !== parent.id && other.to !== parent.id && !!segmentIntersection(a, b, p, q));
     });
