@@ -63,8 +63,10 @@ export class NotebookCanvas {
     this.canvas.style.backgroundSize = `${major}, ${major}, ${minor}, ${minor}`;
     // Offset is diagram zero in canvas coordinates, even when the sheet has a negative origin.
     this.canvas.style.backgroundPosition = `${this.offset.x}px ${this.offset.y}px`;
-    this.canvas.style.setProperty("--minor-alpha", `${Math.max(0, Math.min(1, (this.scale - .35) / .15)) * 100}%`);
-    this.canvas.style.setProperty("--major-alpha", `${Math.max(0, Math.min(1, (this.scale - .1) / .05)) * 100}%`);
+    // 1px CSS lines carry the ink of the old 0.5px / 0.7px scaled strokes, then fade out when dense.
+    const fade = (from: number, to: number) => Math.max(0, Math.min(1, (this.scale - from) / (to - from)));
+    this.canvas.style.setProperty("--minor-alpha", `${fade(.35, .5) * Math.min(1, .5 * this.scale) * 100}%`);
+    this.canvas.style.setProperty("--major-alpha", `${fade(.1, .15) * Math.min(1, .7 * this.scale) * 100}%`);
     // Cancel the outer CSS scale for both the 12px arms and the 1px stroke.
     for (const { path, x, y } of this.exportCorners) path.setAttribute("transform", `translate(${x} ${y}) scale(${1 / this.scale})`);
     const percent = `${Math.round(this.scale * 100)}%`;

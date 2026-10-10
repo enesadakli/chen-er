@@ -15,8 +15,10 @@ ink on white and must look the same as the export. Four graphite corner marks sh
 
 ## Color (Restrained: neutrals + pencil roles)
 - Canvas paper `#FBFBF8`; grid minor `#E7ECEF` every 8 diagram px, major `#D5DDE2` every 40 diagram px
-  (screen only). Lines stay 1 CSS px and follow the drawing through pan and zoom. Minor lines fade linearly
-  from full opacity at 50% zoom to invisible at 35%; major lines fade from 15% to invisible at 10%.
+  (screen only). Lines stay 1 CSS px and follow the drawing through pan and zoom; their opacity matches the
+  ink of a 0.5px (minor) / 0.7px (major) stroke at the current zoom (0.5 × zoom, 0.7 × zoom, capped at 1), so the
+  paper reads as faint as the scaled sheet grid did. Minor lines also fade out from 50% to 35% zoom; major lines
+  from 15% to 10%.
 - Export corners: graphite `#6B7177` at 60% opacity, four L marks with 12 screen px arms and 1px strokes.
 - Margin rule: one vertical line `#E4A9A4` separating sheet from the notes column (the notebook's red margin line).
 - Ink `#1F2328` (diagram, primary text). Graphite `#6B7177` (secondary text, pins, guides).
