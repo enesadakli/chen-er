@@ -174,6 +174,14 @@ especially the distinction between n-ary multiplicity and this model's own-end
 participation cards. Full fixture outputs: [campus Markdown](docs/mapping/campus.md)
 and [campus SQL](docs/mapping/campus.sql).
 
+## Course method reports
+
+`chen report model.er.yaml` writes a Markdown report and sibling SVG; add
+`--format html` for one self-contained, printable A4 document. The report walks
+requirements → ER diagram → model and traceability → lint → relational schema.
+See [report usage and example](docs/report.md). The read-only MCP tool `report_er`
+returns the same report as text.
+
 ## Model reference and architecture
 
 See the [model reference](docs/model-reference.md) for keys, attributes, cardinalities, weak entities, recursive roles and layout files. The structural contract is [schema/er.schema.json](schema/er.schema.json).

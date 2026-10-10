@@ -170,3 +170,19 @@ export async function mapCommand(modelPath: string, options: MapCommandOptions =
     return failure(error);
   }
 }
+
+export interface ReportCommandOptions {
+  format?: import("../app/report.js").ReportFormat;
+  out?: string;
+  pins?: boolean;
+}
+
+export async function reportCommand(modelPath: string, options: ReportCommandOptions = {}): Promise<CommandResult> {
+  try {
+    const { writeReport } = await import("../app/report.js");
+    const result = await writeReport(modelPath, { format: options.format, out: options.out, noPins: options.pins === false });
+    return { exitCode: result.doc ? 0 : 1, stdout: result.paths.join("\n"), stderr: formatDiagnostics(result.diagnostics) };
+  } catch (error) {
+    return failure(error);
+  }
+}

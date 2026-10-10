@@ -73,6 +73,16 @@ program.command("serve").description("open a live local diagram viewer")
     process.once("SIGTERM", stop);
   });
 
+program.command("report").description("export a course method report with an ER diagram and relational schema")
+  .argument("<model>", "path to a .er.yaml model")
+  .option("-o, --out <file>", "report output path (default: next to the model)")
+  .addOption(new Option("--format <name>", "report format").choices(["md", "html"]).default("md"))
+  .option("--no-pins", "ignore the sibling layout file entirely")
+  .action(async (model: string, options: import("./commands.js").ReportCommandOptions) => {
+    const { reportCommand } = await import("./commands.js");
+    print(await reportCommand(model, options));
+  });
+
 program.parseAsync().catch((error: unknown) => {
   if (error instanceof CommanderError) {
     process.exitCode = error.exitCode === 0 ? 0 : 2;
