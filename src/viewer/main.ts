@@ -4,7 +4,7 @@ import { NotebookCanvas } from "./canvas.js";
 import { Notes } from "./notes.js";
 import { findings, type Finding } from "./logic.js";
 import type { Box } from "../core/geometry.js";
-import { placeMenu } from "./menu-position.js";
+import { placeMenu, type MenuDimensions, type MenuObstacle } from "./menu-position.js";
 import { AgentPanel } from "./agent.js";
 import type { Turn } from "./agent-logic.js";
 
@@ -15,6 +15,7 @@ let selected: number | undefined;
 let connected = false;
 let pendingWrites = 0;
 let anchor: Box | undefined;
+let actionObstacles: ((menu: MenuDimensions) => MenuObstacle[]) | undefined;
 let firstSheet = true;
 let drawerResized = false;
 const actions = element("node-actions");
@@ -23,14 +24,15 @@ function positionActions() {
   const viewport = element("canvas");
   // Measure the unconstrained content once, then constrain it to the visible canvas.
   actions.style.maxHeight = ""; actions.style.maxWidth = `${Math.max(0, viewport.clientWidth - 16)}px`;
-  const placement = placeMenu(anchor, { w: actions.offsetWidth, h: actions.offsetHeight }, { w: viewport.clientWidth, h: viewport.clientHeight });
+  const menu = { w: actions.offsetWidth, h: actions.offsetHeight };
+  const placement = placeMenu(anchor, menu, { w: viewport.clientWidth, h: viewport.clientHeight }, 8, 8, actionObstacles?.(menu));
   actions.style.left = `${placement.x}px`; actions.style.top = `${placement.y}px`;
   actions.style.maxWidth = `${placement.maxWidth}px`; actions.style.maxHeight = `${placement.maxHeight}px`;
 }
-function nodeActions(id?: string, box?: Box, dragging = false) {
+function nodeActions(id?: string, box?: Box, dragging = false, obstacles?: (menu: MenuDimensions) => MenuObstacle[]) {
   if (dragging) { actions.hidden = true; return; }
   if (!id) { actions.hidden = true; return; }
-  anchor = box;
+  anchor = box; actionObstacles = obstacles;
   element("node-name").textContent = state?.selection.owners.find((o) => o.id === id)?.label ?? id.slice(2);
   actions.hidden = false; positionActions();
 }

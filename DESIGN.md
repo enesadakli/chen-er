@@ -88,6 +88,7 @@ ink on white and must look the same as the export. Four graphite corner marks sh
 ## Selection and focus
 
 Entity and relationship clicks open a small paper toolbar beside the selected shape with Focus and Close.
+The toolbar stays near the selected shape and chooses a viewport-clamped position that avoids nearby labels, nodes and edge segments whenever space permits.
 Connected relationships keep every end and role/cardinality label together; unrelated drawing elements dim.
 Selection preserves the camera; Focus explicitly fits the neighborhood. Dragging hides actions and starts only
 after 4 screen pixels. Enter opens node actions; Escape dismisses them. Attribute nodes retain movement and

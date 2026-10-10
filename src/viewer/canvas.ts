@@ -1,6 +1,7 @@
 import type { ViewerState } from "../app/serve.js";
 import { center, type Box, type Point } from "../core/geometry.js";
 import { glyphs, snap, targetBox, type Finding } from "./logic.js";
+import type { MenuDimensions, MenuObstacle } from "./menu-position.js";
 import { selectionNeighborhood } from "./selection.js";
 
 const ns = "http://www.w3.org/2000/svg";
@@ -39,7 +40,7 @@ export class NotebookCanvas {
   onSelection: (id?: string) => void = () => {};
   constructor(private canvas: HTMLElement, private selectFinding: (number: number) => void,
     private hover: (number?: number) => void, private pin: (id: string, point: Point | null) => Promise<void>,
-    private actions: (id?: string, anchor?: Box, dragging?: boolean) => void = () => {}) {
+    private actions: (id?: string, anchor?: Box, dragging?: boolean, obstacles?: (menu: MenuDimensions) => MenuObstacle[]) => void = () => {}) {
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
@@ -214,7 +215,31 @@ export class NotebookCanvas {
   private actionPosition() {
     const box = targetBox(this.good?.diagram ?? null, this.selected);
     if (!box || !this.selected || !/^[ER]:/.test(this.selected)) { this.actions(); return; }
-    this.actions(this.selected, { x: box.x * this.scale + this.offset.x, y: box.y * this.scale + this.offset.y, w: box.w * this.scale, h: box.h * this.scale });
+    const diagram = this.good!.diagram!;
+    // Diagram boxes already include the origin; offset locates diagram zero on screen.
+    const screen = (box: Box): Box => ({ x: box.x * this.scale + this.offset.x,
+      y: box.y * this.scale + this.offset.y, w: box.w * this.scale, h: box.h * this.scale });
+    const anchor = screen(box);
+    this.actions(this.selected, anchor, false, (menu) => {
+      const window = { x: anchor.x - menu.w - 60, y: anchor.y - menu.h - 60,
+        w: anchor.w + 2 * (menu.w + 60), h: anchor.h + 2 * (menu.h + 60) };
+      const obstacles: MenuObstacle[] = [];
+      const add = (rect: Box, weight: number) => {
+        if (rect.x < window.x + window.w && rect.x + rect.w > window.x &&
+          rect.y < window.y + window.h && rect.y + rect.h > window.y) obstacles.push({ ...rect, weight });
+      };
+      for (const label of diagram.labels) add(screen(label.box), 4);
+      for (const node of diagram.nodes) if (node.id !== this.selected) add(screen(node.box), 3);
+      for (const edge of diagram.edges) {
+        for (let i = 1; i < edge.points.length; i++) {
+          const a = edge.points[i - 1]!, b = edge.points[i]!;
+          const segment = screen({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y),
+            w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) });
+          add({ x: segment.x - 3, y: segment.y - 3, w: segment.w + 6, h: segment.h + 6 }, 1);
+        }
+      }
+      return obstacles;
+    });
   }
   private openActions() { this.actionsOpen = true; this.actionPosition(); }
   private group(id: string): SVGGElement | undefined {

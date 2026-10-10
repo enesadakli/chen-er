@@ -174,4 +174,87 @@ describe("placeMenu", () => {
       }
     }
   });
+
+  const anchor = { x: 300, y: 250, w: 100, h: 50 };
+  const menu = { w: 200, h: 38 };
+  const viewport = { w: 800, h: 600 };
+  const area = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
+    Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+    Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+  it("places below when a label blocks the toolbar above the anchor", () => {
+    const label = { x: 240, y: 202, w: 220, h: 40, weight: 4 };
+    const result = placeMenu(anchor, menu, viewport, 8, 8, [label]);
+    expect(result.placement).toBe("below");
+    expect(area({ ...result, ...menu }, label)).toBe(0);
+  });
+
+  it("finds a clear side when labels block above and below", () => {
+    const labels = [
+      { x: 200, y: 140, w: 300, h: 102, weight: 4 },
+      { x: 200, y: 308, w: 300, h: 102, weight: 4 },
+    ];
+    const result = placeMenu(anchor, menu, viewport, 8, 8, labels);
+    expect(["left", "right"]).toContain(result.placement);
+    for (const label of labels) expect(area({ ...result, ...menu }, label)).toBe(0);
+    expect(area({ ...result, ...menu }, anchor)).toBe(0);
+  });
+
+  it("pushes above outward in 12 pixel steps when every base candidate is blocked", () => {
+    const obstacles = [
+      { x: 200, y: 226, w: 300, h: 16, weight: 4 },
+      { x: 0, y: 250, w: 800, h: 100, weight: 4 },
+    ];
+    const result = placeMenu(anchor, menu, viewport, 8, 8, obstacles);
+    expect(result.placement).toBe("above");
+    expect(result.y).toBe(180); // The first clear candidate has 24 px extra gap.
+    for (const obstacle of obstacles) expect(area({ ...result, ...menu }, obstacle)).toBe(0);
+  });
+
+  it("preserves the old result with empty or distant obstacles", () => {
+    for (const box of [anchor, { ...anchor, y: 10 }]) {
+      const legacy = placeMenu(box, menu, viewport);
+      expect(placeMenu(box, menu, viewport, 8, 8, [])).toEqual(legacy);
+      expect(placeMenu(box, menu, viewport, 8, 8,
+        [{ x: 750, y: 550, w: 20, h: 20, weight: 4 }])).toEqual(legacy);
+    }
+  });
+
+  it("keeps obstacle-aware candidates within the padded viewport", () => {
+    for (const box of [anchor, { ...anchor, x: -50, y: -20 }, { ...anchor, x: 780, y: 580 }]) {
+      for (const size of [menu, { w: 2000, h: 1000 }]) {
+        const result = placeMenu(box, size, viewport, 8, 8,
+          [{ x: 0, y: 0, w: 800, h: 600, weight: 4 }]);
+        expect(result.x).toBeGreaterThanOrEqual(8);
+        expect(result.y).toBeGreaterThanOrEqual(8);
+        expect(result.x + Math.min(size.w, result.maxWidth)).toBeLessThanOrEqual(viewport.w - 8);
+        expect(result.y + Math.min(size.h, result.maxHeight)).toBeLessThanOrEqual(viewport.h - 8);
+      }
+    }
+  });
+
+  it("never overlaps the anchor when a clear candidate exists despite heavy obstacles", () => {
+    const box = { x: 300, y: 15, w: 100, h: 50 };
+    const result = placeMenu(box, menu, viewport, 8, 8,
+      [{ x: 0, y: 65, w: 800, h: 535, weight: 1_000_000_000 }]);
+    expect(area({ ...result, ...menu }, box)).toBe(0);
+  });
+
+  it("uses obstacle weights to prefer covering edges over labels", () => {
+    const result = placeMenu(anchor, menu, viewport, 8, 8, [
+      { x: 0, y: 0, w: 800, h: 250, weight: 4 },
+      { x: 0, y: 300, w: 800, h: 300, weight: 1 },
+      { x: 0, y: 250, w: 300, h: 50, weight: 3 },
+      { x: 400, y: 250, w: 400, h: 50, weight: 3 },
+    ]);
+    expect(result.placement).toBe("below");
+  });
+
+
+  it("breaks equal scores in favor of above centered even for a tall menu", () => {
+    const size = { w: 40, h: 100 };
+    expect(placeMenu(anchor, size, viewport, 8, 8,
+      [{ x: 750, y: 550, w: 20, h: 20, weight: 4 }])).toEqual(placeMenu(anchor, size, viewport));
+  });
+
 });
