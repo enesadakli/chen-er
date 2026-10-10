@@ -14,7 +14,7 @@ function harness(d: Diagram) {
   const figure = { querySelector: (selector: string) => selector === "svg:last-child" ? null : next, querySelectorAll: () => [], append: vi.fn(), classList: { toggle: vi.fn() } };
   const overlay = { setAttribute: vi.fn(), contains: () => false };
   const canvas = {
-    clientWidth: 1000, clientHeight: 800,
+    clientWidth: 1000, clientHeight: 800, style: { setProperty: vi.fn() },
     getBoundingClientRect: () => ({ left: 100, top: 50 }),
     setPointerCapture: vi.fn(), hasPointerCapture: () => true, releasePointerCapture: vi.fn(), focus: vi.fn(),
   };
@@ -22,7 +22,7 @@ function harness(d: Diagram) {
   const state = { diagram: d, svg: "<svg/>", pins: {}, computing: false } as ViewerState;
   const notebook = Object.assign(Object.create(NotebookCanvas.prototype), {
     good: state, state, scale: 2, offset: { x: 300, y: 400 }, sheet, figure, overlay, canvas,
-    pin, actions: vi.fn(), touches: new Map(), drawOverlay: vi.fn(), lastNodeIds: "", group: () => undefined,
+    pin, actions: vi.fn(), touches: new Map(), drawOverlay: vi.fn(), lastNodeIds: "", exportCorners: [], group: () => undefined,
   }) as {
     good: ViewerState | undefined; scale: number; offset: Point;
     transform(): void; fit(): void; diagramPoint(p: Point): Point; zoom(factor: number, around: Point): void;
