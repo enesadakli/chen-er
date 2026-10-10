@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { getSchema, lintEr, lintInput, mapEr, mapInput, renderEr, renderInput, type ToolIO } from "./tools.js";
+import { reportEr, reportInput } from "./tools.js";
 
 const fileIO: ToolIO = {
   readText: (path) => readFile(path, "utf8"),
@@ -41,6 +42,11 @@ export function createServer(io: ToolIO = fileIO): McpServer {
     inputSchema: mapInput,
     annotations: { readOnlyHint: true },
   }, (input) => safely(() => mapEr(input, io)));
+  server.registerTool("report_er", {
+    description: "Build a course method report: requirements when present, ER diagram, model, traceability, lint and relational schema. Supply exactly one of model or path; format is md (default) or self-contained html. Markdown directs the caller to render_er for the diagram. Returns report text and diagnostics without writing files.",
+    inputSchema: reportInput,
+    annotations: { readOnlyHint: true },
+  }, (input) => safely(() => reportEr(input, io)));
   return server;
 }
 

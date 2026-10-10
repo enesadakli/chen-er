@@ -115,3 +115,18 @@ export async function renderEr(input: z.infer<typeof renderInput>, io: ToolIO): 
     ],
   };
 }
+
+export const reportInput = z.object({
+  ...source,
+  format: z.enum(["md", "html"]).optional(),
+}).strict().refine(exactlyOne, "Supply exactly one of model or path.");
+
+export async function reportEr(input: z.infer<typeof reportInput>, _io: ToolIO): Promise<CallToolResult> {
+  const args = reportInput.parse(input);
+  const { reportText, reportFile, reportContent } = await import("../app/report.js");
+  const result = args.model !== undefined ? await reportText(args.model) : await reportFile(args.path!);
+  return textResult({
+    ...(result.doc ? { report: reportContent(result, args.format ?? "md") } : {}),
+    diagnostics: result.diagnostics,
+  }, !result.doc);
+}

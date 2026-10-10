@@ -30,9 +30,9 @@ describe("MCP in-memory protocol", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("lists the four tools with input schemas", async () => {
+  it("lists the five tools with input schemas", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_schema", "lint_er", "map_er", "render_er"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["get_schema", "lint_er", "map_er", "render_er", "report_er"]);
     expect(tools.every((tool) => tool.inputSchema.type === "object" && tool.description)).toBe(true);
   });
 
