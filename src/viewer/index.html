@@ -4,7 +4,8 @@
 <body>
   <header class="header">
     <div class="model-heading"><h1 id="title">chen-er</h1><span id="path" class="path"></span></div>
-    <div class="header-state"><span id="quality" class="quality">Quality pending</span><span id="status" role="status" aria-live="polite"><span class="status-full">connecting</span><span class="status-short" aria-hidden="true">offline</span></span></div>
+    <div class="header-state"><span id="quality" class="quality">Quality pending</span><span id="status" role="status" aria-live="polite"><span class="status-full">connecting</span><span class="status-short" aria-hidden="true">offline</span><button id="status-undo" hidden aria-label="Undo automatic re-layout">· Undo</button></span></div>
+    <p id="layout-live" class="sr-only" aria-live="polite"></p>
     <div class="header-controls">
       <div class="history-pair" role="group" aria-label="Layout history">
         <button id="undo" class="icon-button" disabled aria-label="Undo (⌘/Ctrl+Z)" title="Undo (⌘/Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 6 6v3"/></svg></button>

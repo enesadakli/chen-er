@@ -10,6 +10,7 @@ import type { Turn } from "./agent-logic.js";
 import { NotesTabs } from "./tabs.js";
 import { RequirementsPanel } from "./requirements.js";
 import { requirementFindings, type RequirementsView } from "./requirements-logic.js";
+import { AUTO_RELAYOUT_MESSAGE, layoutStatus } from "./status.js";
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let state: ViewerState | undefined;
@@ -44,6 +45,7 @@ function historyControls() {
   for (const id of ["reset", "relayout", "node-focus"]) element<HTMLButtonElement>(id).disabled = busy;
   element<HTMLSelectElement>("engine").disabled = busy;
   element<HTMLButtonElement>("undo").disabled = busy || !state?.history.canUndo;
+  element<HTMLButtonElement>("status-undo").disabled = busy || !state?.history.canUndo;
   element<HTMLButtonElement>("redo").disabled = busy || !state?.history.canRedo;
 }
 function status(text: string) {
@@ -52,6 +54,7 @@ function status(text: string) {
   node.querySelector<HTMLElement>(".status-full")!.textContent = text;
   node.querySelector<HTMLElement>(".status-short")!.textContent = short;
   node.dataset.state = short; node.title = text;
+  element<HTMLButtonElement>("status-undo").hidden = text !== AUTO_RELAYOUT_MESSAGE || !state?.history.canUndo;
 }
 function choose(number: number) {
   selected = number; notes.select(number); canvas.highlight(number, true, true);
@@ -92,6 +95,7 @@ function apply(next: ViewerState) {
   // A POST response may arrive after a newer event from the same write.
   if (state && next.updatedAt <= state.updatedAt) return;
   const previous = selected && list.find((f) => f.number === selected);
+  const announceRelayout = next.autoRelayout && !next.computing && (!state?.autoRelayout || state.computing);
   state = next; list = allFindings(next);
   selected = previous ? list.find((f) => f.rule === previous.rule && f.path === previous.path && f.message === previous.message)?.number : undefined;
   element("title").textContent = next.title; document.title = `${next.title} · chen-er`;
@@ -116,8 +120,9 @@ function apply(next: ViewerState) {
   }
   agent.diagram(labels);
   requirements.diagram(next.diagram ? new Set(next.diagram.nodes.map((n) => n.id)) : undefined, labels);
-  if (next.computing) status("Computing layout…");
-  else if (!pendingWrites) status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
+  if (next.computing || !pendingWrites) status(layoutStatus(next, connected));
+  if (announceRelayout) element("layout-live").textContent = `${AUTO_RELAYOUT_MESSAGE}. Pins kept. Undo is available in the header.`;
+  else if (!next.autoRelayout && !next.computing) element("layout-live").textContent = "";
   historyControls();
   const chip = element("status"); chip.classList.remove("updated"); void chip.offsetWidth; chip.classList.add("updated");
   for (const link of document.querySelectorAll<HTMLAnchorElement>(".menu a")) {
@@ -156,7 +161,7 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 let delay = 1000;
 function connect() {
   events = new EventSource("/api/events");
-  events.onopen = () => { connected = true; void agent.sync(); void requirements.reload(); delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
+  events.onopen = () => { connected = true; void agent.sync(); void requirements.reload(); delay = 1000; if (state && !pendingWrites) status(layoutStatus(state, connected)); };
   events.addEventListener("state", (event) => {
     try { apply(JSON.parse((event as MessageEvent<string>).data) as ViewerState); }
     catch { status("Invalid update. Reconnecting…"); events?.close(); retry = setTimeout(connect, delay); }
@@ -237,6 +242,7 @@ drawer.addEventListener("keydown", (e) => {
 });
 
 for (const direction of ["undo", "redo"]) element(direction).addEventListener("click", () => { void write(`/api/history/${direction}`, "POST"); });
+element("status-undo").addEventListener("click", () => { void write("/api/history/undo", "POST"); });
 element("node-focus").addEventListener("click", () => canvas.focusSelection());
 element("close-actions").addEventListener("click", () => { actions.hidden = true; canvas.closeActions(); });
 new ResizeObserver(positionActions).observe(element("canvas"));

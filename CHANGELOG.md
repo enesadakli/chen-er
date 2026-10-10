@@ -7,6 +7,12 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Added
 
+- Automatic re-layout in `chen serve` after structural model changes: compare saved positions with
+  a fresh layout, keep pins, and accept fresh only for a clear quality improvement (rule in DESIGN.md).
+  Accepted changes enter layout Undo/Redo history and show “Re-laid out after model change · Undo”
+  with a live announcement. Attribute/label edits remain incremental; running turns defer the
+  comparison and position save until completion. Position-only saves preserve existing pin precision.
+
 - `chen map <model> --format text|md|sql|json [--out file]` and read-only MCP
   `map_er`: deterministic, browser-safe ER-to-relational mapping with steps 1–7
   and specialization option 8A, source ids, FK/PK/UNIQUE/NOT NULL constraints,

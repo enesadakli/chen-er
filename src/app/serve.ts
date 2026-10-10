@@ -18,6 +18,7 @@ import { AgentError, createAgent, parseTurnRequest, type AgentController, type A
 import { lintCommandFor } from "./agent-prompt.js";
 import { agentStatePathFor } from "./agent-store.js";
 import { createRequirements, requirementsPathFor, RequirementsError, type RequirementsView } from "./requirements.js";
+import { modelStructure, preferFresh } from "./auto-relayout.js";
 
 export interface ViewerDiagnostic extends Diagnostic { target?: string }
 export interface ViewerState {
@@ -33,6 +34,8 @@ export interface ViewerState {
   updatedAt: string;
   layoutRevision: string;
   computing: boolean;
+  /** The accepted layout was automatically replaced after a structural model change. */
+  autoRelayout?: boolean;
   history: { canUndo: boolean; canRedo: boolean };
   selection: SelectionMetadata;
 }
@@ -131,6 +134,8 @@ export async function serve(model: string, options: ServeOptions = {}) {
   let lastWrite: string | undefined;
   /** While an agent turn runs the server does not auto-save positions, so any layout change is a deliberate write. */
   let agentRunning = (): boolean => false;
+  // A running turn may publish intermediate models, but cannot advance the accepted structure.
+  let goodStructure: string | undefined;
   type Snapshot = { model: Buffer | null; layout: Buffer | null; engine: typeof requestedEngine };
   // History holds layout-file bytes and the engine only; the model file is never part of it.
   type LayoutSnap = Pick<Snapshot, "layout" | "engine">;
@@ -182,6 +187,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
   async function refresh(fresh = false, savePositions = true): Promise<ViewerState> {
     boundary();
     const inputs = snapshot();
+    const duringTurn = agentRunning();
     if (state) { state.computing = true; publish(); }
     let yaml = "";
     let diagnostics: ViewerDiagnostic[] = [];
@@ -189,6 +195,9 @@ export async function serve(model: string, options: ServeOptions = {}) {
     let svg: string | null = null;
     let selection: SelectionMetadata = { owners: [], relationships: [] };
     let title = basename(modelPath);
+    let nextStructure: string | undefined;
+    let autoRelayout = false;
+    let measured: QualityReport | null = null;
     const saved = readPins(modelPath);
     const pins = saved.options.pins ?? {};
     const engine = requestedEngine ?? saved.options.engine ?? DEFAULT_ENGINE;
@@ -201,12 +210,30 @@ export async function serve(model: string, options: ServeOptions = {}) {
       if (parsed.model && !hasErrors(parsed.diagnostics)) {
         // Incremental by default: the last accepted positions keep untouched nodes in place.
         const positions = fresh ? undefined : saved.options.positions;
-        const result = await layout(parsed.model, { engine, pins, positions });
+        nextStructure = modelStructure(parsed.model);
+        let result = await layout(parsed.model, { engine, pins, positions });
+        let freshWins = false;
+        if (!fresh && savePositions && !duringTurn && !agentRunning() && !saved.diagnostics.length
+          && goodStructure !== undefined && nextStructure !== goodStructure) {
+          measured = quality(result.diagram, pins);
+          const candidate = await layout(parsed.model, { engine, pins });
+          const candidateQuality = quality(candidate.diagram, pins);
+          if (preferFresh(measured, candidateQuality)) {
+            result = candidate; measured = candidateQuality; freshWins = true;
+          }
+        }
         diagram = result.diagram;
         svg = renderSvg(diagram);
         all = [...all, ...result.diagnostics];
-        if (savePositions && !agentRunning() && !saved.diagnostics.length && same(snapshot(), inputs)) {
-          try { writeLayout({ positions: diagramPositions(diagram) }, inputs); }
+        if (savePositions && !duringTurn && !agentRunning() && !saved.diagnostics.length && same(snapshot(), inputs)) {
+          try {
+            writeLayout({ positions: diagramPositions(diagram) }, inputs);
+            if (freshWins && revision(inputs.layout) !== revision(fileBytes(pinsPath))) {
+              undo.push({ before: { layout: inputs.layout, engine: inputs.engine }, after: { layout: fileBytes(pinsPath), engine: requestedEngine } });
+              if (undo.length > 50) undo.shift(); redo.length = 0;
+              autoRelayout = true;
+            }
+          }
           catch (error) { all.push({ rule: "layout-file", severity: "warning", message: `Positions not saved: ${(error as Error).message}` }); }
         }
       }
@@ -220,10 +247,11 @@ export async function serve(model: string, options: ServeOptions = {}) {
       return refresh(fresh, savePositions);
     }
     observed = current;
+    if (diagram && nextStructure !== undefined && !duringTurn && !agentRunning()) goodStructure = nextStructure;
     state = { modelPath, title, engine, svg, diagram, diagnostics, pins, yaml, selection,
-      layoutRevision: revision(current.layout), computing: false,
+      layoutRevision: revision(current.layout), computing: false, autoRelayout,
       history: { canUndo: undo.length > 0, canRedo: redo.length > 0 },
-      quality: diagram ? quality(diagram, pins) : null, updatedAt: "" };
+      quality: diagram ? measured ?? quality(diagram, pins) : null, updatedAt: "" };
     publish();
     return state;
   }

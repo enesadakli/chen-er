@@ -178,9 +178,9 @@ export function formatLayoutFile(current: { pins: Record<string, Point>; engine?
   const pins = patch.pins ?? current.pins;
   const engine = patch.engine ?? current.engine;
   const positions = patch.positions === null ? undefined : (patch.positions ?? current.positions);
-  const sorted = (r: Record<string, Point>) =>
-    Object.fromEntries(Object.keys(r).sort().map((id) => [id, { x: round(r[id]!.x), y: round(r[id]!.y) }]));
-  const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sorted(pins), ...(positions ? { positions: sorted(positions) } : {}) });
+  const sorted = (r: Record<string, Point>, rounded = true) =>
+    Object.fromEntries(Object.keys(r).sort().map((id) => [id, rounded ? { x: round(r[id]!.x), y: round(r[id]!.y) } : r[id]!]));
+  const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sorted(pins, patch.pins !== undefined), ...(positions ? { positions: sorted(positions) } : {}) });
   return JSON.stringify(file, null, 2) + "\n";
 }
 

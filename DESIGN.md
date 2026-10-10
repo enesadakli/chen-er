@@ -96,6 +96,29 @@ unpin shortcuts. The viewer does not edit the model; it writes only the layout f
 
 Undo/Redo are session controls in the header and cover layout changes only (pins, reset, relayout, engine).
 Computing, saved, conflict and failure states remain visible in the status strip.
+After an automatic layout replacement the strip reads **Re-laid out after model change · Undo**;
+Undo uses the same session history as the header button, and an sr-only polite live region announces
+the change, that pins were kept, and that Undo is available. Both sequential candidate layouts stay
+under **Computing layout…**; the canvas camera stays where the reviewer left it.
+
+### Automatic re-layout decision
+
+Only changes to the sets of entity ids, relationship ids, or end ids and their entity targets trigger
+two sequential layouts: saved positions plus pins, then pins alone, with the same engine. Attributes,
+labels, roles, cardinalities and map ordering retain incremental behavior. The comparison uses the
+last successfully rendered model; invalid edits do not advance it. Initial load, engine switch,
+explicit Re-layout and layout-history restore keep their existing behavior.
+
+Fresh wins when it has zero pin drift and fewer total hard violations plus hierarchy violations.
+The hard counts are `diagonalEnds`, `overlaps`, `shapeCrossings`, `labelCollisions`, `labelAmbiguity`,
+`labelLoose`, `labelOnOwnEdge`, `labelOnAnyEdge`, `pinDrift`, `attributeEdgeBends`, `edgeOverlap`,
+`tinySegments`, `endPortCrowding`, `diamondVertexViolations`, `doubleEdgeArtifacts`, and out-of-canvas
+issues. If totals are equal, fresh must have at least two fewer `edgeCrossings` or a `longEdgeMax`
+at least 20% lower (with a positive incremental value); otherwise incremental wins. These are
+aggregate criteria: an individual metric can regress while the total improves or the tie-break wins.
+Pins are kept verbatim; accepted soft positions are saved normally and the previous layout bytes
+enter session undo history. During a running turn, only incremental previews run, without saving
+positions or advancing the comparison baseline; comparison and saving wait until the turn finishes.
 
 ## Agent panel
 
