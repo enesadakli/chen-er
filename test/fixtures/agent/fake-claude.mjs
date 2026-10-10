@@ -29,7 +29,22 @@ if (mode === "login") {
   out({ type: "result", subtype: "success", is_error: true, result: "Invalid API key · Please run /login", session_id: session });
   process.exit(1);
 }
-if (mode === "slow" || mode === "stubborn") {
+if (prompt.includes("```chen-trace") && mode !== "slow" && mode !== "stubborn") {
+  // Requirements apply: add BirthDate once and answer with a trace (FAKE_AGENT_TRACE replaces the default block body;
+  // "none" leaves the block out).
+  const ids = [...prompt.split("Requirements to apply now")[1].split("\n\n")[0].matchAll(/^(r\d+) \(R\d+\): /gm)].map((m) => m[1]);
+  if (model && mode !== "noedit") {
+    const text = readFileSync(model, "utf8");
+    if (!text.includes("BirthDate")) writeFileSync(model, text.replace(/^(    attrs:\n)/m, "$1      - BirthDate\n"));
+  }
+  const trace = process.env.FAKE_AGENT_TRACE ?? JSON.stringify(Object.fromEntries(ids.map((id, i) => [id, i === 0
+    ? { elements: ["A:MEMBER.BirthDate", "MEMBER", "E:GHOST"], why: "MEMBER records the birth date." }
+    : { elements: [], why: "Nothing in the model covers it yet." }])));
+  const reply = `Added BirthDate to MEMBER.${trace === "none" ? "" : `\n\n\`\`\`chen-trace\n${trace}\n\`\`\``}`;
+  out({ type: "assistant", message: { content: [{ type: "tool_use", name: "Edit", input: { file_path: model } }] }, session_id: session });
+  out({ type: "assistant", message: { content: [{ type: "text", text: reply }] }, session_id: session });
+  out({ type: "result", subtype: "success", is_error: false, result: reply, session_id: session });
+} else if (mode === "slow" || mode === "stubborn") {
   if (mode === "stubborn") process.on("SIGTERM", () => { /* ignore */ });
   out({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: { file_path: model } }] }, session_id: session });
   setTimeout(() => process.exit(0), 30_000);

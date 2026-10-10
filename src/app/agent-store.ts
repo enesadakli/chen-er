@@ -7,6 +7,21 @@ import type { AgentKind, ErrorKind } from "./agent-runner.js";
 import type { Step } from "./agent-stream.js";
 
 export type TurnStatus = "running" | "ok" | "error" | "cancelled" | "limit" | "undone";
+/** Machine state of one requirement before an apply wrote it, so Undo can put it back. */
+export interface RequirementMark { applied?: string; trace?: string[]; why?: string }
+/** A requirements apply turn (docs/requirements.md). */
+export interface TurnRequirements {
+  /** Stable ids processed by this turn, with their R-number labels and text hashes at the start. */
+  ids: string[];
+  labels: string[];
+  hashes: string[];
+  /** Validated trace per id, set when the turn finished ok. */
+  trace?: Record<string, { elements: string[]; why?: string; dropped?: string[] }>;
+  /** True when the reply had no readable trace block. */
+  noTrace?: boolean;
+  /** State of each id before this turn wrote it (for Undo). */
+  before?: Record<string, RequirementMark>;
+}
 export interface Turn {
   id: string;
   text: string;
@@ -22,6 +37,7 @@ export interface Turn {
   errorKind?: ErrorKind;
   /** Why the server ended the turn itself, e.g. it stopped while the turn was running. */
   notice?: string;
+  requirements?: TurnRequirements;
 }
 
 /** One turn plus its model revisions (sha256 of the bytes, or "absent"). `before` holds the bytes only while
@@ -49,7 +65,17 @@ function validTurn(value: unknown): value is Turn {
     && t.steps.every((s) => isRecord(s) && (s.kind === "tool" || s.kind === "text") && isString(s.summary))
     && optional(t.finishedAt, isString) && optional(t.reply, isString) && optional(t.error, isString) && optional(t.notice, isString)
     && optional(t.errorKind, (k) => ERROR_KINDS.has(k as ErrorKind))
-    && optional(changes, (c) => isRecord(c) && strings(c.added) && strings(c.removed) && strings(c.modified) && optional(c.parseError, (p) => typeof p === "boolean"));
+    && optional(changes, (c) => isRecord(c) && strings(c.added) && strings(c.removed) && strings(c.modified) && optional(c.parseError, (p) => typeof p === "boolean"))
+    && optional(t.requirements, validRequirements);
+}
+
+function validRequirements(value: unknown): boolean {
+  if (!isRecord(value) || !strings(value.ids) || !strings(value.labels) || !strings(value.hashes)) return false;
+  if (value.labels.length !== value.ids.length || value.hashes.length !== value.ids.length) return false;
+  const marks = (v: unknown, test: (m: Record<string, unknown>) => boolean) => isRecord(v) && Object.values(v).every((m) => isRecord(m) && test(m));
+  return optional(value.noTrace, (n) => typeof n === "boolean")
+    && optional(value.trace, (v) => marks(v, (m) => strings(m.elements) && optional(m.why, isString) && optional(m.dropped, strings)))
+    && optional(value.before, (v) => marks(v, (m) => optional(m.applied, isString) && optional(m.trace, strings) && optional(m.why, isString)));
 }
 
 /** Parses a stored thread; undefined when it is malformed or belongs to another model or agent kind. */

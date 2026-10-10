@@ -151,7 +151,7 @@ describe("agent routes", () => {
     expect(prompt).toContain(`Model file: ${model}`);
     expect(prompt).toContain("E:MEMBER (MEMBER)\nA:MEMBER.MemberId (MemberId)\nE:NOPE\n");
     expect(prompt).toMatch(/run `\S+ (\S+ )?lint \S+club\.er\.yaml` and fix any errors/);
-    expect(prompt).toContain("Never edit *.er.layout.json or *.er.agent.json files.");
+    expect(prompt).toContain("Never edit *.er.layout.json, *.er.agent.json or *.er.requirements.md files.");
     expect(prompt.endsWith("Request:\nfirst")).toBe(true);
     expect(second!.args.slice(-2)).toEqual(["--resume", "fake-session-1"]);
   });

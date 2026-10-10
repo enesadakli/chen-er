@@ -3,12 +3,12 @@ import { dirname, extname } from "node:path";
 import { changeSet } from "./agent-changes.js";
 import { buildPrompt, claudeArgs, codexArgs, selectionLabels } from "./agent-prompt.js";
 import { runAgent, type AgentKind, type RunHandle, type RunOutcome } from "./agent-runner.js";
-import { readThread, writeThread, type StoredThread, type Turn, type TurnStatus } from "./agent-store.js";
+import { readThread, writeThread, type StoredThread, type Turn, type TurnRequirements, type TurnStatus } from "./agent-store.js";
 import { clip } from "./agent-stream.js";
 import { fileBytes, revision } from "./file-guard.js";
 
 export type { AgentKind } from "./agent-runner.js";
-export type { Turn, TurnStatus } from "./agent-store.js";
+export type { Turn, TurnStatus, TurnRequirements } from "./agent-store.js";
 export interface AgentInfo { enabled: true; kind: AgentKind; cwd: string; running: string | null; turns: Turn[] }
 
 export class AgentError extends Error {
@@ -31,6 +31,8 @@ export interface AgentDeps {
   isServerLayout(bytes: Buffer | null): boolean;
   /** Called once a turn has settled, so the server can save positions it skipped during the turn. */
   afterTurn?(modelChanged: boolean): void;
+  /** Called after Undo restored the model for a turn (requirements applies put their line state back). */
+  onUndo?(turn: Turn): Promise<void>;
   /** Thread file (`<model>.er.agent.json`); without it the thread lives only in memory. */
   statePath?: string;
   killAfterMs?: number;
@@ -39,6 +41,14 @@ export interface AgentDeps {
 /** `before` holds the pre-turn model bytes (null: no model file) while they may be needed for undo; revisions
  * outlive it, so a restored thread still knows which turns changed the model. */
 interface Entry { turn: Turn; beforeRevision: string; afterRevision?: string; before?: Buffer | null }
+
+/** A turn with its own prompt instead of a chat request (requirements apply). */
+export interface TurnPlan {
+  prompt: string;
+  requirements?: TurnRequirements;
+  /** Runs once the agent has finished, before the final event: may rewrite the reply and the requirements state. */
+  settle?(turn: Turn): Promise<void>;
+}
 
 export const INTERRUPTED = "The server stopped while this request was running, so it was cancelled. Changes are measured against the model as found at restart.";
 
@@ -67,7 +77,7 @@ const changed = (entry: Entry): boolean => entry.afterRevision !== undefined && 
 export function createAgent(deps: AgentDeps) {
   const entries: Entry[] = [];
   let sessionId: string | undefined;
-  let running: { entry: Entry; handle: RunHandle; finished: Promise<void> } | undefined;
+  let running: { entry: Entry; handle: RunHandle; finished: Promise<void>; plan?: TurnPlan } | undefined;
   let undoing = false;
   let counter = 0;
   let warned = false;
@@ -140,6 +150,11 @@ export function createAgent(deps: AgentDeps) {
     if (outcome.errorKind) turn.errorKind = outcome.errorKind;
     const last = turn.steps.at(-1);
     if (turn.reply && last?.kind === "text" && last.summary === clip(turn.reply)) turn.steps.pop();
+    const plan = running?.entry === entry ? running.plan : undefined;
+    if (plan?.settle) {
+      try { await plan.settle(turn); }
+      catch (error) { turn.steps.push({ kind: "text", summary: clip(`The requirements file was not updated: ${(error as Error).message}`) }); }
+    }
     turn.finishedAt = new Date().toISOString();
     running = undefined;
     emit(turn);
@@ -150,15 +165,15 @@ export function createAgent(deps: AgentDeps) {
     info(): AgentInfo {
       return { enabled: true, kind: deps.kind, cwd: deps.cwd, running: running?.entry.turn.id ?? null, turns: entries.map((e) => e.turn) };
     },
-    start(request: { text: string; selection: string[] }): string {
+    start(request: { text: string; selection: string[] }, plan?: TurnPlan): string {
       if (running) throw new AgentError(409, "A turn is already running.");
       if (undoing) throw new AgentError(409, "An undo is in progress.");
       const before = fileBytes(deps.modelPath);
       const layoutBefore = fileBytes(deps.layoutPath);
       const turn: Turn = { id: `t${++counter}`, text: request.text, selection: request.selection,
-        startedAt: new Date().toISOString(), status: "running", steps: [] };
+        startedAt: new Date().toISOString(), status: "running", steps: [], ...(plan?.requirements ? { requirements: plan.requirements } : {}) };
       const entry: Entry = { turn, beforeRevision: revision(before), before };
-      const prompt = buildPrompt({ modelPath: deps.modelPath, lintCommand: deps.lintCommand,
+      const prompt = plan?.prompt ?? buildPrompt({ modelPath: deps.modelPath, lintCommand: deps.lintCommand,
         selection: selectionLabels(before?.toString("utf8") ?? null, request.selection), text: request.text });
       const modelDir = dirname(deps.modelPath);
       const args = deps.kind === "codex" ? codexArgs(prompt, deps.cwd, modelDir, sessionId) : claudeArgs(prompt, modelDir, deps.lintCommand, sessionId);
@@ -166,7 +181,7 @@ export function createAgent(deps: AgentDeps) {
         onStep: (step) => { turn.steps.push(step); emit(turn); } });
       entries.push(entry);
       const finished = handle.done.then((outcome) => finish(entry, layoutBefore, outcome));
-      running = { entry, handle, finished };
+      running = { entry, handle, finished, ...(plan ? { plan } : {}) };
       emit(turn);
       return turn.id;
     },
@@ -193,6 +208,10 @@ export function createAgent(deps: AgentDeps) {
       try { await deps.writeModel(current, entry.before); }
       finally { undoing = false; }
       entry.turn.status = "undone";
+      if (deps.onUndo) {
+        try { await deps.onUndo(entry.turn); }
+        catch (error) { entry.turn.steps.push({ kind: "text", summary: clip(`The requirements file was not reverted: ${(error as Error).message}`) }); }
+      }
       emit(entry.turn);
       return { status: "undone" };
     },

@@ -99,7 +99,7 @@ describe("agent prompt and command", () => {
     expect(prompt).toContain("Model file: /m/My Model.er.yaml\nSelected elements:\nE:STUDENT (STUDENT)\nA:STUDENT.Name (Name)\nR:GONE\nRules:");
     expect(prompt).toContain("run `node /r/bin/chen.js lint '/m/My Model.er.yaml'` and fix any errors");
     expect(prompt).toContain("Keep its comments and formatting.");
-    expect(prompt).toContain("\n- Never edit *.er.layout.json or *.er.agent.json files.\n");
+    expect(prompt).toContain("\n- Never edit *.er.layout.json, *.er.agent.json or *.er.requirements.md files.\n");
     expect(prompt).toContain("Reply with one or two plain sentences");
     expect(prompt).toContain("\n- Do not create or update notes, memory, receipts or logs outside the model file.\n");
     expect(buildPrompt({ modelPath: "/m", lintCommand: "x", selection: [], text: "t" })).toContain("Selected elements:\n(none)\n");

@@ -36,6 +36,18 @@ export function selectionLabels(yaml: string | null, ids: readonly string[]): Se
   return ids.map((id) => ({ id, label: labels.get(id) }));
 }
 
+/** Rules every agent turn gets, chat request or requirements apply. */
+function rules(modelPath: string, lintCommand: string): string[] {
+  return [
+    "Rules:",
+    "- Edit only that YAML file.",
+    "- Keep its comments and formatting.",
+    `- After editing, run \`${lintCommand} ${quote(modelPath)}\` and fix any errors.`,
+    "- Never edit *.er.layout.json, *.er.agent.json or *.er.requirements.md files.",
+    "- Do not create or update notes, memory, receipts or logs outside the model file.",
+  ];
+}
+
 export function buildPrompt(input: { modelPath: string; lintCommand: string; selection: readonly SelectedNode[]; text: string }): string {
   const selected = input.selection.length
     ? input.selection.map((s) => s.label ? `${s.id} (${s.label})` : s.id)
@@ -45,16 +57,47 @@ export function buildPrompt(input: { modelPath: string; lintCommand: string; sel
     `Model file: ${input.modelPath}`,
     "Selected elements:",
     ...selected,
-    "Rules:",
-    "- Edit only that YAML file.",
-    "- Keep its comments and formatting.",
-    `- After editing, run \`${input.lintCommand} ${quote(input.modelPath)}\` and fix any errors.`,
-    "- Never edit *.er.layout.json or *.er.agent.json files.",
-    "- Do not create or update notes, memory, receipts or logs outside the model file.",
+    ...rules(input.modelPath, input.lintCommand),
     "- Reply with one or two plain sentences describing what changed.",
     "",
     "Request:",
     input.text,
+  ].join("\n");
+}
+
+export interface PromptRequirement { id: string; label: string; text: string; changed?: boolean; trace?: readonly string[] }
+
+/**
+ * One requirements apply: the lines to process now (new or changed), the whole list as context, the usual rules and
+ * the trace format the server parses (docs/requirements.md). Lines carry their stable id and their R-number.
+ */
+export function buildRequirementsPrompt(input: { modelPath: string; lintCommand: string; apply: readonly PromptRequirement[]; all: readonly PromptRequirement[] }): string {
+  const line = (r: PromptRequirement) => `${r.id} (${r.label}): ${r.text}`;
+  const example = Object.fromEntries(input.apply.slice(0, 2).map((r, i) => [r.id, i === 0
+    ? { elements: ["E:COURSE", "R:OFFERS", "A:COURSE.Title"], why: "one line: how these elements implement the requirement" }
+    : { elements: [], why: "one line: why no element implements it" }]));
+  return [
+    "You build a Chen ER model for the chen-er viewer from a student's requirements, the way a database course does:",
+    "requirements, then entities, relationships, attributes and (min,max) constraints.",
+    `Model file: ${input.modelPath}`,
+    ...rules(input.modelPath, input.lintCommand),
+    "- Never write coordinates or layout; the viewer lays the model out.",
+    "- Implement the requirements to apply now. Keep elements that other requirements still need; change them only when a",
+    "  requirement to apply now requires it.",
+    "",
+    "Requirements to apply now (new or changed since the last apply):",
+    ...input.apply.map((r) => `${line(r)}${r.changed ? `  [changed${r.trace?.length ? `; it was linked to ${r.trace.join(", ")}` : ""}]` : "  [new]"}`),
+    "",
+    "All requirements, for context:",
+    ...input.all.map(line),
+    "",
+    "Element ids: E:<Entity>, R:<Relationship>, A:<Owner>.<attribute> (A:<Owner>.<attribute>.<part> for composite parts),",
+    "using the names in the YAML file.",
+    "Reply with one or two plain sentences describing what changed. Then end the reply with a fenced block tagged",
+    "chen-trace that maps every requirement id applied now to the element ids that implement it, plus a one-line why:",
+    "```chen-trace",
+    JSON.stringify(example),
+    "```",
   ].join("\n");
 }
 
