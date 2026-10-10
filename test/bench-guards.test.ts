@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { guardFailures, guardInputs, hierarchyMinimumOf, loadPins, regressionBaseline, stabilityOf } from "../bench/run.js";
+import { guardFailures, guardInputs, hierarchyMinimumOf, isLargeInput, loadPins, regressionBaseline, stabilityOf } from "../bench/run.js";
 import type { Diagram } from "../src/core/geometry.js";
 import { DEFAULT_ENGINE, layout } from "../src/core/layout/index.js";
 import { parseModel } from "../src/core/normalize.js";
@@ -17,7 +17,7 @@ async function failuresOf(input: string): Promise<string[]> {
   const { diagram } = await layout(model, { engine: DEFAULT_ENGINE, pins });
   const elapsed = performance.now() - start;
   const q = assessQuality(diagram, pins, model);
-  const stability = await stabilityOf(model, diagram, DEFAULT_ENGINE, pins);
+  const stability = isLargeInput(input) ? { max: NaN, median: NaN } : await stabilityOf(model, diagram, DEFAULT_ENGINE, pins);
   return guardFailures({ input, diagram, q, hierarchyMinimum: hierarchyMinimumOf(model), elapsed: process.env.CHEN_PERF === "1" ? elapsed : 0, stabilityMax: stability.max, stabilityMedian: stability.median });
 }
 
@@ -29,6 +29,7 @@ describe("bench regression guards", () => {
     expect(inputs).toContain("bench/fixtures/campus.er.yaml");
     expect(inputs).toContain("bench/fixtures/hub-company.er.yaml");
     expect(inputs).toContain("examples/library.er.yaml");
+    expect(inputs).toContain("bench/fixtures/large/transit-network.er.yaml");
     expect(Object.keys(regressionBaseline)).toContain("campus");
   });
 
