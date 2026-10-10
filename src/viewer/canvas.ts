@@ -32,6 +32,7 @@ export class NotebookCanvas {
   private lastNodeIds = "";
   private figure = document.querySelector<HTMLDivElement>("#figure")!;
   private overlay = document.querySelector<SVGSVGElement>("#overlay")!;
+  private exportCorners: { path: SVGPathElement; x: number; y: number }[] = [];
   private flashes?: { ids: string[]; start: number; timer: ReturnType<typeof setTimeout> };
   private notifiedSelection?: string;
   /** Called whenever the selected drawing element changes (the agent panel turns it into a context chip). */
@@ -57,6 +58,14 @@ export class NotebookCanvas {
   private diagramPoint(p: Point): Point { return { x: (p.x - this.offset.x) / this.scale, y: (p.y - this.offset.y) / this.scale }; }
   private transform() {
     this.sheet.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.scale})`;
+    const minor = `${8 * this.scale}px ${8 * this.scale}px`, major = `${40 * this.scale}px ${40 * this.scale}px`;
+    this.canvas.style.backgroundSize = `${major}, ${major}, ${minor}, ${minor}`;
+    // Offset is diagram zero in canvas coordinates, even when the sheet has a negative origin.
+    this.canvas.style.backgroundPosition = `${this.offset.x}px ${this.offset.y}px`;
+    this.canvas.style.setProperty("--minor-alpha", `${Math.max(0, Math.min(1, (this.scale - .35) / .15)) * 100}%`);
+    this.canvas.style.setProperty("--major-alpha", `${Math.max(0, Math.min(1, (this.scale - .1) / .05)) * 100}%`);
+    // Cancel the outer CSS scale for both the 12px arms and the 1px stroke.
+    for (const { path, x, y } of this.exportCorners) path.setAttribute("transform", `translate(${x} ${y}) scale(${1 / this.scale})`);
     const percent = `${Math.round(this.scale * 100)}%`;
     document.querySelector<HTMLElement>("#zoom")!.textContent = percent;
     document.querySelector<HTMLButtonElement>("#actual")!.setAttribute("aria-label", `Zoom ${percent}. Reset to 100% (0)`);
@@ -220,12 +229,15 @@ export class NotebookCanvas {
       group.classList.toggle("connected", !!neighborhood && group.classList.contains("er-edge") && activeIds.has(group.dataset.id ?? ""));
     }
     if (rebuild) {
-    const defs = svg("defs", {});
-    const minor = svg("pattern", { id: "minor-grid", width: 8, height: 8, patternUnits: "userSpaceOnUse" });
-    minor.append(svg("path", { d: "M 8 0 H 0 V 8", fill: "none", stroke: "var(--grid)", "stroke-width": .5 }));
-    const major = svg("pattern", { id: "major-grid", width: 40, height: 40, patternUnits: "userSpaceOnUse" });
-    major.append(svg("rect", { width: 40, height: 40, fill: "url(#minor-grid)" }), svg("path", { d: "M 40 0 H 0 V 40", fill: "none", stroke: "var(--grid-major)", "stroke-width": .7 }));
-    defs.append(minor, major); this.overlay.append(defs, svg("rect", { width: "100%", height: "100%", fill: "url(#major-grid)" }));
+      const { x, y, width, height } = this.overlay.viewBox.baseVal;
+      const corners = [[x, y, 1, 1], [x + width, y, -1, 1], [x, y + height, 1, -1], [x + width, y + height, -1, -1]] as const;
+      this.exportCorners = corners.map(([x, y, dx, dy]) => {
+        const path = svg("path", { class: "export-corner", d: `M 0 ${12 * dy} V 0 H ${12 * dx}`,
+          transform: `translate(${x} ${y}) scale(${1 / this.scale})`, fill: "none", stroke: "var(--graphite)",
+          "stroke-opacity": .6, "stroke-width": 1, "aria-hidden": "true" });
+        this.overlay.append(path);
+        return { path, x, y };
+      });
     }
     this.overlay.querySelector(".halos")?.remove();
     const halos = svg("g", { class: "halos" });

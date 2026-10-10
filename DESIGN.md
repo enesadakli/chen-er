@@ -9,18 +9,23 @@ an agent's terminal and full screen for polishing, equally.
 
 ## Physical scene
 A student at a desk under ordinary room light, laptop next to the course book, a terminal on the left half of
-the screen. The page must read like paper in daylight; in dark mode the desk goes dark but the sheet stays paper,
-because the figure is black ink on white and must look the same as the export.
+the screen. The entire canvas is endless engineering graph paper, including the space around the figure. In
+dark mode only the header and menus become a dark desk; the canvas stays paper because the figure is black
+ink on white and must look the same as the export. Four graphite corner marks show where the export ends.
 
 ## Color (Restrained: neutrals + pencil roles)
-- Sheet `#FBFBF8`; grid minor `#E7ECEF` every 8px, major `#D5DDE2` every 40px (screen only).
+- Canvas paper `#FBFBF8`; grid minor `#E7ECEF` every 8 diagram px, major `#D5DDE2` every 40 diagram px
+  (screen only). Lines stay 1 CSS px and follow the drawing through pan and zoom. Minor lines fade linearly
+  from full opacity at 50% zoom to invisible at 35%; major lines fade from 15% to invisible at 10%.
+- Export corners: graphite `#6B7177` at 60% opacity, four L marks with 12 screen px arms and 1px strokes.
 - Margin rule: one vertical line `#E4A9A4` separating sheet from the notes column (the notebook's red margin line).
 - Ink `#1F2328` (diagram, primary text). Graphite `#6B7177` (secondary text, pins, guides).
 - Finding roles, always paired with a glyph and a number, never color alone:
   error = red pencil `#C4362D` + ✕ in a circle; course = blue pencil `#2F5FA8` + △; heuristic = graphite `#6B7177` + ○;
   info = graphite light `#9AA1A7` + •.
 - Selection/hover halo: graphite at 35% opacity, 6px outside the shape outline.
-- Dark mode: desk `#14171A`, chrome text `#D7DCE0`, chrome rules `#2A3036`; the sheet keeps its light colors.
+- Dark mode: header/menu desk `#14171A`, chrome text `#D7DCE0`, chrome rules `#2A3036`; the entire canvas
+  keeps its light paper colors, with no dark surround at the figure bounds.
 
 ## Type
 - Diagram: Inter (bundled; layout is measured against it). Never change the diagram font in the viewer.
@@ -33,7 +38,9 @@ because the figure is black ink on white and must look the same as the export.
   quiet quality summary and live status; joined Undo/Redo icons; Layout menu (Engine, Re-layout, Reset pins);
   ghost Fit; sun/moon theme icon; filled Export menu (SVG, PNG). Actions use 8px gaps within groups and 16px
   between groups. Status retains its live region and pencil underline.
-- Sheet (canvas) fills the rest; notes column (320px) right of the margin rule.
+- Endless paper canvas fills the rest; notes column (320px) right of the margin rule. The sheet is transparent;
+  four thin corner marks in the overlay delimit its export bounds and retain their screen size at every zoom.
+  Grid and corners never reach server-generated exports, which retain their plain white background.
 - ≤ 900px wide: title takes at most 40% of the header; live status is an 8px dot and a short word with full text
   available to assistive technology and in `title`. Undo/Redo stay visible; Layout, theme and exports share one
   More menu. Fit remains in the zoom strip. Notes become a bottom drawer (initially 40–60% height to match
