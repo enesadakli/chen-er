@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { serve, type ViewerState } from "../src/app/serve.js";
 import { diagramPositions, layoutPathFor, quality, readPins } from "../src/app/render.js";
+import { relativeAttributePins } from "../src/core/pins.js";
 import { center } from "../src/core/geometry.js";
 import * as layoutService from "../src/core/layout/index.js";
 import { parseModel } from "../src/core/normalize.js";
@@ -35,21 +36,47 @@ function removeAttributePins() {
 }
 
 describe("automatic viewer re-layout", () => {
-  it("keeps incremental for CAMPUS/LOCATED_IN when fixed attribute spokes would cross shapes and edges", async () => {
+  it("migrates legacy attribute pins without a jump, then accepts clean fresh for CAMPUS/LOCATED_IN", async () => {
+    const legacy = readPins(model).options;
+    const original = await layoutService.layout(parseModel(source).model!, legacy);
     viewer = await serve(model, { port: 0 });
-    const before = readPins(model).options, beforePins = before.pins!;
+    const initial = await get();
+    expect(initial.diagram).toEqual(original.diagram);
+    const pins = relativeAttributePins(legacy.pins!, initial.diagram!);
+    expect(initial.pins).toEqual(pins);
+    expect(readPins(model).options.pins).toEqual(pins);
     const spy = vi.spyOn(layoutService, "layout");
     const next = await changed(grown);
     expect(spy).toHaveBeenCalledTimes(2);
     const incremental = await spy.mock.results[0]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
     const fresh = await spy.mock.results[1]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
-    expect(quality(incremental.diagram, beforePins)).toMatchObject({ hierarchyViolations: 4, shapeCrossings: 0, spokeEdgeViolations: 0, edgeCrossings: 0, pinDrift: 0 });
-    expect(quality(fresh.diagram, beforePins)).toMatchObject({ hierarchyViolations: 0, shapeCrossings: 3, spokeEdgeViolations: 2, edgeCrossings: 3, pinDrift: 0 });
-    expect(next).toMatchObject({ autoRelayout: false, history: { canUndo: false, canRedo: false }, quality: { hierarchyViolations: 4, shapeCrossings: 0, spokeEdgeViolations: 0 } });
-    expect(next.diagram).toEqual(incremental.diagram);
-    expect(readPins(model).options.pins).toEqual(beforePins);
-    for (const id of ["E:COURSE", "R:ENROLLS"]) expect(readPins(model).options.positions![id]).toEqual(before.positions![id]);
-    for (const [id, p] of Object.entries(beforePins)) expect(center(next.diagram!.nodes.find((n) => n.id === id)!.box)).toEqual(p);
+    expect(quality(incremental.diagram, pins).hierarchyViolations).toBe(4);
+    expect(next).toMatchObject({ autoRelayout: true, history: { canUndo: true, canRedo: false }, quality: {
+      hierarchyViolations: 0, overlaps: 0, shapeCrossings: 0, spokeEdgeViolations: 0, spokeLabelViolations: 0,
+      labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0, labelOnOwnEdge: 0, labelOnAnyEdge: 0,
+      diagonalEnds: 0, pinDrift: 0, attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0,
+      endPortCrowding: 0, diamondVertexViolations: 0, doubleEdgeArtifacts: 0,
+    } });
+    expect(next.quality!.issues.filter((i) => i.kind !== "edge-crossing")).toEqual([]);
+    expect(next.diagram).toEqual(fresh.diagram);
+    expect(readPins(model).options.pins).toEqual(pins);
+    expect(center(next.diagram!.nodes.find((n) => n.id === "E:COURSE")!.box)).not.toEqual(legacy.positions!["E:COURSE"]);
+  });
+  it("vetoes fresh when absolute entity pins force hard regressions despite shorter edges", async () => {
+    const saved = readPins(model).options;
+    const pins = { "E:COURSE": saved.positions!["E:COURSE"]!, "E:DEAN": saved.positions!["E:DEAN"]! };
+    writeFileSync(layoutPathFor(model), JSON.stringify({ version: 1, pins, positions: saved.positions }));
+    viewer = await serve(model, { port: 0 });
+    const spy = vi.spyOn(layoutService, "layout");
+    const next = await changed(grown);
+    const incremental = await spy.mock.results[0]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
+    const fresh = await spy.mock.results[1]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
+    const a = quality(incremental.diagram, pins), b = quality(fresh.diagram, pins);
+    expect(a.shapeCrossings).toBe(0); expect(b.shapeCrossings).toBeGreaterThan(0);
+    expect(b.longEdgeMax).toBeLessThan(a.longEdgeMax * .8);
+    expect(next.autoRelayout).toBe(false); expect(next.diagram).toEqual(incremental.diagram);
+    expect(next.history.canUndo).toBe(false); expect(next.pins).toEqual(pins);
+    for (const [id, pin] of Object.entries(pins)) expect(center(next.diagram!.nodes.find((n) => n.id === id)!.box)).toEqual(pin);
   });
   it("accepts clean fresh for CAMPUS/LOCATED_IN without the two attribute pins and restores exact previous layout bytes on undo", async () => {
     removeAttributePins();
@@ -115,9 +142,12 @@ describe("automatic viewer re-layout", () => {
     const pins = { ...saved.pins, "A:COURSE.Title": { x: 552.123456, y: 276.654321 } };
     writeFileSync(layoutPathFor(model), JSON.stringify({ version: 1, ...saved, pins }));
     viewer = await serve(model, { port: 0 });
-    expect(readPins(model).options.pins).toEqual(pins);
+    const initial = await get();
+    const relative = relativeAttributePins(pins, initial.diagram!);
+    expect(readPins(model).options.pins).toEqual(relative);
+    expect(center(initial.diagram!.nodes.find((n) => n.id === "A:COURSE.Title")!.box)).toEqual(pins["A:COURSE.Title"]);
     await changed(grown);
-    expect(readPins(model).options.pins).toEqual(pins);
+    expect(readPins(model).options.pins).toEqual(relative);
   });
   it("keeps computing visible while the second sequential candidate is pending", async () => {
     removeAttributePins();

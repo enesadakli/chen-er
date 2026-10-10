@@ -3,13 +3,14 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
-import type { Diagram, LayoutOptions, Point } from "../core/geometry.js";
+import type { Diagram, LayoutOptions, Pins, Point } from "../core/geometry.js";
 import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
 import { parseModel, type NModel } from "../core/normalize.js";
 import { renderSvg } from "../core/render/svg.js";
 import { lint, type LintOptions } from "../core/lint/index.js";
 import { assessQuality } from "../core/quality.js";
 import { LayoutFile } from "../core/schema.js";
+import { isRelativePin, relativeAttributePins } from "../core/pins.js";
 
 /**
  * Application services shared by the CLI and the MCP server. These are the only
@@ -90,12 +91,12 @@ function engineNote(modelPath: string, requested: LayoutOptions["engine"], store
 }
 
 /** Pins that name a node of the diagram; the others cannot affect the drawing. */
-function activePins(diagram: Diagram | undefined, pins: Record<string, Point> = {}): Record<string, Point> {
+function activePins(diagram: Diagram | undefined, pins: Pins = {}): Pins {
   const ids = new Set(diagram?.nodes.map((n) => n.id));
   return Object.fromEntries(Object.entries(pins).filter(([id]) => ids.has(id)));
 }
 
-const HARD_METRICS = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
+const HARD_METRICS = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations"] as const;
 
 /**
  * Lay the model out once without pins or positions and compare. Returns a diagnostic when the
@@ -103,7 +104,7 @@ const HARD_METRICS = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmb
  * `engine` is the explicit engine, if any, so the baseline matches what `--no-pins` would produce.
  */
 export async function pinsDegradeDiagnostic(
-  model: NModel, pinned: Diagram, pins: Record<string, Point>, engine?: LayoutOptions["engine"],
+  model: NModel, pinned: Diagram, pins: Pins, engine?: LayoutOptions["engine"],
 ): Promise<Diagnostic | undefined> {
   const baseline = (await layout(model, engine ? { engine } : {})).diagram;
   const withPins = assessQuality(pinned, pins, model);
@@ -149,12 +150,12 @@ export function lintFile(path: string, options: LintOptions = {}) {
   return lintText(readFileSync(path, "utf8"), options);
 }
 
-export function quality(diagram: Diagram, pins: Record<string, Point> = {}) {
+export function quality(diagram: Diagram, pins: Pins = {}) {
   return assessQuality(diagram, pins);
 }
 
 export interface LayoutFilePatch {
-  pins?: Record<string, Point>;
+  pins?: Pins;
   engine?: LayoutOptions["engine"];
   /** `null` removes the soft positions (fresh layout next time). */
   positions?: Record<string, Point> | null;
@@ -162,32 +163,37 @@ export interface LayoutFilePatch {
 
 /**
  * Merge a patch into *.er.layout.json and return the exact text written, so callers that watch
- * the file can recognise their own writes. Keys are sorted and coordinates rounded for stable diffs.
+ * the file can recognise their own writes. Keys are sorted; soft positions and changed absolute shape
+ * pins are rounded. Attribute offsets retain full precision. Legacy conversion needs the current diagram.
  */
-export function writeLayoutFile(modelPath: string, patch: LayoutFilePatch): string {
+export function writeLayoutFile(modelPath: string, patch: LayoutFilePatch, diagram?: Diagram): string {
   const path = layoutPathFor(modelPath);
-  let current: { pins: Record<string, Point>; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> } = { pins: {} };
+  let current: { pins: Pins; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> } = { pins: {} };
   if (existsSync(path)) current = LayoutFile.parse(JSON.parse(readFileSync(path, "utf8")));
-  const text = formatLayoutFile(current, patch);
+  const text = formatLayoutFile(current, patch, diagram);
   writeFileSync(path, text);
   return text;
 }
 
 /** Shared formatting for direct app writes and the viewer's atomic replacement. */
-export function formatLayoutFile(current: { pins: Record<string, Point>; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> }, patch: LayoutFilePatch): string {
-  const pins = patch.pins ?? current.pins;
+export function formatLayoutFile(current: { pins: Pins; engine?: LayoutOptions["engine"]; positions?: Record<string, Point> }, patch: LayoutFilePatch, diagram?: Diagram): string {
+  const pins = relativeAttributePins(patch.pins ?? current.pins, diagram);
   const engine = patch.engine ?? current.engine;
   const positions = patch.positions === null ? undefined : (patch.positions ?? current.positions);
-  const sorted = (r: Record<string, Point>, rounded = true) =>
-    Object.fromEntries(Object.keys(r).sort().map((id) => [id, rounded ? { x: round(r[id]!.x), y: round(r[id]!.y) } : r[id]!]));
-  const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sorted(pins, patch.pins !== undefined), ...(positions ? { positions: sorted(positions) } : {}) });
+  const sorted = (r: Record<string, Point>) =>
+    Object.fromEntries(Object.keys(r).sort().map((id) => [id, { x: round(r[id]!.x), y: round(r[id]!.y) }]));
+  const sortedPins = Object.fromEntries(Object.keys(pins).sort().map((id) => {
+    const pin = pins[id]!;
+    return [id, !isRelativePin(pin) && patch.pins !== undefined ? { x: round(pin.x), y: round(pin.y) } : pin];
+  }));
+  const file = LayoutFile.parse({ version: 1, ...(engine ? { engine } : {}), pins: sortedPins, ...(positions ? { positions: sorted(positions) } : {}) });
   return JSON.stringify(file, null, 2) + "\n";
 }
 
 const round = (v: number) => Math.round(v * 10) / 10;
 
-export function writePins(modelPath: string, pins: Record<string, Point>): void {
-  writeLayoutFile(modelPath, { pins });
+export function writePins(modelPath: string, pins: Pins, diagram?: Diagram): void {
+  writeLayoutFile(modelPath, { pins }, diagram);
 }
 
 /** Node id → center for every node of a diagram: the soft positions of the next incremental layout. */

@@ -55,7 +55,7 @@ Diagnostics include source positions, rule ids, severity and repair hints. There
 
 ## Agents: skill and MCP
 
-The repository [er-diagram skill](skills/er-diagram/SKILL.md) describes the loop: write YAML, lint, fix, render, inspect the PNG, then revise the model or layout pins. Add that directory to your client's skill search path.
+The repository [er-diagram skill](skills/er-diagram/SKILL.md) describes the loop: write YAML, lint, fix, render, inspect the PNG, then revise the model. Pins are human-owned; the viewer handles placement corrections. Add that directory to your client's skill search path.
 
 Start the stdio MCP server from the checkout:
 
@@ -101,7 +101,7 @@ File input loads sibling layout settings. Relative paths resolve against the ser
 npx tsx src/cli/index.ts serve examples/company-project.er.yaml
 ```
 
-Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `company-project.er.layout.json`; previous positions keep subsequent layouts stable. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
+Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `company-project.er.layout.json`; previous positions keep subsequent layouts stable. Attribute pins are `{dx, dy}` offsets from the immediate parent centre (composite parts use their parent oval); entity/relationship pins remain absolute `{x, y}` centres. Attributes follow their parent on drop and during fresh layout. Legacy absolute attribute pins remain exact on read and convert without a jump on the next layout-file write, using the current drawing; offsets retain full precision. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
 
 Click an entity or relationship to open its actions. Selection emphasizes all ends and labels of connected relationships; **Focus** fits that neighborhood without changing the layout. The viewer does not edit the model; it writes only the layout file and the requirements file. An agent or your text editor changes the YAML, and the viewer refreshes.
 

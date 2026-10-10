@@ -1,5 +1,6 @@
-import { boxAround, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Point } from "../geometry.js";
-import { flattenAttrs, type NAttribute, type NModel } from "../normalize.js";
+import { absolutePins, attributeParents } from "../pins.js";
+import { boxAround, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Pins, type Point } from "../geometry.js";
+import { flattenAttrs, type NModel } from "../normalize.js";
 import { attributeSize, entitySize, relationshipSize } from "../style.js";
 import { assessQuality } from "../quality.js";
 import { boxGap, MIN_OVAL_LABEL_CLEARANCE } from "./semantic-clearance.js";
@@ -28,22 +29,24 @@ export async function incrementalLayout(
   options: LayoutOptions,
 ): Promise<LayoutResult> {
   const pins = options.pins ?? {};
+  const absolute = absolutePins(pins);
   const soft = options.positions ?? {};
   const sizes = shapeSizes(model, metrics);
-  const owners = attributeOwners(model);
+  const owners = attributeParents(model);
 
   const moved = new Set<string>();
   for (const id of sizes.keys()) {
     if (id.startsWith("A:")) continue;
-    const pin = pins[id];
+    const pin = absolute[id];
     const prev = soft[id];
     if (pin && (!prev || Math.hypot(pin.x - prev.x, pin.y - prev.y) > 1)) moved.add(id);
   }
 
   const fixed: Record<string, Point> = {};
+  const attributePins: Pins = {};
   for (const id of sizes.keys()) {
     if (id.startsWith("A:")) continue;
-    const p = pins[id] ?? soft[id];
+    const p = absolute[id] ?? soft[id];
     if (p) fixed[id] = p;
   }
 
@@ -78,7 +81,7 @@ export async function incrementalLayout(
   });
   for (const [id, owner] of owners) {
     if (pins[id]) {
-      fixed[id] = pins[id]!;
+      attributePins[id] = pins[id]!;
       continue;
     }
     const prev = soft[id];
@@ -89,7 +92,7 @@ export async function incrementalLayout(
     fixed[id] = prev;
   }
 
-  let result = await engine(model, metrics, { ...options, pins: fixed, positions: undefined });
+  let result = await engine(model, metrics, { ...options, pins: { ...fixed, ...attributePins }, positions: undefined });
   // Saved attribute positions are soft: release only a blocking oval when fixed geometry has no label slot.
   // Real pins and every entity/relationship position remain fixed during these retries.
   let quality = assessQuality(result.diagram, pins, model);
@@ -102,7 +105,7 @@ export async function incrementalLayout(
       if (pins[id] || !fixed[id] || !blockedOwners.has(owner)) continue;
       const released = { ...fixed };
       delete released[id];
-      const candidate = await engine(model, metrics, { ...options, pins: released, positions: undefined });
+      const candidate = await engine(model, metrics, { ...options, pins: { ...released, ...attributePins }, positions: undefined });
       const next = assessQuality(candidate.diagram, pins, model);
       if (next.spokeLabelViolations >= quality.spokeLabelViolations || hard.some((key) => next[key] > quality[key])) continue;
       delete fixed[id];
@@ -181,20 +184,6 @@ function shapeSizes(model: NModel, m: TextMetrics): Map<string, { w: number; h: 
   return sizes;
 }
 
-/** Attribute id → id of the node it hangs from (entity, relationship or parent attribute). */
-function attributeOwners(model: NModel): Map<string, string> {
-  const owners = new Map<string, string>();
-  const visit = (attrs: readonly NAttribute[]) => {
-    for (const a of attrs) {
-      owners.set(a.id, a.parent ?? `${a.ownerKind === "entity" ? "E" : "R"}:${a.owner}`);
-      visit(a.parts);
-    }
-  };
-  for (const e of model.entities) visit(e.attrs);
-  for (const r of model.relationships) visit(r.attrs);
-  return owners;
-}
-
 /** True when the attribute's owner chain reaches a moved shape. */
 function releasedAncestor(id: string, owners: Map<string, string>, moved: Set<string>): boolean {
   for (let cur = owners.get(id); cur; cur = owners.get(cur)) if (moved.has(cur)) return true;
@@ -212,4 +201,4 @@ function pushAway(b: Box, c: Point, s: { w: number; h: number }, gap: number): P
   return needX <= needY ? { x: snap(c.x + sx * (needX + 1)), y: c.y } : { x: c.x, y: snap(c.y + sy * (needY + 1)) };
 }
 
-const mentionsRealPin = (message: string, pins: Record<string, Point>) => Object.keys(pins).some((id) => message.includes(id));
+const mentionsRealPin = (message: string, pins: Pins) => Object.keys(pins).some((id) => message.includes(id));

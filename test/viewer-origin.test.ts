@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewerState } from "../src/app/serve.js";
-import type { Diagram, Point } from "../src/core/geometry.js";
+import type { Diagram, Pin, Point } from "../src/core/geometry.js";
 import { NotebookCanvas } from "../src/viewer/canvas.js";
 
 const diagram = (origin?: Point): Diagram => ({
@@ -18,7 +18,7 @@ function harness(d: Diagram) {
     getBoundingClientRect: () => ({ left: 100, top: 50 }),
     setPointerCapture: vi.fn(), hasPointerCapture: () => true, releasePointerCapture: vi.fn(), focus: vi.fn(),
   };
-  const pin = vi.fn(async (_id: string, _point: Point | null) => {});
+  const pin = vi.fn(async (_id: string, _point: Pin | null) => {});
   const state = { diagram: d, svg: "<svg/>", pins: {}, computing: false } as ViewerState;
   const notebook = Object.assign(Object.create(NotebookCanvas.prototype), {
     good: state, state, scale: 2, offset: { x: 300, y: 400 }, sheet, figure, overlay, canvas,
@@ -27,6 +27,7 @@ function harness(d: Diagram) {
     good: ViewerState | undefined; scale: number; offset: Point;
     transform(): void; fit(): void; diagramPoint(p: Point): Point; zoom(factor: number, around: Point): void;
     show(state: ViewerState, list: []): void;
+    key(e: KeyboardEvent): void;
     down(e: PointerEvent): void; move(e: PointerEvent): void; up(e: PointerEvent): void;
   };
   const placeholder = { hidden: false, textContent: "" };
@@ -70,6 +71,29 @@ describe("viewer canvas origin", () => {
     notebook.good = undefined;
     notebook.show(state, []);
     expect(sheet.style.transform).toBe("translate(350px, 511px) scale(1.5) translate(-200px, -300px)");
+  });
+
+  it("sends relative attribute offsets on pointer drop and arrow movement, and Delete removes the pin", async () => {
+    const d = diagram({ x: -200, y: -300 });
+    d.nodes.push({ id: "A:ITEM.Name", kind: "attribute", label: "Name", double: false, box: { x: -210, y: -252, w: 100, h: 34 } });
+    d.edges.push({ id: "edge:A:ITEM.Name", kind: "attribute", from: "E:ITEM", to: "A:ITEM.Name", points: [], double: false });
+    const { notebook, pin, state } = harness(d);
+    state.pins = { "A:ITEM.Name": { dx: -95, dy: -98 } };
+    class Group {
+      dataset = { id: "A:ITEM.Name" };
+      closest(selector: string) { return selector.startsWith(".er-entity") ? this : null; }
+      focus() {}
+      setAttribute = vi.fn(); removeAttribute = vi.fn();
+    }
+    vi.stubGlobal("Element", Group); const group = new Group();
+    const event = (clientX: number, clientY: number) => ({ button: 0, pointerId: 1, target: group, clientX, clientY, altKey: true }) as unknown as PointerEvent;
+    notebook.down({ ...event(80, -20), altKey: false } as PointerEvent); notebook.move(event(112, -4)); notebook.up(event(112, -4));
+    await Promise.resolve(); await Promise.resolve();
+    expect(pin).toHaveBeenCalledWith("A:ITEM.Name", { dx: -79, dy: -90 });
+    notebook.key({ key: "ArrowRight", altKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent);
+    expect(pin).toHaveBeenLastCalledWith("A:ITEM.Name", { dx: -87, dy: -98 });
+    notebook.key({ key: "Delete", preventDefault: vi.fn() } as unknown as KeyboardEvent);
+    expect(pin).toHaveBeenLastCalledWith("A:ITEM.Name", null);
   });
 
   it.each([false, true])("saves a dragged node above y=0 in diagram coordinates (free=%s)", async (free) => {

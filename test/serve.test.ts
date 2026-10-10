@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { request } from "node:http";
 import * as lintService from "../src/core/lint/index.js";
 import { serve, type ViewerState } from "../src/app/serve.js";
+import { center } from "../src/core/geometry.js";
 import { layoutPathFor, STARTER_MODEL } from "../src/app/render.js";
 
 let dir: string, model: string, viewer: Awaited<ReturnType<typeof serve>>;
@@ -58,6 +59,35 @@ describe("local viewer server", () => {
     expect((await getState()).pins).toEqual({});
     expect(JSON.parse(readFileSync(layoutPathFor(model), "utf8")).engine).toBe("stress");
     expect(readFileSync(model, "utf8")).toBe(STARTER_MODEL);
+  });
+  it("stores attribute offsets, follows owner drops, preserves pins in history and unpins by Delete's route", async () => {
+    const pins = { "A:COURSE.Title": { dx: 120.123456, dy: -85.654321 } };
+    const response = await post("/api/pins", { pins }); expect(response.status).toBe(200);
+    const initial = await response.json() as ViewerState;
+    expect(initial.pins).toEqual(pins); expect(initial.quality!.pinDrift).toBe(0);
+    const move = await post("/api/pins", { pins: { "E:COURSE": { x: 1200, y: 800 } } });
+    expect(move.status).toBe(200);
+    const next = await move.json() as ViewerState;
+    const attribute = next.diagram!.nodes.find((n) => n.id === "A:COURSE.Title")!;
+    expect(center(attribute.box)).toEqual({ x: 1320.123456, y: 714.345679 });
+    expect(attribute.pinned).toBe(true); expect(next.quality!.pinDrift).toBe(0);
+    expect((await post("/api/history/undo", { expectedLayoutRevision: next.layoutRevision })).status).toBe(200);
+    expect((await getState()).pins).toEqual(pins);
+    expect((await post("/api/history/redo", { expectedLayoutRevision: (await getState()).layoutRevision })).status).toBe(200);
+    expect((await getState()).pins["A:COURSE.Title"]).toEqual(pins["A:COURSE.Title"]);
+    expect((await fetch(`${viewer.url}/api/pins/${encodeURIComponent("A:COURSE.Title")}`, { method: "DELETE" })).status).toBe(200);
+    const unpinned = await getState();
+    expect(unpinned.pins["A:COURSE.Title"]).toBeUndefined();
+    expect(unpinned.diagram!.nodes.find((n) => n.id === "A:COURSE.Title")!.pinned).toBe(false);
+  });
+  it("converts an absolute attribute centre sent by an older viewer against current geometry", async () => {
+    const state = await getState(), parent = center(state.diagram!.nodes.find((n) => n.id === "E:COURSE")!.box);
+    const response = await post("/api/pins", { pins: { "A:COURSE.Title": { x: parent.x + 123.456789, y: parent.y - 80.123456 } } });
+    expect(response.status).toBe(200);
+    const next = await response.json() as ViewerState;
+    expect(next.pins["A:COURSE.Title"]).toEqual({ dx: parent.x + 123.456789 - parent.x, dy: parent.y - 80.123456 - parent.y });
+    expect(next.quality!.pinDrift).toBe(0);
+    expect((await post("/api/pins", { pins: { "E:COURSE": { dx: 1, dy: 2 } } })).status).toBe(400);
   });
   it("emits full SSE states after model edits, layout edits and API writes", async () => {
     const abort = new AbortController();

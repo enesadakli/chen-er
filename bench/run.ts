@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
-import { center, type Diagram } from "../src/core/geometry.js";
+import { center, type Diagram, type Pins } from "../src/core/geometry.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "../src/core/layout/semantic-graph.js";
 import { DEFAULT_ENGINE, engines, layout } from "../src/core/layout/index.js";
 import { parseModel, type NModel } from "../src/core/normalize.js";
@@ -53,13 +53,13 @@ type EngineName = keyof typeof engines;
 export const hierarchyMinimumOf = (model: NModel): number =>
   new Set(hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model))).cyclic.values()).size;
 
-export function loadPins(input: string): Record<string, { x: number; y: number }> {
+export function loadPins(input: string): Pins {
   const pinFile = input.replace(/\.er\.yaml$/, ".er.layout.json");
   return resolve(input) === resolve("bench/fixtures/pinned.er.yaml") && existsSync(pinFile) ? LayoutFile.parse(JSON.parse(readFileSync(pinFile, "utf8"))).pins : {};
 }
 
 /** Entity displacement when one extra attribute is added to each entity in turn. */
-export async function stabilityOf(model: NModel, diagram: Diagram, engine: EngineName, pins: Record<string, { x: number; y: number }>): Promise<{ max: number; median: number }> {
+export async function stabilityOf(model: NModel, diagram: Diagram, engine: EngineName, pins: Pins): Promise<{ max: number; median: number }> {
   const displacement: number[] = [];
   for (const entity of model.entities) {
     const modified: NModel = { ...model, entities: model.entities.map((e) => e !== entity ? e : { ...e, attrs: [...e.attrs, {

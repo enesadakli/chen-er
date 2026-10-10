@@ -1,5 +1,6 @@
+import { isRelativePin } from "../pins.js";
 import { labelIntersectsLines } from "./label-geometry.js";
-import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
+import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Pins, type Point } from "../geometry.js";
 import { attributeAnchors } from "./attributes.js";
 import type { EndPort } from "./anchors.js";
 import { MIN_ROUTE_SEGMENT, visibleEdgePaths } from "./semantic-edges.js";
@@ -11,7 +12,7 @@ export function straightSpoke(edge: DEdge, nodes: DNode[], radial = true): Point
 }
 
 /** Move free ovals to clear radial spokes rather than bending an attribute edge. */
-export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>, labels: DLabel[] = [], shorten = false): boolean {
+export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>, labels: DLabel[] = [], shorten = false, pins: Pins = {}): boolean {
   let moved = false;
   // Ovals move by replacing their box, so one lookup serves the whole repair.
   const byId = new Map<string, DNode>();
@@ -23,7 +24,9 @@ export function repairAttributeSpokes(nodes: DNode[], edges: DEdge[], ports: Map
     let fixed: { lines: [Point, Point][]; end: boolean }[] | undefined, portAnchors: Point[] | undefined;
     edge.points = spokeOf(edge);
     const originalClear = clear(oval, edge.points);
-    if (oval.pinned || (originalClear && (!shorten || distance(edge.points[0]!, edge.points[1]!) <= oval.box.h * 2.5))) continue;
+    // A composite's final centre anchors its relative parts; keep it fixed during clearance repair.
+    const anchorsPart = edges.some((e) => e.kind === "part" && e.from === oval.id && pins[e.to] && isRelativePin(pins[e.to]!));
+    if (oval.pinned || anchorsPart || (originalClear && (!shorten || distance(edge.points[0]!, edge.points[1]!) <= oval.box.h * 2.5))) continue;
     const p = center(parent.box), original = center(oval.box), preferred = Math.atan2(original.y - p.y, original.x - p.x);
     const radius = Math.max(distance(p, original), parent.box.w / 2 + 90);
     const angles = Array.from({ length: 72 }, (_, i) => preferred + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI / 36);

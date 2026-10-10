@@ -1,5 +1,6 @@
+import { isRelativePin, pinPoint } from "../pins.js";
 import { labelIntersectsLines } from "./label-geometry.js";
-import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
+import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Pins, type Point } from "../geometry.js";
 import type { NAttribute } from "../normalize.js";
 import { attributeSize } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
@@ -11,7 +12,7 @@ import type { Cluster } from "./clusters.js";
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 interface Fan { nodes: DNode[]; edges: DEdge[]; angle: number }
 
-export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = []): boolean {
+export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = [], pins: Pins = {}): boolean {
   const nodeCount = nodes.length, edgeCount = edges.length;
   const entities = nodes.filter((n) => n.kind === "entity").map((n) => center(n.box));
   const centroid = { x: entities.reduce((s, p) => s + p.x, 0) / (entities.length || 1), y: entities.reduce((s, p) => s + p.y, 0) / (entities.length || 1) };
@@ -36,7 +37,8 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
   return true;
 
   function plan(attr: NAttribute, parent: DNode, preferred: number, chosen: number[], pendingNodes: DNode[], pendingEdges: DEdge[], rings: number): Fan | undefined {
-    const pc = center(parent.box), size = attributeSize(attr.label, metrics), fixed = nodes.find((n) => n.id === attr.id);
+    const pc = center(parent.box), size = attributeSize(attr.label, metrics), pin = pins[attr.id];
+    const fixed = nodes.find((n) => n.id === attr.id) ?? (pin && isRelativePin(pin) ? attributeNode(attr, pinPoint(pin, pc), metrics, true) : undefined);
     const angles = Array.from({ length: 72 }, (_, i) => preferred + i * Math.PI / 36).sort((a, b) => {
       const score = (t: number) => angleDistance(t, preferred) + chosen.reduce((s, u) => s + Math.max(0, 0.45 - angleDistance(t, u)) * 12, 0);
       return score(a) - score(b) || a - b;
@@ -121,7 +123,7 @@ export function attributeNode(a: NAttribute, p: Point, metrics: TextMetrics, pin
   return { id: a.id, kind: "attribute", label: a.label, box: boxAround(p, size.w, size.h), double: a.multivalued, pinned, attr: { key: a.key, partial: a.partial, multivalued: a.multivalued, derived: a.derived } };
 }
 
-export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map()): void {
+export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), pins: Pins = {}): void {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const skeleton = edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points).map(([a, b]) => ({ a, b })));
   for (const c of clusters) {
@@ -137,6 +139,11 @@ export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges
   function place(a: NAttribute, parent: DNode, preferred: number, radius: number, used: number[], chosen: number[]) {
     const pc = center(parent.box), size = attributeSize(a.label, metrics);
     let node = byId.get(a.id);
+    const pin = pins[a.id];
+    if (!node && pin && isRelativePin(pin)) {
+      node = attributeNode(a, pinPoint(pin, pc), metrics, true);
+      nodes.push(node); byId.set(node.id, node);
+    }
     let angle = preferred;
     if (!node) {
       const candidates = Array.from({ length: 72 }, (_, i) => -Math.PI + i * Math.PI / 36).sort((a, b) => {

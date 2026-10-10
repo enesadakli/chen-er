@@ -1,4 +1,5 @@
-import { boxAround, center, intersects, type DEdge, type DNode, type Point } from "../geometry.js";
+import { isRelativePin } from "../pins.js";
+import { boxAround, center, intersects, type DEdge, type DNode, type Pins, type Point } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { boxShape, distance, segmentThrough } from "./shapes.js";
 import { MIN_ROUTE_SEGMENT } from "./semantic-edges.js";
@@ -65,7 +66,7 @@ export function alignDiamondPorts(nodes: DNode[], edges: DEdge[], ports: Map<str
 }
 
 /** Allocate each entity's ports together; adjacent sides absorb a full side. */
-export function fanEndAnchors(nodes: DNode[], edges: DEdge[]): Map<string, EndPort> {
+export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): Map<string, EndPort> {
   const result = new Map<string, EndPort>();
   for (const entity of nodes.filter((n) => n.kind === "entity")) {
     const incoming = edges.filter((e) => e.kind === "end" && e.to === entity.id);
@@ -153,7 +154,7 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[]): Map<string, EndPo
     const c = center(entity.box), b = entity.box;
     const blocked = (candidate: EndPort) => {
       const escape = { x: candidate.anchor.x + candidate.normal.x * 96, y: candidate.anchor.y + candidate.normal.y * 96 };
-      return nodes.some((n) => n.kind === "relationship" && n.id !== edge.from && segmentThrough(candidate.anchor, escape,
+      return nodes.some((n) => (n.kind === "relationship" && n.id !== edge.from || n.kind === "attribute" && pins[n.id] && isRelativePin(pins[n.id]!)) && segmentThrough(candidate.anchor, escape,
         boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 })));
     };
     if (!blocked(port)) continue;

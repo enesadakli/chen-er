@@ -1,9 +1,10 @@
+import { isRelativePin, pinPoint } from "./pins.js";
 import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
 import { clearanceQuality, type ClearanceQuality } from "./layout/semantic-clearance.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
 import { labelAmbiguityReasons, labelGeometry, labelIntersectsLines, labelLooseReasons, labelOnOwnEdge, linesBox } from "./layout/label-geometry.js";
-import { center, intersects, type Diagram, type Point } from "./geometry.js";
+import { center, intersects, type Diagram, type Pins, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
@@ -42,14 +43,17 @@ export interface QualityReport extends SemanticQuality, EdgeQuality, ClearanceQu
   issues: QualityIssue[];
 }
 
-export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}, model?: NModel): QualityReport {
+export function assessQuality(diagram: Diagram, pins: Pins = {}, model?: NModel): QualityReport {
   const issues: QualityIssue[] = [];
   const add = (kind: QualityIssue["kind"], ids: string[]) => issues.push({ kind, ids, message: `${kind}: ${ids.join(", ")}` });
   const { nodes, edges, labels } = diagram;
+  const parents = new Map(edges.filter((e) => e.kind !== "end").map((e) => [e.to, e.from]));
+  const centres = new Map(nodes.map((n) => [n.id, center(n.box)]));
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i]!;
     for (const other of nodes.slice(i + 1)) if (shapesNear(n, other, 4)) add("overlap", [n.id, other.id]);
-    if (pins[n.id] && distance(center(n.box), pins[n.id]!) > 0.5) add("pin-drift", [n.id]);
+    const pin = pins[n.id], parent = centres.get(parents.get(n.id) ?? "");
+    if (pin && ((!parent && isRelativePin(pin)) || distance(center(n.box), pinPoint(pin, parent ?? { x: 0, y: 0 })) > 0.5)) add("pin-drift", [n.id]);
   }
   const paths = new Map(edges.map((e) => [e.id, drawnPaths(e)]));
   const labelContext = labelGeometry(nodes, edges, paths);

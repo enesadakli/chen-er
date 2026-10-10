@@ -1,4 +1,5 @@
-import { boxAround, center, intersects, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Point } from "../geometry.js";
+import { absolutePins, isRelativePin, pinPoint } from "../pins.js";
+import { boxAround, center, intersects, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Pins, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
 import { assessQuality, type QualityReport } from "../quality.js";
 import type { TextMetrics } from "../text/metrics.js";
@@ -20,10 +21,11 @@ import { chooseSpacing, searchBudget } from "./semantic-spacing.js";
 export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine {
   return async (model, metrics, options) => {
     const pins = options.pins ?? {};
-    const pinnedAttributes = measureClusters(model, metrics, pins).flatMap((c) => flattenAttrs(c.attrs)).filter((a) => pins[a.id]).map((a) => attributeNode(a, pins[a.id]!, metrics, true));
-    const clusters = measureClusters(model, metrics, pins);
+    const absolute = absolutePins(pins);
+    const pinnedAttributes = measureClusters(model, metrics, absolute).flatMap((c) => flattenAttrs(c.attrs)).filter((a) => absolute[a.id]).map((a) => attributeNode(a, absolute[a.id]!, metrics, true));
+    const clusters = measureClusters(model, metrics, absolute);
     let result: LayoutResult;
-    const semanticBuild = (positions: Cluster[]) => buildDiagram(positions, pinnedAttributes, model, metrics, name, true);
+    const semanticBuild = (positions: Cluster[]) => buildDiagram(positions, pinnedAttributes, model, metrics, name, true, pins);
     // Entity cells depend only on topology; attribute clearance never selects a new skeleton.
     if (name !== "simple") {
       const placement = semanticPlacements(model)[0]!;
@@ -39,7 +41,7 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       }
     } else {
       await placeClusters(clusters, model, options, name, pinnedAttributes.map((n) => n.box));
-      result = buildDiagram(clusters, pinnedAttributes, model, metrics, name);
+      result = buildDiagram(clusters, pinnedAttributes, model, metrics, name, false, pins);
     }
     const quality = assessQuality(result.diagram, pins, model);
     const pinConflict = (issue: (typeof quality.issues)[number]) => issue.ids.some((id) => !!pins[id]) || (issue.kind === "out-of-canvas" && Object.keys(pins).length > 0);
@@ -75,7 +77,7 @@ function clearanceRouteScore(result: LayoutResult, id: string, dx: number, dy: n
 }
 
 /** Only diamonds move during clearance refinement; entity ranks and cells stay fixed. */
-function refineClearance(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
+function refineClearance(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Pins, model: NModel, initial?: LayoutResult): LayoutResult {
   let best = initial ?? build(clusters);
   const score = (result: LayoutResult) => {
     const q = assessQuality(result.diagram, pins, model);
@@ -123,7 +125,7 @@ function zRouteScore(result: LayoutResult, id: string, dx: number, dy: number, m
 }
 
 /** Bound Z refinement to three diamonds (fewer on large models) and two full builds each; entity cells stay fixed. */
-function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model: NModel, initial?: LayoutResult): LayoutResult {
+function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Pins, model: NModel, initial?: LayoutResult): LayoutResult {
   let best = initial ?? build(clusters);
   const baseline = assessQuality(best.diagram, pins, model);
   const symmetric = model.relationships.filter((r) => r.ends.length === 2 && r.ends.every((e) => e.entity === r.ends[0]!.entity)).filter((r) => {
@@ -183,7 +185,7 @@ function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResu
   return best;
 }
 
-function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NModel, metrics: TextMetrics, name: string, semantic = false): LayoutResult {
+function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NModel, metrics: TextMetrics, name: string, semantic = false, pins: Pins = {}): LayoutResult {
   clusters = clusters.map((c) => ({ ...c, node: { ...c.node, box: { ...c.node.box } } }));
   for (const c of clusters) if (!c.node.pinned) {
     const p = center(c.node.box);
@@ -198,15 +200,27 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     nodes.push(n);
     byId.set(n.id, n);
   }
-  if (semantic) clearPinnedSpokes(model, nodes);
+  const relativeRoots = clusters.flatMap((c) => c.attrs.filter((a) => pins[a.id] && isRelativePin(pins[a.id]!)).map((a) => ({ attr: a, parent: c.node })));
+  for (const { attr, parent } of relativeRoots) {
+    const node = attributeNode(attr, pinPoint(pins[attr.id]!, center(parent.box)), metrics, true);
+    nodes.push(node); byId.set(node.id, node);
+  }
+  const syncRoots = () => {
+    for (const { attr, parent } of relativeRoots) {
+      const node = byId.get(attr.id)!;
+      node.box = boxAround(pinPoint(pins[attr.id]!, center(parent.box)), node.box.w, node.box.h);
+    }
+  };
+  if (semantic) { clearPinnedSpokes(model, nodes); syncRoots(); }
   const edges: DEdge[] = [];
   for (const r of model.relationships) for (const end of r.ends) if (byId.has(`E:${end.entity}`)) edges.push({
     id: `edge:${end.id}`, kind: "end", from: r.id, to: `E:${end.entity}`, points: [], double: r.identifies === end.entity, end: end.id,
   });
-  let endPorts = fanEndAnchors(nodes, edges);
+  let endPorts = fanEndAnchors(nodes, edges, pins);
   if (semantic) {
     alignDiamondPorts(nodes, edges, endPorts);
-    endPorts = fanEndAnchors(nodes, edges);
+    syncRoots();
+    endPorts = fanEndAnchors(nodes, edges, pins);
   }
   const preliminary: DEdge[] = [];
   for (const e of edges) {
@@ -214,14 +228,23 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     preliminary.push(e);
   }
   let radialFan = !semantic || nodes.some((n) => n.pinned) || clusters.some((c) => c.attrs.filter((a) => a.parts.length).length > 1);
-  if (!radialFan) radialFan = !placeAttributes(clusters, nodes, edges, metrics, endPorts, placeLabels(model, nodes, edges, metrics));
+  if (!radialFan) radialFan = !placeAttributes(clusters, nodes, edges, metrics, endPorts, placeLabels(model, nodes, edges, metrics), pins);
   if (radialFan) {
     if (semantic) semanticAttributes(clusters, nodes, edges, metrics, endPorts);
-    placeRadialAttributes(clusters, nodes, edges, metrics, endPorts);
+    placeRadialAttributes(clusters, nodes, edges, metrics, endPorts, pins);
   }
   for (const n of nodes.filter((n) => n.kind === "attribute" && !n.pinned)) {
     const p = center(n.box);
     n.box = boxAround({ x: Math.round(p.x), y: Math.round(p.y) }, n.box.w, n.box.h);
+  }
+  // Free parent ovals have now been rounded; offsets stay exact against those final centres.
+  for (const edge of edges.filter((e) => e.kind !== "end")) {
+    const pin = pins[edge.to];
+    if (pin && isRelativePin(pin)) {
+      const node = byId.get(edge.to) ?? nodes.find((n) => n.id === edge.to)!;
+      const parent = nodes.find((n) => n.id === edge.from)!;
+      node.box = boxAround(pinPoint(pin, center(parent.box)), node.box.w, node.box.h);
+    }
   }
   const ordered = [...edges.filter((e) => e.kind !== "end"), ...edges.filter((e) => e.kind === "end")];
   const routed: DEdge[] = [];
@@ -235,11 +258,11 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     else e.points = semanticRoute(e, nodes, routed, endPorts.get(e.id)) ?? routeEdge(e, nodes, routed, offsets.get(e.id) ?? 0, [], { endPort: endPorts.get(e.id) });
     routed.push(e);
   }
-  repairAttributeSpokes(nodes, edges, endPorts, [], !radialFan);
+  repairAttributeSpokes(nodes, edges, endPorts, [], !radialFan, pins);
   let labels: DLabel[] = [];
   for (let pass = 0; pass < 4; pass++) {
     labels = placeLabels(model, nodes, edges, metrics);
-    if (repairAttributeSpokes(nodes, edges, endPorts, labels, !radialFan)) labels = placeLabels(model, nodes, edges, metrics);
+    if (repairAttributeSpokes(nodes, edges, endPorts, labels, !radialFan, pins)) labels = placeLabels(model, nodes, edges, metrics);
     const result = assessQuality({ width: Infinity, height: Infinity, nodes, edges, labels, notes: [], meta: { engine: name } });
     if ((!result.shapeCrossings && !result.labelCollisions && !result.labelAmbiguity && !result.labelLoose && !result.overlaps) || pass === 3) break;
     for (const e of edges) {

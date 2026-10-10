@@ -1,4 +1,4 @@
-import type { Box, LayoutResult, Point } from "../geometry.js";
+import type { Box, LayoutResult, Pins } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { assessQuality, type QualityReport } from "../quality.js";
 import type { Cluster } from "./clusters.js";
@@ -50,7 +50,7 @@ const fullSpacingAccepted = (q: QualityReport): boolean =>
  * Bounded spacing search for larger unpinned models. Candidates are ranked on the skeleton; the
  * first one whose full drawing passes the limits wins, otherwise the default grid stays.
  */
-export function chooseSpacing(clusters: Cluster[], model: NModel, placement: SemanticPlacement, base: number, reserved: Box[], pins: Record<string, Point>,
+export function chooseSpacing(clusters: Cluster[], model: NModel, placement: SemanticPlacement, base: number, reserved: Box[], pins: Pins,
   build: (cs: Cluster[]) => LayoutResult): { spacing: Spacing; initial?: LayoutResult } {
   const fallback = { spacing: { columns: base, rows: base } };
   if (Object.keys(pins).length || model.entities.length <= 4) return fallback;

@@ -94,6 +94,20 @@ describe("MCP in-memory protocol", () => {
     expect(payload(result).writtenPaths).toEqual([]);
   });
 
+  it("reports relative pin drift and clearance diagnostics without writing human-owned pins", async () => {
+    const path = join(dir, "model.er.yaml"), saved = join(dir, "model.er.layout.json");
+    await writeFile(path, exampleModel);
+    const bytes = JSON.stringify({ version: 1, pins: { "A:BOOK.Title": { dx: 0, dy: 0 } } });
+    await writeFile(saved, bytes);
+    const result = payload(await client.callTool({ name: "render_er", arguments: { path, report: true, scale: 1 } }));
+    expect(result.quality.pinDrift).toBe(0); expect(result.quality.overlaps).toBeGreaterThan(0);
+    expect(result.diagnostics.some((d: { rule: string }) => d.rule === "pins-degrade-layout")).toBe(true);
+    expect(await readFile(saved, "utf8")).toBe(bytes);
+    const baseline = payload(await client.callTool({ name: "render_er", arguments: { path, report: true, noPins: true, scale: 1 } }));
+    expect(baseline.quality.overlaps).toBe(0); expect(baseline.quality.pinDrift).toBe(0);
+    expect(await readFile(saved, "utf8")).toBe(bytes);
+  });
+
   it("loads file pins and writes SVG and PNG", async () => {
     const path = join(dir, "model.er.yaml");
     const out = join(dir, "diagram.svg");

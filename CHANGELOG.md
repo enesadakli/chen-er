@@ -7,6 +7,14 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Added
 
+- Parent-relative attribute pins (`{dx, dy}`) in version 1 layout files, including relationship attributes
+  and composite parts. Entity/relationship pins remain absolute. Legacy absolute attributes stay exact on
+  read and migrate using the current parent centre on the next layout-file write, preserving precision.
+  Viewer attribute drops/arrow keys write offsets; owner drops and fresh layouts carry them together.
+  Pin drift reports and stale-pin diagnostics understand offsets; MCP `render_er` accepts `report: true`.
+  Fresh CAMPUS/LOCATED_IN layouts now clear the pinned attribute geometry; absolute entity pins still
+  veto hard regressions. Pins remain human-owned.
+
 - Automatic re-layout in `chen serve` after structural model changes: compare saved positions with
   a fresh layout, keep pins, and veto fresh if any individual hard geometry or attribute clearance metric
   regresses; only then compare hierarchy and crossing/edge-length improvements (rule in DESIGN.md).

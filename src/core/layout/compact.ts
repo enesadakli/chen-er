@@ -1,4 +1,4 @@
-import { boxAround, center, intersects, type LayoutResult, type Point } from "../geometry.js";
+import { boxAround, center, intersects, type LayoutResult, type Pins, type Point } from "../geometry.js";
 import { assessQuality, type QualityReport } from "../quality.js";
 import type { NModel } from "../normalize.js";
 import type { Cluster } from "./clusters.js";
@@ -26,7 +26,7 @@ export function layoutScore(q: QualityReport): number {
     + q.meanEdgeRatio + Math.max(0, q.longestEdgeRatio - 7) * 4 + Math.max(0, q.meanEdgeRatio - 3.5) + aspectPenalty * 6 - q.density * 4;
 }
 
-export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model?: NModel): LayoutResult[] {
+export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Pins, model?: NModel): LayoutResult[] {
   const results = [build(clusters)];
   if (!clusters.some((c) => !c.node.pinned)) return results;
   const centers = clusters.map((c) => center(c.node.box));
@@ -52,7 +52,7 @@ export function compactCandidates(clusters: Cluster[], build: (cs: Cluster[]) =>
   return results;
 }
 
-export function compactLocally(initial: LayoutResult, clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Record<string, Point>, model?: NModel): LayoutResult {
+export function compactLocally(initial: LayoutResult, clusters: Cluster[], build: (cs: Cluster[]) => LayoutResult, pins: Pins, model?: NModel): LayoutResult {
   let best = initial;
   let score = layoutScore(assessQuality(best.diagram, pins, model));
   if (!Number.isFinite(score)) return best;

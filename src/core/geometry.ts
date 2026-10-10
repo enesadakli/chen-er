@@ -14,6 +14,11 @@ export interface Point {
   y: number;
 }
 
+/** Offset from the immediate parent's centre, in diagram px (attributes only). */
+export interface RelativePin { dx: number; dy: number }
+export type Pin = Point | RelativePin;
+export type Pins = Record<string, Pin>;
+
 /** Axis-aligned box; (x, y) is the top-left corner. */
 export interface Box {
   x: number;
@@ -86,8 +91,8 @@ export interface Diagram {
 
 export interface LayoutOptions {
   engine?: "layered" | "stress" | "simple";
-  /** Node id → center position. */
-  pins?: Record<string, Point>;
+  /** Absolute entity/relationship centres; attribute pins may be parent-relative offsets. */
+  pins?: Pins;
   /**
    * Soft positions from the previous layout (node id → center). When present, the engine runs
    * incrementally: nodes keep these positions, only new, moved or colliding nodes are placed.

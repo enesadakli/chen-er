@@ -65,6 +65,16 @@ const farApart = {
 };
 
 describe("stale pins", () => {
+  it("reports relative pin drift and warns for conflicting offsets without migrating on render", async () => {
+    writeLayout({ pins: { "A:CUSTOMER.Name": { dx: 0, dy: 0 } } });
+    const before = layoutBefore();
+    const result = await renderCommand(model, { out: join(dir, "relative.svg"), report: true, json: true });
+    expect(result.exitCode).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.quality.pinDrift).toBe(0); expect(report.quality.overlaps).toBeGreaterThan(0);
+    expect(report.diagnostics.some((d: { rule: string }) => d.rule === "pins-degrade-layout")).toBe(true);
+    expect(layoutBefore()).toBe(before);
+  });
   it("warns with both measurements and the fix when pins degrade the layout", async () => {
     writeLayout({ pins: farApart });
     const result = await renderCommand(model, { out: join(dir, "out.svg") });

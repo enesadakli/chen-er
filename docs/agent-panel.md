@@ -13,7 +13,7 @@ helper in the notebook margin.
 
 - The viewer still never writes the model itself. The agent writes the model. The only server-side model write is
   **Undo agent change**, an explicit user action that restores the snapshot taken before that agent turn.
-- The agent never writes the layout file (pins/positions stay the human's).
+- The agent never writes the layout file (pins/positions stay the human's). Attribute pins are relative to the immediate parent centre, including composite parts; entity/relationship pins remain absolute.
 - No API keys: the server runs the user's installed, logged-in CLI (`claude -p` or `codex exec`).
 - The panel exists only when `chen serve` is started with `--agent`.
 

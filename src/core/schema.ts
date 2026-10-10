@@ -94,12 +94,19 @@ export type EntityInput = z.infer<typeof Entity>;
 export type RelationshipInput = z.infer<typeof Relationship>;
 export type AttributeInput = z.infer<typeof Attribute>;
 
-/** Pins file next to a model: `model.er.layout.json`. Coordinates are node centers in diagram units (px). */
+/** Pins file next to a model: `model.er.layout.json`. Absolute centres or attribute offsets from the immediate parent, in diagram px. */
 export const LayoutFile = z
   .object({
     version: z.literal(1),
     engine: z.enum(["layered", "stress", "simple"]).optional(),
-    pins: z.record(z.string(), z.object({ x: z.number(), y: z.number() }).strict()).default({}),
+    pins: z.record(z.string(), z.union([
+      z.object({ x: z.number(), y: z.number() }).strict(),
+      z.object({ dx: z.number(), dy: z.number() }).strict(),
+    ])).default({}).superRefine((pins, ctx) => {
+      for (const [id, pin] of Object.entries(pins)) if ("dx" in pin && !id.startsWith("A:")) {
+        ctx.addIssue({ code: "custom", path: [id], message: "Relative pins are only valid for attributes." });
+      }
+    }),
     /**
      * Soft positions: the last accepted layout (node id → center). Unlike pins they are hints, not
      * constraints; incremental layout keeps them so a drag or a model edit changes as little as possible.

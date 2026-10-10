@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
-import type { Diagram, LayoutOptions, Point } from "../core/geometry.js";
+import type { Diagram, LayoutOptions, Pins, Point } from "../core/geometry.js";
 import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
 import { renderSvg } from "../core/render/svg.js";
 import type { QualityReport } from "../core/quality.js";
@@ -29,7 +29,7 @@ export interface ViewerState {
   diagram: Diagram | null;
   diagnostics: ViewerDiagnostic[];
   quality: QualityReport | null;
-  pins: Record<string, Point>;
+  pins: Pins;
   yaml: string;
   updatedAt: string;
   layoutRevision: string;
@@ -199,7 +199,7 @@ export async function serve(model: string, options: ServeOptions = {}) {
     let autoRelayout = false;
     let measured: QualityReport | null = null;
     const saved = readPins(modelPath);
-    const pins = saved.options.pins ?? {};
+    let pins = saved.options.pins ?? {};
     const engine = requestedEngine ?? saved.options.engine ?? DEFAULT_ENGINE;
     try {
       yaml = readFileSync(modelPath, "utf8");
@@ -227,7 +227,8 @@ export async function serve(model: string, options: ServeOptions = {}) {
         all = [...all, ...result.diagnostics];
         if (savePositions && !duringTurn && !agentRunning() && !saved.diagnostics.length && same(snapshot(), inputs)) {
           try {
-            writeLayout({ positions: diagramPositions(diagram) }, inputs);
+            writeLayout({ positions: diagramPositions(diagram) }, inputs, diagram);
+            pins = readPins(modelPath).options.pins ?? {};
             if (freshWins && revision(inputs.layout) !== revision(fileBytes(pinsPath))) {
               undo.push({ before: { layout: inputs.layout, engine: inputs.engine }, after: { layout: fileBytes(pinsPath), engine: requestedEngine } });
               if (undo.length > 50) undo.shift(); redo.length = 0;
@@ -269,17 +270,17 @@ export async function serve(model: string, options: ServeOptions = {}) {
       catch { throw new HttpError(409, "Fix or delete the invalid layout file before writing pins."); }
     }
   }
-  function writeLayout(patch: LayoutFilePatch, expected?: Snapshot): void {
+  function writeLayout(patch: LayoutFilePatch, expected?: Snapshot, diagram: Diagram | null = state?.diagram ?? null): void {
     guardLayoutPath();
     if (expected && !same(snapshot(), expected)) throw new HttpError(409, "The files changed externally during layout.");
     const before = fileBytes(pinsPath);
     const current = before ? LayoutFile.parse(JSON.parse(before.toString("utf8"))) : { pins: {} };
-    const text = formatLayoutFile(current, patch);
+    const text = formatLayoutFile(current, patch, diagram ?? undefined);
     if (expected && revision(fileBytes(modelPath)) !== revision(expected.model)) throw new HttpError(409, "The model changed externally during layout.");
     replaceBytes(pinsPath, before, Buffer.from(text));
     lastWrite = text;
   }
-  function persist(pins: Record<string, Point>, engine?: LayoutOptions["engine"]): void {
+  function persist(pins: Pins, engine?: LayoutOptions["engine"]): void {
     const parsed = LayoutFile.parse({ version: 1, pins, ...(engine ? { engine } : {}) });
     writeLayout({ pins: parsed.pins, ...(parsed.engine ? { engine: parsed.engine } : {}) });
   }

@@ -62,10 +62,14 @@ Use `title` for the heading and top-level `notes` for text printed below the dia
 A sibling `model.er.layout.json` stores an optional engine (`layered`, `stress`, `simple`), hard `pins` and optional soft `positions`:
 
 ```json
-{"version":1,"engine":"layered","pins":{"E:PROJECT":{"x":240,"y":160}}}
+{"version":1,"engine":"layered","pins":{"E:PROJECT":{"x":240,"y":160},"A:PROJECT.Name":{"dx":40,"dy":-64}}}
 ```
 
-Coordinates are node centers in pixels, with the origin at the top left and y increasing downward. Stable node ids are `E:<Entity>`, `R:<Relationship>` and `A:<Owner>.<attr>[.<part>]`. Relationship end ids are `<Relationship>#<id>` or `<Relationship>#<index>` when no explicit id is provided.
+Entity/relationship pins use absolute node centres `{x, y}` in pixels, with the origin at the top left and y increasing downward. Attribute pins use `{dx, dy}` from the immediate parent centre: an entity, a relationship or a parent attribute for composite parts. Relative pins are only valid on `A:` ids; each entry must use exactly one coordinate form. Soft positions remain absolute centres.
+
+Version 1 files with absolute attribute pins remain readable and honour those centres exactly. On the next pin, position or engine write, the writer converts them against the parent's centre in the current diagram, without rounding the offset or moving the drawing. Starting the viewer saves accepted positions and performs this conversion too. Direct app writers (`writeLayoutFile`, `writePins`, `formatLayoutFile`) take the current `Diagram` as their final argument when converting legacy attribute pins; they reject conversion without that geometry. Inactive legacy pins whose nodes/parents are absent are retained until geometry is available. Rendering via CLI/MCP reads the file without migrating it.
+
+Pins are human-owned; agents edit the YAML model and use reports for inspection. `chen render --report` and MCP `render_er` with `report: true` measure relative pin drift against the actual parent centre plus the offset. `pins-degrade-layout` compares against an unpinned layout and includes spoke/label clearance regressions. Stable node ids are `E:<Entity>`, `R:<Relationship>` and `A:<Owner>.<attr>[.<part>]`. Relationship end ids are `<Relationship>#<id>` or `<Relationship>#<index>` when no explicit id is provided.
 
 Pins constrain placement. Saved positions guide incremental layout. If restored attribute positions leave no readable
 participation/role label slot, only a blocking unpinned attribute position is released; real pins and restored

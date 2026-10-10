@@ -1,5 +1,6 @@
+import { relativeAttributePins } from "../core/pins.js";
 import type { ViewerState } from "../app/serve.js";
-import { center, type Box, type Point } from "../core/geometry.js";
+import { center, type Box, type Pin, type Point } from "../core/geometry.js";
 import { glyphs, snap, targetBox, type Finding } from "./logic.js";
 import type { MenuDimensions, MenuObstacle } from "./menu-position.js";
 import { selectionNeighborhood } from "./selection.js";
@@ -39,7 +40,7 @@ export class NotebookCanvas {
   /** Called whenever the selected drawing element changes (the agent panel turns it into a context chip). */
   onSelection: (id?: string) => void = () => {};
   constructor(private canvas: HTMLElement, private selectFinding: (number: number) => void,
-    private hover: (number?: number) => void, private pin: (id: string, point: Point | null) => Promise<void>,
+    private hover: (number?: number) => void, private pin: (id: string, point: Pin | null) => Promise<void>,
     private actions: (id?: string, anchor?: Box, dragging?: boolean, obstacles?: (menu: MenuDimensions) => MenuObstacle[]) => void = () => {}) {
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
@@ -352,7 +353,7 @@ export class NotebookCanvas {
       this.drag = undefined;
       if (!cancel && drag.id && drag.next && drag.moved) {
         this.savingDrag = true;
-        void this.pin(drag.id, drag.next).finally(() => {
+        void this.pinAt(drag.id, drag.next).finally(() => {
           this.savingDrag = false;
           drag.group?.removeAttribute("transform");
           this.flushPending();
@@ -368,6 +369,11 @@ export class NotebookCanvas {
     if (!this.drag && !this.savingDrag && this.pending) { const pending = this.pending; this.pending = undefined; this.show(pending.state, pending.list); }
   }
 
+  private pinAt(id: string, point: Point): Promise<void> {
+    const pin = relativeAttributePins({ [id]: point }, this.good?.diagram ?? undefined)[id]!;
+    return this.pin(id, pin);
+  }
+
   private key(e: KeyboardEvent) {
     if (this.writing || this.savingDrag || this.state?.computing) return;
     if (e.ctrlKey || e.metaKey) return;
@@ -379,7 +385,7 @@ export class NotebookCanvas {
       e.preventDefault();
       const dx = e.key === "ArrowLeft" ? -8 : e.key === "ArrowRight" ? 8 : 0;
       const dy = e.key === "ArrowUp" ? -8 : e.key === "ArrowDown" ? 8 : 0;
-      if (node) { const p = this.state?.pins[node.id] ?? center(node.box); void this.pin(node.id, snap({ x: p.x + dx, y: p.y + dy }, e.altKey)); }
+      if (node) { const p = center(node.box); void this.pinAt(node.id, snap({ x: p.x + dx, y: p.y + dy }, e.altKey)); }
       else { this.offset.x -= dx * 4; this.offset.y -= dy * 4; this.transform(); }
     } else if (node && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); void this.pin(node.id, null); }
     else if (e.code === "Space") e.preventDefault();

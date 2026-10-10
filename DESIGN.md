@@ -54,7 +54,7 @@ ink on white and must look the same as the export. Four graphite corner marks sh
   hint in graphite, "line 14" link (mono). Selected card expands to show the YAML excerpt (±3 lines, line
   numbers, target line marked with a pencil bar). Identity never depends on color alone.
 - Drawing marks: small numbered circle (16px) at the element's top-right, same color/glyph as its card.
-- Pin mark: 6px graphite tick at a pinned node's top-left; pinned nodes also get a dotted outline on hover.
+- Pin mark: 6px graphite tick at a pinned node's top-left; pinned nodes also get a dotted outline on hover. Attribute pins follow their immediate parent (composite parts follow the parent oval); the mark stays the same.
 - Buttons: 28px high, 4px radius, ghost at rest; hover uses 9% ink/chrome ink and active 14%. A visible focus
   ring remains for keyboard navigation. Outlined controls are reserved for the history pair, native engine
   select, paper textarea, Send, Apply to model and Undo agent change. History icons share one border with a 1px divider.
@@ -77,7 +77,7 @@ ink on white and must look the same as the export. Four graphite corner marks sh
 
 ## Motion
 - Live update: crossfade 120ms; the changed status chip gets a 600ms pencil-stroke underline. No other ambient motion.
-- Drag: node follows pointer 1:1 with grid snap (8px; hold Alt to free-move); on drop the layout re-runs with pins.
+- Drag: node follows pointer 1:1 with grid snap (8px; hold Alt to free-move); on drop the layout re-runs with pins. Attribute drops write `{dx, dy}` from the current parent centre; their relative-pinned descendants follow on drop. Entity/relationship drops write absolute `{x, y}` centres. Arrow keys use the same rule; Delete unpins.
 - Respect `prefers-reduced-motion`: no crossfade, no underline animation.
 
 ## Never
@@ -118,7 +118,7 @@ The hard counts are `diagonalEnds`, `overlaps`, `shapeCrossings`, `labelCollisio
 win for fewer `hierarchyViolations`; if hierarchy counts are equal it needs at least two fewer
 `edgeCrossings` or a `longEdgeMax` at least 20% lower (with a positive incremental value). More hierarchy
 violations always lose; ties or hard improvements alone keep incremental. No summed violation score is used.
-Pins are kept verbatim; accepted soft positions are saved normally and the previous layout bytes
+Relative offsets and absolute shape pins are preserved. Legacy absolute attribute pins stay exact on read; the next layout-file write converts them using current parent centres, preserving precision and the displayed positions. Version 1 accepts both pin forms; soft positions remain absolute. The layout file is human-owned. Accepted soft positions are saved normally and the previous layout bytes
 enter session undo history. During a running turn, only incremental previews run, without saving
 positions or advancing the comparison baseline; comparison and saving wait until the turn finishes.
 
