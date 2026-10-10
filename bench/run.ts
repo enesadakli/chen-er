@@ -19,7 +19,8 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   "company-project": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1.1829629629629628, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9528637261622064 },
   "dense-attrs": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 10.168208659840005, emptyAreaRatio: 0.9262881531759711 },
   "hub-company": { zRoutes: 5, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.2857142857142858, attributeSpokeMax: 2.47972935709149, emptyAreaRatio: 0.9053139114525204 },
-  "pinned": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0360721442885772, attributeSpokeMax: 3.3823529411764706, emptyAreaRatio: 0.9324797452787567 },
+  // The full pinned canvas includes negative geometry; its area is 1364 × 792.
+  "pinned": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0360721442885772, attributeSpokeMax: 3.3823529411764706, emptyAreaRatio: 0.957303324218917 },
   "recursive": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1562962962962962, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8690333701650775 },
   "ternary": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1615798922800717, attributeSpokeMax: 1.0654701843573313, emptyAreaRatio: 0.9313489034397789 },
   "turkish-labels": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8434353146897209 },

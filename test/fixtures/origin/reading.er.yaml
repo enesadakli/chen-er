@@ -1,0 +1,15 @@
+version: 1
+title: Reading list
+entities:
+  READER:
+    attrs: [ReaderId, Name]
+    keys: [[ReaderId]]
+  BOOK:
+    attrs: [BookId, Title]
+    keys: [[BookId]]
+relationships:
+  READS:
+    ends:
+      - {entity: READER, card: 0..N, role: reader}
+      - {entity: BOOK, card: 0..N, role: book}
+notes: [A reader can read several books.]

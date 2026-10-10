@@ -56,7 +56,8 @@ export class NotebookCanvas {
   }
   private diagramPoint(p: Point): Point { return { x: (p.x - this.offset.x) / this.scale, y: (p.y - this.offset.y) / this.scale }; }
   private transform() {
-    this.sheet.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.scale})`;
+    const origin = this.good?.diagram?.origin ?? { x: 0, y: 0 };
+    this.sheet.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.scale}) translate(${origin.x}px, ${origin.y}px)`;
     const percent = `${Math.round(this.scale * 100)}%`;
     document.querySelector<HTMLElement>("#zoom")!.textContent = percent;
     document.querySelector<HTMLButtonElement>("#actual")!.setAttribute("aria-label", `Zoom ${percent}. Reset to 100% (0)`);
@@ -73,7 +74,8 @@ export class NotebookCanvas {
     const diagram = this.good?.diagram;
     if (!diagram) return;
     const figure = this.figure.querySelector("svg");
-    const b = box ?? { x: 0, y: 0, w: diagram.width, h: Number(figure?.getAttribute("height") ?? diagram.height) };
+    const origin = diagram.origin ?? { x: 0, y: 0 };
+    const b = box ?? { x: origin.x, y: origin.y, w: diagram.width, h: Number(figure?.getAttribute("height") ?? diagram.height) };
     const padding = matchMedia("(max-width: 900px)").matches ? 24 : 48;
     this.scale = Math.max(.1, Math.min(box ? 2 : 1.5, (this.canvas.clientWidth - padding) / Math.max(b.w, 80), (this.canvas.clientHeight - padding) / Math.max(b.h, 80)));
     const c = center(b);
@@ -116,7 +118,8 @@ export class NotebookCanvas {
       } else previous?.remove();
       this.sheet.style.width = `${state.diagram.width}px`;
       this.sheet.style.height = `${next.getAttribute("height")}px`;
-      this.overlay.setAttribute("viewBox", `0 0 ${state.diagram.width} ${next.getAttribute("height")}`);
+      const origin = state.diagram.origin ?? { x: 0, y: 0 };
+      this.overlay.setAttribute("viewBox", `${origin.x} ${origin.y} ${state.diagram.width} ${next.getAttribute("height")}`);
       this.overlay.setAttribute("width", String(state.diagram.width));
       this.overlay.setAttribute("height", next.getAttribute("height")!);
       for (const node of state.diagram.nodes) {
@@ -143,7 +146,7 @@ export class NotebookCanvas {
     this.drawOverlay(true);
     if (focusId) this.group(focusId)?.focus({ preventScroll: true });
     if (focusMark) this.overlay.querySelector<SVGGElement>(`[data-finding="${focusMark}"]`)?.focus({ preventScroll: true });
-    if (first && state.svg) this.fit();
+    if (first && state.svg) this.fit(); else this.transform();
     if (this.actionsOpen) this.actionPosition();
   }
   highlight(number?: number, selected = false, focus = false) {

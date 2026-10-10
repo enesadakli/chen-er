@@ -50,7 +50,7 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
         expect(q.edgeCrossings).toBeLessThanOrEqual(2);
       }
     }
-    if (!Object.keys(pins).length) expect(q.issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);
+    expect(q.issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);
     for (const [id, pin] of Object.entries(pins)) expect(center(first.diagram.nodes.find((n) => n.id === id)!.box)).toEqual(pin);
     for (const e of first.diagram.edges) {
       const from = first.diagram.nodes.find((n) => n.id === e.from)!;
@@ -103,14 +103,17 @@ describe.each(Object.keys(engines) as (keyof typeof engines)[])("%s layout", (en
     expect(q.pinDrift).toBe(0);
     for (const [id, pin] of Object.entries(pins)) expect(center(result.diagram.nodes.find((n) => n.id === id)!.box)).toEqual(pin);
   });
-  it("keeps negative pins without producing a negative canvas", async () => {
+  it("keeps negative pins inside an expanded canvas", async () => {
     const model = parseModel("version: 1\nentities:\n  A: {}\n").model!;
     const pins = { "E:A": { x: -300, y: -300 } };
     const result = await layout(model, { engine, pins });
     expect(center(result.diagram.nodes[0]!.box)).toEqual(pins["E:A"]);
     expect(result.diagram.width).toBeGreaterThan(0);
     expect(result.diagram.height).toBeGreaterThan(0);
-    expect(result.diagnostics.some((d) => d.rule === "pin-conflict")).toBe(true);
+    expect(result.diagram.origin!.x).toBeLessThan(-300);
+    expect(result.diagram.origin!.y).toBeLessThan(-300);
+    expect(assessQuality(result.diagram, pins).issues.filter((i) => i.kind === "out-of-canvas")).toEqual([]);
+    expect(result.diagnostics.some((d) => d.rule === "pin-conflict")).toBe(false);
   });
   it("supports empty and disconnected graphs", async () => {
     const empty = await layout(parseModel("version: 1\nentities: {}\n").model!, { engine });

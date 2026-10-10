@@ -72,6 +72,8 @@ export interface DLabel {
 }
 
 export interface Diagram {
+  /** Top-left of the canvas in diagram coordinates; defaults to { x: 0, y: 0 }. */
+  origin?: Point;
   width: number;
   height: number;
   title?: string;

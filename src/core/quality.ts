@@ -83,7 +83,8 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     }));
     if (crossing) add("edge-crossing", [e.id, other.id]);
   }
-  const outside = (p: Point) => !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0 || p.x > diagram.width || p.y > diagram.height;
+  const origin = diagram.origin ?? { x: 0, y: 0 };
+  const outside = (p: Point) => !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < origin.x || p.y < origin.y || p.x > origin.x + diagram.width || p.y > origin.y + diagram.height;
   for (const item of [...nodes, ...labels]) {
     const b = item.box;
     if (outside({ x: b.x, y: b.y }) || outside({ x: b.x + b.w, y: b.y + b.h })) add("out-of-canvas", [item.id]);

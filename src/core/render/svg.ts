@@ -11,10 +11,13 @@ export function renderSvg(d: Diagram): string {
   const notesH = d.notes.length ? d.notes.length * style.note.lineHeight + style.margin : 0;
   const width = d.width;
   const height = d.height + notesH;
+  const { x: ox, y: oy } = d.origin ?? { x: 0, y: 0 };
   const out: string[] = [];
   out.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT_FAMILY}">`,
-    `<rect width="100%" height="100%" fill="${c.background}"/>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${ox} ${oy} ${width} ${height}" font-family="${FONT_FAMILY}">`,
+    ox === 0 && oy === 0
+      ? `<rect width="100%" height="100%" fill="${c.background}"/>`
+      : `<rect x="${ox}" y="${oy}" width="${width}" height="${height}" fill="${c.background}"/>`,
     `<g fill="none" stroke="${c.ink}" stroke-width="${style.stroke}" stroke-linejoin="round">`,
   );
   for (const e of d.edges) out.push(edgeSvg(e));
@@ -28,12 +31,12 @@ export function renderSvg(d: Diagram): string {
   }
   if (d.title) {
     out.push(
-      `<g data-id="title" class="er-label"><text x="${style.margin}" y="${style.margin + style.title.fontSize}" font-size="${style.title.fontSize}" font-weight="700" fill="${c.ink}">${esc(d.title)}</text></g>`,
+      `<g data-id="title" class="er-label"><text x="${ox + style.margin}" y="${oy + style.margin + style.title.fontSize}" font-size="${style.title.fontSize}" font-weight="700" fill="${c.ink}">${esc(d.title)}</text></g>`,
     );
   }
   d.notes.forEach((note, i) => {
-    const y = d.height + style.margin / 2 + (i + 0.7) * style.note.lineHeight;
-    out.push(`<g data-id="note:${i}" class="er-label"><text x="${style.margin}" y="${f(y)}" font-size="${style.note.fontSize}" fill="${c.muted}">${esc(note)}</text></g>`);
+    const y = oy + d.height + style.margin / 2 + (i + 0.7) * style.note.lineHeight;
+    out.push(`<g data-id="note:${i}" class="er-label"><text x="${ox + style.margin}" y="${f(y)}" font-size="${style.note.fontSize}" fill="${c.muted}">${esc(note)}</text></g>`);
   });
   out.push(`</svg>`);
   return out.join("\n") + "\n";
