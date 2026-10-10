@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hospital operations</title>
+<style>
+@page { size: A4; margin: 16mm; }
+body { font: 11pt/1.5 Arial, Helvetica, sans-serif; color: #202020; background: white; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+h1, h2, h3 { line-height: 1.2; } h2 { margin-top: 2rem; } h1, h2, h3 { break-after: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; } th, td { border: 1px solid #777; padding: .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-line; } th { background: #f0f0f0; }
+.requirements th:first-child, .requirements td:first-child { white-space: nowrap; min-width: 3ch; overflow-wrap: normal; }
+.requirements th:last-child, .requirements td:last-child { white-space: nowrap; min-width: 16ch; overflow-wrap: normal; }
+table, figure { page-break-inside: avoid; break-inside: avoid; } figure { margin: 1rem 0; } svg { width: 100%; height: auto; } .mapping p { break-inside: avoid; }
+@media print { body { margin: 0; padding: 0; max-width: none; font-size: 10pt; } }
+</style></head><body>
+<h1>Hospital operations</h1><p>Model: campus.er.yaml</p>
+<section><h2>Requirements</h2>
+<table class="requirements"><thead><tr><th scope="col">#</th><th scope="col">Requirement</th><th scope="col">Model elements</th><th scope="col">Status</th></tr></thead><tbody><tr><td>R1</td><td>Each hospital has one or more wards, and every ward belongs to exactly one hospital.</td><td></td><td>Not applied yet</td></tr><tr><td>R2</td><td>Every ward has one or more rooms; each room has one or more beds and belongs to exactly one ward.</td><td></td><td>Not applied yet</td></tr><tr><td>R3</td><td>Staff members have an identifier, a composite name, a role and multiple qualifications; each staff member is assigned to exactly one ward.</td><td></td><td>Not applied yet</td></tr><tr><td>R4</td><td>A staff member may supervise several trainees, and each trainee has at most one supervisor.</td><td></td><td>Not applied yet</td></tr><tr><td>R5</td><td>Patients have an identifier, a composite name, a birth date and an allergy record; staff may treat many patients, recording the treatment start date.</td><td></td><td>Not applied yet</td></tr><tr><td>R6</td><td>Each admission belongs to one patient and is identified by that patient and its admission date; it records a reason and an optional discharge date.</td><td></td><td>Not applied yet</td></tr><tr><td>R7</td><td>An admission occupies at most one bed and has one attending staff member; its discharging clinician may be different.</td><td></td><td>Not applied yet</td></tr><tr><td>R8</td><td>Hospitals employ staff members independently of ward assignments, and shifts roster one or more staff members.</td><td></td><td>Not applied yet</td></tr></tbody></table></section>
+<section><h2>ER diagram</h2>
+<figure aria-label="ER diagram"><svg xmlns="http://www.w3.org/2000/svg" width="1669" height="1318" viewBox="0 0 1669 1318" font-family="Inter, Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g fill="none" stroke="#1f2328" stroke-width="1.5" stroke-linejoin="round">
+<g data-id="edge:HAS_WARD#0" class="er-edge"><polyline points="764,311 764,196"/></g>
+<g data-id="edge:HAS_WARD#1" class="er-edge"><polyline points="764,375 764,490"/></g>
+<g data-id="edge:HAS_ROOM#0" class="er-edge"><polyline points="579.5,683 709,683 709,536"/></g>
+<g data-id="edge:HAS_ROOM#1" class="er-edge"><polyline points="428.5,683 309,683 309,830"/></g>
+<g data-id="edge:HAS_BED#0" class="er-edge"><polyline points="244,991 244,876"/></g>
+<g data-id="edge:HAS_BED#1" class="er-edge"><polyline points="244,1055 244,1170"/></g>
+<g data-id="edge:ASSIGNED_TO#0" class="er-edge"><polyline points="1111.5,683 1150,683 1150,830"/></g>
+<g data-id="edge:ASSIGNED_TO#1" class="er-edge"><polyline points="936.5,683 819,683 819,536"/></g>
+<g data-id="edge:SUPERVISES#supervisor" class="er-edge"><polyline points="1284,755 1284,830"/></g>
+<g data-id="edge:SUPERVISES#trainee" class="er-edge"><polyline points="1332,736.7 1332,830"/></g>
+<g data-id="edge:TREATS#0" class="er-edge"><polyline points="1083.5,853 1134,853"/></g>
+<g data-id="edge:TREATS#1" class="er-edge"><polyline points="964.5,853 858,853"/></g>
+<g data-id="edge:ADMISSION_OF#0" class="er-edge"><polyline points="764,991 764,876"/></g>
+<g data-id="edge:ADMISSION_OF#1" class="er-edge"><polyline points="762,1055 762,1170"/><polyline points="766,1055 766,1170"/></g>
+<g data-id="edge:OCCUPIES#0" class="er-edge"><polyline points="429,1193 315.5,1193"/></g>
+<g data-id="edge:OCCUPIES#1" class="er-edge"><polyline points="579,1193 670.5,1193"/></g>
+<g data-id="edge:ATTENDS#0" class="er-edge"><polyline points="1131,1084 1198,1084 1198,876"/></g>
+<g data-id="edge:ATTENDS#1" class="er-edge"><polyline points="997,1084 848.5,1084 848.5,1170"/></g>
+<g data-id="edge:DISCHARGES#0" class="er-edge"><polyline points="1063.5,906 1150,906 1150,876"/></g>
+<g data-id="edge:DISCHARGES#1" class="er-edge"><polyline points="979,938 979,1071 820.5,1071 820.5,1170"/></g>
+<g data-id="edge:ROSTERS#0" class="er-edge"><polyline points="1284,991 1284,876"/></g>
+<g data-id="edge:ROSTERS#1" class="er-edge"><polyline points="1284,1055 1284,1170"/></g>
+<g data-id="edge:EMPLOYS#0" class="er-edge"><polyline points="844,417 844,196"/></g>
+<g data-id="edge:EMPLOYS#1" class="er-edge"><polyline points="914.5,449 1182,449 1182,830"/></g>
+<g data-id="edge:A:HOSPITAL.HospitalId" class="er-edge"><polyline points="764,150 764,114"/></g>
+<g data-id="edge:A:HOSPITAL.Name" class="er-edge"><polyline points="853,150 885,141.3"/></g>
+<g data-id="edge:A:HOSPITAL.City" class="er-edge"><polyline points="675,150 643,141.1"/></g>
+<g data-id="edge:A:WARD.WardCode" class="er-edge"><polyline points="700,490 694.3,468"/></g>
+<g data-id="edge:A:WARD.Name" class="er-edge"><polyline points="700,500 664.5,500"/></g>
+<g data-id="edge:A:WARD.Specialty" class="er-edge"><polyline points="828,513 864,513"/></g>
+<g data-id="edge:A:ROOM.RoomNo" class="er-edge"><polyline points="170,853 134,853"/></g>
+<g data-id="edge:A:ROOM.Floor" class="er-edge"><polyline points="170,876 160.5,890.7"/></g>
+<g data-id="edge:A:BED.BedNo" class="er-edge"><polyline points="172.5,1216 164.1,1233.3"/></g>
+<g data-id="edge:A:BED.Kind" class="er-edge"><polyline points="172.5,1201 136.5,1201"/></g>
+<g data-id="edge:A:STAFF.Name" class="er-edge"><polyline points="1434,853 1470.5,853"/></g>
+<g data-id="edge:A:STAFF.Name.First" class="er-edge"><polyline points="1540.9,841.5 1574.6,828.6"/></g>
+<g data-id="edge:A:STAFF.Name.Last" class="er-edge"><polyline points="1541.3,864.3 1574.8,876.8"/></g>
+<g data-id="edge:A:STAFF.StaffId" class="er-edge"><polyline points="1424,876 1424,912"/></g>
+<g data-id="edge:A:STAFF.Role" class="er-edge"><polyline points="1328,876 1328,930"/></g>
+<g data-id="edge:A:STAFF.Qualifications" class="er-edge"><polyline points="1434,830 1452.9,803.7"/></g>
+<g data-id="edge:A:PATIENT.Name" class="er-edge"><polyline points="764,830 764,794"/></g>
+<g data-id="edge:A:PATIENT.Name.First" class="er-edge"><polyline points="755.9,760.3 740,727.5"/></g>
+<g data-id="edge:A:PATIENT.Name.Last" class="er-edge"><polyline points="777.8,761 801.5,733.6"/></g>
+<g data-id="edge:A:PATIENT.PatientId" class="er-edge"><polyline points="670,830 641.2,821.4"/></g>
+<g data-id="edge:A:PATIENT.BirthDate" class="er-edge"><polyline points="670,866 634.5,866"/></g>
+<g data-id="edge:A:PATIENT.Allergy" class="er-edge"><polyline points="680,876 680,912"/></g>
+<g data-id="edge:A:ADMISSION.AdmittedOn" class="er-edge"><polyline points="764,1216 764,1252"/></g>
+<g data-id="edge:A:ADMISSION.DischargedOn" class="er-edge"><polyline points="857.5,1216 885,1218.9"/></g>
+<g data-id="edge:A:ADMISSION.Reason" class="er-edge"><polyline points="680,1170 680,1151"/></g>
+<g data-id="edge:A:SHIFT.ShiftId" class="er-edge"><polyline points="1345,1216 1359.1,1233.8"/></g>
+<g data-id="edge:A:SHIFT.Day" class="er-edge"><polyline points="1345,1200 1381,1200"/></g>
+<g data-id="edge:A:SHIFT.StartTime" class="er-edge"><polyline points="1345,1170 1375.8,1162.5"/></g>
+<g data-id="edge:A:TREATS.StartDate" class="er-edge"><polyline points="1038.2,828.6 1056.2,797.7"/></g>
+</g>
+<g data-id="E:HOSPITAL" class="er-entity"><rect x="675" y="150" width="178" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="173" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Hospital Campus</text></g>
+<g data-id="E:WARD" class="er-entity"><rect x="700" y="490" width="128" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="513" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Care Ward</text></g>
+<g data-id="E:ROOM" class="er-entity"><rect x="170" y="830" width="148" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="244" y="853" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Patient Room</text></g>
+<g data-id="E:BED" class="er-entity"><rect x="172.5" y="1170" width="143" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="244" y="1193" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Hospital Bed</text></g>
+<g data-id="E:STAFF" class="er-entity"><rect x="1134" y="830" width="300" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1284" y="853" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Staff Member</text></g>
+<g data-id="E:PATIENT" class="er-entity"><rect x="670" y="830" width="188" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="853" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Registered Patient</text></g>
+<g data-id="E:ADMISSION" class="er-entity"><rect x="670.5" y="1170" width="187" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><rect x="675.5" y="1175" width="177" height="36" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="1193" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Admission Record</text></g>
+<g data-id="E:SHIFT" class="er-entity"><rect x="1223" y="1170" width="122" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1284" y="1193" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Duty Shift</text></g>
+<g data-id="R:HAS_WARD" class="er-relationship"><polygon points="764,311 838.5,343 764,375 689.5,343" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="343" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Has ward</text></g>
+<g data-id="R:HAS_ROOM" class="er-relationship"><polygon points="504,651 579.5,683 504,715 428.5,683" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="504" y="683" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Has room</text></g>
+<g data-id="R:HAS_BED" class="er-relationship"><polygon points="244,991 312,1023 244,1055 176,1023" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="244" y="1023" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Has bed</text></g>
+<g data-id="R:ASSIGNED_TO" class="er-relationship"><polygon points="1024,651 1111.5,683 1024,715 936.5,683" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1024" y="683" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Assigned to</text></g>
+<g data-id="R:SUPERVISES" class="er-relationship"><polygon points="1284,691 1368,723 1284,755 1200,723" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1284" y="723" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Supervises</text></g>
+<g data-id="R:TREATS" class="er-relationship"><polygon points="1024,821 1083.5,853 1024,885 964.5,853" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1024" y="853" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Treats</text></g>
+<g data-id="R:ADMISSION_OF" class="er-relationship"><polygon points="764,991 858,1023 764,1055 670,1023" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><polygon points="764,998 837.4,1023 764,1048 690.6,1023" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="1023" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Admission of</text></g>
+<g data-id="R:OCCUPIES" class="er-relationship"><polygon points="504,1161 579,1193 504,1225 429,1193" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="504" y="1193" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Occupies</text></g>
+<g data-id="R:ATTENDS" class="er-relationship"><polygon points="1064,1052 1131,1084 1064,1116 997,1084" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1064" y="1084" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Attends</text></g>
+<g data-id="R:DISCHARGES" class="er-relationship"><polygon points="979,874 1063.5,906 979,938 894.5,906" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="979" y="906" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Discharges</text></g>
+<g data-id="R:ROSTERS" class="er-relationship"><polygon points="1284,991 1349.5,1023 1284,1055 1218.5,1023" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="1284" y="1023" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Rosters</text></g>
+<g data-id="R:EMPLOYS" class="er-relationship"><polygon points="844,417 914.5,449 844,481 773.5,449" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="844" y="449" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Employs</text></g>
+<g data-id="A:HOSPITAL.HospitalId" class="er-attribute"><ellipse cx="764" cy="97" rx="56.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="97" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">HospitalId</text><line x1="730.8" y1="105.7" x2="797.2" y2="105.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:HOSPITAL.Name" class="er-attribute"><ellipse cx="919" cy="132" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="919" y="132" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:HOSPITAL.City" class="er-attribute"><ellipse cx="614" cy="133" rx="33" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="614" y="133" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">City</text></g>
+<g data-id="A:WARD.WardCode" class="er-attribute"><ellipse cx="690" cy="451" rx="59" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="690" y="451" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">WardCode</text><line x1="654.6" y1="459.7" x2="725.4" y2="459.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:WARD.Name" class="er-attribute"><ellipse cx="624" cy="500" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="624" y="500" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:WARD.Specialty" class="er-attribute"><ellipse cx="917" cy="513" rx="53" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="917" y="513" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Specialty</text></g>
+<g data-id="A:ROOM.RoomNo" class="er-attribute"><ellipse cx="83" cy="853" rx="51" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="83" y="853" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">RoomNo</text><line x1="54.5" y1="861.7" x2="111.5" y2="861.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:ROOM.Floor" class="er-attribute"><ellipse cx="150" cy="907" rx="37.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="150" y="907" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Floor</text></g>
+<g data-id="A:BED.BedNo" class="er-attribute"><ellipse cx="156" cy="1250" rx="44" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="156" y="1250" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BedNo</text><line x1="133.6" y1="1258.7" x2="178.4" y2="1258.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:BED.Kind" class="er-attribute"><ellipse cx="101" cy="1201" rx="35.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="101" y="1201" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Kind</text></g>
+<g data-id="A:STAFF.Name" class="er-attribute"><ellipse cx="1511" cy="853" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1511" y="853" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:STAFF.Name.First" class="er-attribute"><ellipse cx="1602" cy="818" rx="35" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1602" y="818" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">First</text></g>
+<g data-id="A:STAFF.Name.Last" class="er-attribute"><ellipse cx="1602" cy="887" rx="34" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1602" y="887" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Last</text></g>
+<g data-id="A:STAFF.StaffId" class="er-attribute"><ellipse cx="1424" cy="929" rx="43.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1424" y="929" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">StaffId</text><line x1="1401.9" y1="937.7" x2="1446.1" y2="937.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:STAFF.Role" class="er-attribute"><ellipse cx="1328" cy="947" rx="35" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1328" y="947" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Role</text></g>
+<g data-id="A:STAFF.Qualifications" class="er-attribute"><ellipse cx="1465" cy="787" rx="70" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><ellipse cx="1465" cy="787" rx="66" ry="13" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="1465" y="787" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Qualifications</text></g>
+<g data-id="A:PATIENT.Name" class="er-attribute"><ellipse cx="764" cy="777" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="777" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:PATIENT.Name.First" class="er-attribute"><ellipse cx="732" cy="711" rx="35" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="732" y="711" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">First</text></g>
+<g data-id="A:PATIENT.Name.Last" class="er-attribute"><ellipse cx="815" cy="718" rx="34" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="815" y="718" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Last</text></g>
+<g data-id="A:PATIENT.PatientId" class="er-attribute"><ellipse cx="603" cy="810" rx="51.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="603" y="810" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PatientId</text><line x1="573.9" y1="818.7" x2="632.1" y2="818.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:PATIENT.BirthDate" class="er-attribute"><ellipse cx="581" cy="866" rx="53.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="581" y="866" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BirthDate</text></g>
+<g data-id="A:PATIENT.Allergy" class="er-attribute"><ellipse cx="680" cy="929" rx="45" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="680" y="929" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Allergy</text></g>
+<g data-id="A:ADMISSION.AdmittedOn" class="er-attribute"><ellipse cx="764" cy="1269" rx="63.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="764" y="1269" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">AdmittedOn</text><line x1="724.6" y1="1277.7" x2="803.4" y2="1277.7" stroke="#1f2328" stroke-width="1.2" stroke-dasharray="4 3"/></g>
+<g data-id="A:ADMISSION.DischargedOn" class="er-attribute"><ellipse cx="951" cy="1226" rx="72.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="951" y="1226" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">DischargedOn</text></g>
+<g data-id="A:ADMISSION.Reason" class="er-attribute"><ellipse cx="680" cy="1134" rx="46.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="680" y="1134" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Reason</text></g>
+<g data-id="A:SHIFT.ShiftId" class="er-attribute"><ellipse cx="1372" cy="1250" rx="43" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1372" y="1250" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">ShiftId</text><line x1="1350.6" y1="1258.7" x2="1393.4" y2="1258.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:SHIFT.Day" class="er-attribute"><ellipse cx="1414" cy="1200" rx="33" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1414" y="1200" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Day</text></g>
+<g data-id="A:SHIFT.StartTime" class="er-attribute"><ellipse cx="1419" cy="1152" rx="55" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1419" y="1152" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">StartTime</text></g>
+<g data-id="A:TREATS.StartDate" class="er-attribute"><ellipse cx="1066" cy="781" rx="54" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1066" y="781" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">StartDate</text></g>
+<g data-id="label:edge:HAS_WARD#0:cardinality" class="er-label"><text x="744.5" y="211" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:HAS_WARD#1:cardinality" class="er-label"><text x="781" y="475" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:HAS_ROOM#0:cardinality" class="er-label"><text x="689.5" y="551" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:HAS_ROOM#1:cardinality" class="er-label"><text x="326" y="815" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:HAS_BED#0:cardinality" class="er-label"><text x="224.5" y="891" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:HAS_BED#1:cardinality" class="er-label"><text x="261" y="1155" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:ASSIGNED_TO#0:cardinality" class="er-label"><text x="1133" y="815" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:ASSIGNED_TO#1:cardinality" class="er-label"><text x="798" y="551" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:SUPERVISES#supervisor:cardinality" class="er-label"><text x="1305" y="815" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:SUPERVISES#supervisor:role" class="er-label"><text x="1246.5" y="782" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">supervisor</text></g>
+<g data-id="label:edge:SUPERVISES#trainee:cardinality" class="er-label"><text x="1350.5" y="815" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:SUPERVISES#trainee:role" class="er-label"><text x="1358.5" y="782" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">trainee</text></g>
+<g data-id="label:edge:TREATS#0:cardinality" class="er-label"><text x="1109" y="864" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:TREATS#1:cardinality" class="er-label"><text x="883" y="864" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:ADMISSION_OF#0:cardinality" class="er-label"><text x="743" y="891" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:ADMISSION_OF#1:cardinality" class="er-label"><text x="783" y="1155" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:OCCUPIES#0:cardinality" class="er-label"><text x="338" y="1204" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:OCCUPIES#1:cardinality" class="er-label"><text x="648" y="1182" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:ATTENDS#0:cardinality" class="er-label"><text x="1177" y="891" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:ATTENDS#1:cardinality" class="er-label"><text x="865.5" y="1155" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:DISCHARGES#0:cardinality" class="er-label"><text x="1129" y="893" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:DISCHARGES#1:cardinality" class="er-label"><text x="802" y="1122" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:ROSTERS#0:cardinality" class="er-label"><text x="1263" y="891" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:ROSTERS#1:cardinality" class="er-label"><text x="1303.5" y="1155" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:EMPLOYS#0:cardinality" class="er-label"><text x="824.5" y="211" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:EMPLOYS#1:cardinality" class="er-label"><text x="1199" y="815" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="title" class="er-label"><text x="32" y="52" font-size="20" font-weight="700" fill="#1f2328">Hospital operations</text></g>
+</svg>
+</figure></section>
+<section><h2>Model</h2>
+<table><thead><tr><th scope="col">Entity</th><th scope="col">Kind</th><th scope="col">Key</th><th scope="col">Attributes</th></tr></thead><tbody><tr><td>Hospital Campus (HOSPITAL)</td><td>Strong</td><td>(HospitalId)</td><td>HospitalId, Name, City</td></tr><tr><td>Care Ward (WARD)</td><td>Strong</td><td>(WardCode)</td><td>WardCode, Name, Specialty</td></tr><tr><td>Patient Room (ROOM)</td><td>Strong</td><td>(RoomNo)</td><td>RoomNo, Floor</td></tr><tr><td>Hospital Bed (BED)</td><td>Strong</td><td>(BedNo)</td><td>BedNo, Kind</td></tr><tr><td>Staff Member (STAFF)</td><td>Strong</td><td>(StaffId)</td><td>StaffId, Name(First, Last), Role, {Qualifications}</td></tr><tr><td>Registered Patient (PATIENT)</td><td>Strong</td><td>(PatientId)</td><td>PatientId, Name(First, Last), BirthDate, Allergy</td></tr><tr><td>Admission Record (ADMISSION)</td><td>Weak</td><td>AdmittedOn</td><td>AdmittedOn, DischargedOn, Reason</td></tr><tr><td>Duty Shift (SHIFT)</td><td>Strong</td><td>(ShiftId)</td><td>ShiftId, Day, StartTime</td></tr></tbody></table>
+<table><thead><tr><th scope="col">Relationship</th><th scope="col">Degree</th><th scope="col">Participants (min,max)</th><th scope="col">Attributes</th><th scope="col">Identifying</th></tr></thead><tbody><tr><td>Has ward (HAS_WARD)</td><td>2</td><td>Hospital Campus (HOSPITAL) (1,N), Care Ward (WARD) (1,1)</td><td></td><td>No</td></tr><tr><td>Has room (HAS_ROOM)</td><td>2</td><td>Care Ward (WARD) (1,N), Patient Room (ROOM) (1,1)</td><td></td><td>No</td></tr><tr><td>Has bed (HAS_BED)</td><td>2</td><td>Patient Room (ROOM) (1,N), Hospital Bed (BED) (1,1)</td><td></td><td>No</td></tr><tr><td>Assigned to (ASSIGNED_TO)</td><td>2</td><td>Staff Member (STAFF) (1,1), Care Ward (WARD) (0,N)</td><td></td><td>No</td></tr><tr><td>Supervises (SUPERVISES)</td><td>2</td><td>Staff Member (STAFF) [supervisor] (0,N), Staff Member (STAFF) [trainee] (0,1)</td><td></td><td>No</td></tr><tr><td>Treats (TREATS)</td><td>2</td><td>Staff Member (STAFF) (0,N), Registered Patient (PATIENT) (0,N)</td><td>StartDate</td><td>No</td></tr><tr><td>Admission of (ADMISSION_OF)</td><td>2</td><td>Registered Patient (PATIENT) (0,N), Admission Record (ADMISSION) (1,1)</td><td></td><td>Yes (Admission Record)</td></tr><tr><td>Occupies (OCCUPIES)</td><td>2</td><td>Hospital Bed (BED) (0,1), Admission Record (ADMISSION) (0,1)</td><td></td><td>No</td></tr><tr><td>Attends (ATTENDS)</td><td>2</td><td>Staff Member (STAFF) (0,N), Admission Record (ADMISSION) (1,1)</td><td></td><td>No</td></tr><tr><td>Discharges (DISCHARGES)</td><td>2</td><td>Staff Member (STAFF) (0,N), Admission Record (ADMISSION) (0,1)</td><td></td><td>No</td></tr><tr><td>Rosters (ROSTERS)</td><td>2</td><td>Staff Member (STAFF) (0,N), Duty Shift (SHIFT) (1,N)</td><td></td><td>No</td></tr><tr><td>Employs (EMPLOYS)</td><td>2</td><td>Hospital Campus (HOSPITAL) (1,N), Staff Member (STAFF) (1,1)</td><td></td><td>No</td></tr></tbody></table></section>
+<section><h2>Traceability</h2>
+<p>No requirement has been applied to the model yet, so traceability is not available.</p></section>
+<section><h2>Lint</h2>
+<table><thead><tr><th scope="col">Severity</th><th scope="col">Rule</th><th scope="col">Message</th></tr></thead><tbody><tr><td>info</td><td>parallel-relationships</td><td>Relationships ATTENDS, DISCHARGES connect the same entities (ADMISSION, STAFF) and may record the same fact twice. Justified by note: &quot;The discharging clinician can differ from the attending one recorded by ATTENDS.&quot; — No action needed unless the note no longer holds.</td></tr><tr><td>info</td><td>redundant-functional-path</td><td>EMPLOYS directly maps STAFF to at most one HOSPITAL, while the to-one path STAFF → ASSIGNED_TO → WARD → HAS_WARD → HOSPITAL stores the same fact (STAFF&#39;s HOSPITAL) twice and may disagree. Justified by note: &quot;Employment is contractual with the hospital; ward assignment may change without changing the employer.&quot; — No action needed unless the note no longer holds.</td></tr></tbody></table>
+<p><em>0 errors does not mean the model is right; it means nothing obviously wrong was found.</em></p></section>
+<section><h2>Relational schema</h2>
+<div class="mapping"><p>PATIENT(<u>PatientId</u>, Name_First, Name_Last, BirthDate, Allergy)<br>
+Step 1: E:PATIENT is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.</p>
+<p>HOSPITAL(<u>HospitalId</u>, Name, City)<br>
+Step 1: E:HOSPITAL is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.</p>
+<p>SHIFT(<u>ShiftId</u>, Day, StartTime)<br>
+Step 1: E:SHIFT is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.</p>
+<p>WARD(<u>WardCode</u>, Name, Specialty, HOSPITAL_HospitalId)<br>
+HOSPITAL_HospitalId → HOSPITAL(HospitalId) [NOT NULL]<br>
+Step 1: E:WARD is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.<br>
+Step 4: R:HAS_WARD is 1:N (E:HOSPITAL 1..N, E:WARD 1..1); FK on E:WARD, the max=1 (relational N-side) end.</p>
+<p>ROOM(<u>RoomNo</u>, Floor, WARD_WardCode)<br>
+WARD_WardCode → WARD(WardCode) [NOT NULL]<br>
+Step 1: E:ROOM is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.<br>
+Step 4: R:HAS_ROOM is 1:N (E:WARD 1..N, E:ROOM 1..1); FK on E:ROOM, the max=1 (relational N-side) end.</p>
+<p>BED(<u>BedNo</u>, Kind, ROOM_RoomNo)<br>
+ROOM_RoomNo → ROOM(RoomNo) [NOT NULL]<br>
+Step 1: E:BED is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.<br>
+Step 4: R:HAS_BED is 1:N (E:ROOM 1..N, E:BED 1..1); FK on E:BED, the max=1 (relational N-side) end.</p>
+<p>STAFF(<u>StaffId</u>, Name_First, Name_Last, Role, WARD_WardCode, HOSPITAL_HospitalId, supervisor_StaffId)<br>
+WARD_WardCode → WARD(WardCode) [NOT NULL]<br>
+HOSPITAL_HospitalId → HOSPITAL(HospitalId) [NOT NULL]<br>
+supervisor_StaffId → STAFF(StaffId)<br>
+Step 1: E:STAFF is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.<br>
+Step 4: R:ASSIGNED_TO is 1:N (E:STAFF 1..1, E:WARD 0..N); FK on E:STAFF, the max=1 (relational N-side) end.<br>
+Step 4: R:EMPLOYS is 1:N (E:HOSPITAL 1..N, E:STAFF 1..1); FK on E:STAFF, the max=1 (relational N-side) end.<br>
+Step 4: R:SUPERVISES is 1:N (E:STAFF/supervisor 0..N, E:STAFF/trainee 0..1); FK on E:STAFF/trainee, the max=1 (relational N-side) end.</p>
+<p>ADMISSION(<u>PATIENT_PatientId</u>, <u>AdmittedOn</u>, DischargedOn, Reason, ATTENDS_StaffId, DISCHARGES_StaffId, BED_BedNo)<br>
+PATIENT_PatientId → PATIENT(PatientId) [NOT NULL]<br>
+ATTENDS_StaffId → STAFF(StaffId) [NOT NULL]<br>
+DISCHARGES_StaffId → STAFF(StaffId)<br>
+BED_BedNo → BED(BedNo)<br>
+UNIQUE(BED_BedNo)<br>
+Step 2: E:ADMISSION is weak, identified by R:ADMISSION_OF; PK = owner PK(s) + partial key.<br>
+Step 4: R:ATTENDS is 1:N (E:STAFF 0..N, E:ADMISSION 1..1); FK on E:ADMISSION, the max=1 (relational N-side) end.<br>
+Step 4: R:DISCHARGES is 1:N (E:STAFF 0..N, E:ADMISSION 0..1); FK on E:ADMISSION, the max=1 (relational N-side) end.<br>
+Step 3: R:OCCUPIES is 1:1 (E:BED 0..1, E:ADMISSION 0..1); FK on E:ADMISSION, the chosen end; both or neither end is total: choose the first entity/end id in lexical order.</p>
+<p>ROSTERS(<u>STAFF_StaffId</u>, <u>SHIFT_ShiftId</u>)<br>
+STAFF_StaffId → STAFF(StaffId) [NOT NULL]<br>
+SHIFT_ShiftId → SHIFT(ShiftId) [NOT NULL]<br>
+Step 5: R:ROSTERS is M:N (E:STAFF 0..N, E:SHIFT 1..N); PK = all participating PKs.</p>
+<p>TREATS(<u>STAFF_StaffId</u>, <u>PATIENT_PatientId</u>, StartDate)<br>
+STAFF_StaffId → STAFF(StaffId) [NOT NULL]<br>
+PATIENT_PatientId → PATIENT(PatientId) [NOT NULL]<br>
+Step 5: R:TREATS is M:N (E:STAFF 0..N, E:PATIENT 0..N); PK = all participating PKs.</p>
+<p>STAFF_Qualifications(<u>STAFF_StaffId</u>, <u>Qualifications</u>)<br>
+STAFF_StaffId → STAFF(StaffId) [NOT NULL]<br>
+Step 6: A:STAFF.Qualifications is multivalued; PK = owner PK + stored simple value components.</p>
+<p>Notes:</p>
+<p>- R:DISCHARGES: The discharging clinician can differ from the attending one recorded by ATTENDS.<br>
+- R:EMPLOYS: Employment is contractual with the hospital; ward assignment may change without changing the employer.<br>
+- R:EMPLOYS, EMPLOYS#0 (E:HOSPITAL 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.<br>
+- R:HAS_BED, HAS_BED#0 (E:ROOM 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.<br>
+- R:HAS_ROOM, HAS_ROOM#0 (E:WARD 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.<br>
+- R:HAS_WARD, HAS_WARD#0 (E:HOSPITAL 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.<br>
+- R:ROSTERS, ROSTERS#1 (E:SHIFT 1..N): minimum participation 1 requires an assertion or trigger; FK/NOT NULL does not ensure a referenced entity has relationship rows.</p></div></section>
+</body></html>

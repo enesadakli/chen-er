@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="901" height="868" viewBox="0 0 901 868" font-family="Inter, Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g fill="none" stroke="#1f2328" stroke-width="1.5" stroke-linejoin="round">
+<g data-id="edge:COPY_OF#0" class="er-edge"><polyline points="196,499 196,434"/></g>
+<g data-id="edge:COPY_OF#1" class="er-edge"><polyline points="194,563 194,628"/><polyline points="198,563 198,628"/></g>
+<g data-id="edge:BORROWS#0" class="er-edge"><polyline points="492,651 568.5,651"/></g>
+<g data-id="edge:BORROWS#1" class="er-edge"><polyline points="330,651 251,651"/></g>
+<g data-id="edge:PUBLISHES#0" class="er-edge"><polyline points="196,259 196,194"/></g>
+<g data-id="edge:PUBLISHES#1" class="er-edge"><polyline points="196,323 196,388"/></g>
+<g data-id="edge:A:BOOK.ISBN" class="er-edge"><polyline points="141,388 119.2,371.5"/></g>
+<g data-id="edge:A:BOOK.Title" class="er-edge"><polyline points="141,411 105.5,411"/></g>
+<g data-id="edge:A:BOOK.Authors" class="er-edge"><polyline points="251,388 271.5,370.7"/></g>
+<g data-id="edge:A:BOOK.Year" class="er-edge"><polyline points="141,434 114.2,449"/></g>
+<g data-id="edge:A:COPY.CopyNo" class="er-edge"><polyline points="151,674 151,710"/></g>
+<g data-id="edge:A:COPY.Shelf" class="er-edge"><polyline points="141,671 108,671"/></g>
+<g data-id="edge:A:MEMBER.Name" class="er-edge"><polyline points="683.5,674 703.9,690"/></g>
+<g data-id="edge:A:MEMBER.Name.First" class="er-edge"><polyline points="763.2,707.2 799.2,709.1"/></g>
+<g data-id="edge:A:MEMBER.Name.Last" class="er-edge"><polyline points="734.3,721.3 754.9,750.9"/></g>
+<g data-id="edge:A:MEMBER.MemberId" class="er-edge"><polyline points="683.5,651 720,651"/></g>
+<g data-id="edge:A:MEMBER.Email" class="er-edge"><polyline points="683.5,628 701.5,611.3"/></g>
+<g data-id="edge:A:MEMBER.Age" class="er-edge"><polyline points="634,674 634,710"/></g>
+<g data-id="edge:A:PUBLISHER.PubName" class="er-edge"><polyline points="170,148 170,114"/></g>
+<g data-id="edge:A:PUBLISHER.City" class="er-edge"><polyline points="129.5,148 96.7,141.3"/></g>
+<g data-id="edge:A:BORROWS.LoanDate" class="er-edge"><polyline points="426.4,676.9 445.1,708.3"/></g>
+<g data-id="edge:A:BORROWS.DueDate" class="er-edge"><polyline points="433.4,627.9 458.3,602.2"/></g>
+</g>
+<g data-id="E:BOOK" class="er-entity"><rect x="141" y="388" width="110" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="196" y="411" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BOOK</text></g>
+<g data-id="E:COPY" class="er-entity"><rect x="141" y="628" width="110" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><rect x="146" y="633" width="100" height="36" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="196" y="651" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">COPY</text></g>
+<g data-id="E:MEMBER" class="er-entity"><rect x="568.5" y="628" width="115" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="626" y="651" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">MEMBER</text></g>
+<g data-id="E:PUBLISHER" class="er-entity"><rect x="129.5" y="148" width="133" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="196" y="171" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PUBLISHER</text></g>
+<g data-id="R:COPY_OF" class="er-relationship"><polygon points="196,499 272,531 196,563 120,531" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><polygon points="196,506 255.4,531 196,556 136.6,531" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="196" y="531" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">COPY_OF</text></g>
+<g data-id="R:BORROWS" class="er-relationship"><polygon points="411,619 492,651 411,683 330,651" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="411" y="651" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BORROWS</text></g>
+<g data-id="R:PUBLISHES" class="er-relationship"><polygon points="196,259 280.5,291 196,323 111.5,291" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="196" y="291" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PUBLISHES</text></g>
+<g data-id="A:BOOK.ISBN" class="er-attribute"><ellipse cx="100" cy="357" rx="37" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="100" y="357" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">ISBN</text><line x1="83.8" y1="365.7" x2="116.2" y2="365.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:BOOK.Title" class="er-attribute"><ellipse cx="71" cy="411" rx="34.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="71" y="411" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Title</text></g>
+<g data-id="A:BOOK.Authors" class="er-attribute"><ellipse cx="290" cy="355" rx="48" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><ellipse cx="290" cy="355" rx="44" ry="13" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="290" y="355" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Authors</text></g>
+<g data-id="A:BOOK.Year" class="er-attribute"><ellipse cx="91" cy="462" rx="36" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="91" y="462" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Year</text></g>
+<g data-id="A:COPY.CopyNo" class="er-attribute"><ellipse cx="151" cy="727" rx="49.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="151" y="727" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">CopyNo</text><line x1="124" y1="735.7" x2="178" y2="735.7" stroke="#1f2328" stroke-width="1.2" stroke-dasharray="4 3"/></g>
+<g data-id="A:COPY.Shelf" class="er-attribute"><ellipse cx="70" cy="671" rx="38" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="70" y="671" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Shelf</text></g>
+<g data-id="A:MEMBER.Name" class="er-attribute"><ellipse cx="723" cy="705" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="723" y="705" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:MEMBER.Name.First" class="er-attribute"><ellipse cx="834" cy="711" rx="35" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="834" y="711" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">First</text></g>
+<g data-id="A:MEMBER.Name.Last" class="er-attribute"><ellipse cx="766" cy="767" rx="34" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="766" y="767" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Last</text></g>
+<g data-id="A:MEMBER.MemberId" class="er-attribute"><ellipse cx="777" cy="651" rx="57" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="777" y="651" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">MemberId</text><line x1="743.3" y1="659.7" x2="810.7" y2="659.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:MEMBER.Email" class="er-attribute"><ellipse cx="718" cy="596" rx="38.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="718" y="596" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Email</text><line x1="700.3" y1="604.7" x2="735.7" y2="604.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:MEMBER.Age" class="er-attribute"><ellipse cx="634" cy="727" rx="33.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5" stroke-dasharray="5 4"/><text x="634" y="727" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Age</text></g>
+<g data-id="A:PUBLISHER.PubName" class="er-attribute"><ellipse cx="170" cy="97" rx="55.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="170" y="97" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">PubName</text><line x1="137.7" y1="105.7" x2="202.3" y2="105.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:PUBLISHER.City" class="er-attribute"><ellipse cx="66" cy="135" rx="33" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="66" y="135" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">City</text></g>
+<g data-id="A:BORROWS.LoanDate" class="er-attribute"><ellipse cx="455" cy="725" rx="54.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="455" y="725" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">LoanDate</text></g>
+<g data-id="A:BORROWS.DueDate" class="er-attribute"><ellipse cx="474" cy="586" rx="51" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="474" y="586" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">DueDate</text></g>
+<g data-id="label:edge:COPY_OF#0:cardinality" class="er-label"><text x="175" y="449" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:COPY_OF#1:cardinality" class="er-label"><text x="215" y="613" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:BORROWS#0:cardinality" class="er-label"><text x="543.5" y="640" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:BORROWS#1:cardinality" class="er-label"><text x="276" y="662" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:PUBLISHES#0:cardinality" class="er-label"><text x="175" y="209" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:PUBLISHES#1:cardinality" class="er-label"><text x="213" y="373" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="title" class="er-label"><text x="32" y="52" font-size="20" font-weight="700" fill="#1f2328">Library</text></g>
+<g data-id="note:0" class="er-label"><text x="32" y="846" font-size="13" fill="#57606a">A copy only exists as a copy of a book.</text></g>
+</svg>
