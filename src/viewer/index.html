@@ -50,15 +50,35 @@
         <button id="zoom-fit" class="icon-button" aria-label="Fit to sheet" title="Fit to sheet (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>
       </div>
     </section>
-    <aside id="notes" class="notes" aria-label="Model findings">
+    <aside id="notes" class="notes" aria-label="Notes column">
       <div class="notes-heading">
         <button id="drawer" class="drawer" aria-label="Resize notes drawer. Arrow keys change its height."><span aria-hidden="true"></span></button>
-        <div id="tabs" class="tabs" role="tablist" aria-label="Notes column" hidden>
+        <div id="tabs" class="tabs" role="tablist" aria-label="Notes column">
           <button id="tab-notes" role="tab" aria-selected="true" aria-controls="findings">Notes</button>
-          <button id="tab-agent" role="tab" aria-selected="false" aria-controls="agent" tabindex="-1">Agent <span id="tab-agent-state" class="tab-state" hidden></span></button>
+          <button id="tab-requirements" role="tab" aria-selected="false" aria-controls="requirements" tabindex="-1">Requirements <span id="tab-requirements-state" class="tab-state" hidden></span></button>
+          <button id="tab-agent" role="tab" aria-selected="false" aria-controls="agent" tabindex="-1" hidden>Agent <span id="tab-agent-state" class="tab-state" hidden></span></button>
         </div>
       </div>
-      <div id="findings" class="findings"><p>Waiting for findings…</p></div>
+      <div id="findings" class="findings" role="tabpanel" aria-labelledby="tab-notes"><p>Waiting for findings…</p></div>
+      <section id="requirements" class="requirements" role="tabpanel" aria-labelledby="tab-requirements" hidden>
+        <p class="req-heading"><span id="req-file" class="basename"></span> <span id="req-save" class="req-save" role="status"></span></p>
+        <div id="req-conflict" class="req-conflict" role="alert" hidden>
+          <p><span class="glyph" aria-hidden="true">✕</span> The requirements file changed outside the viewer, so these lines are not saved.</p>
+          <p><button id="req-load" type="button" class="link-button">Load the file</button> · <button id="req-keep" type="button" class="link-button">Keep these lines</button></p>
+        </div>
+        <p id="req-empty" class="req-lead">Write the requirements in plain sentences, one per line. Enter starts the next line. Apply builds the model from new and changed lines and links each requirement to the elements that implement it.</p>
+        <ol id="req-list" class="req-list" aria-label="Requirements"></ol>
+        <div class="req-apply">
+          <p id="req-progress" class="req-progress" role="status" hidden></p>
+          <div class="req-apply-row">
+            <span id="req-summary" class="req-summary"></span>
+            <button id="req-apply" type="button" hidden>Apply to model</button>
+          </div>
+          <p id="req-off" class="req-off">To apply them to the model, start <code>chen serve</code> with <code>--agent claude</code> or <code>--agent codex</code>.</p>
+          <p id="req-result" class="req-result" hidden></p>
+          <p id="req-notice" class="req-notice" role="status" hidden></p>
+        </div>
+      </section>
       <section id="agent" class="agent" role="tabpanel" aria-labelledby="tab-agent" hidden>
         <div id="agent-empty" class="agent-empty">
           <p id="agent-context" class="agent-context"></p>

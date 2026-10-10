@@ -4,6 +4,14 @@ export type TurnStatus = "running" | "ok" | "error" | "cancelled" | "limit" | "u
 export type ErrorKind = "not-found" | "not-logged-in" | "limit" | "other";
 export interface Step { kind: "tool" | "text"; summary: string }
 export interface Changes { added: string[]; removed: string[]; modified: string[]; parseError?: boolean }
+/** Set on a requirements apply turn (docs/requirements.md). */
+export interface TurnRequirements {
+  ids: string[];
+  labels: string[];
+  hashes: string[];
+  trace?: Record<string, { elements: string[]; why?: string; dropped?: string[] }>;
+  noTrace?: boolean;
+}
 export interface Turn {
   id: string;
   text: string;
@@ -18,6 +26,7 @@ export interface Turn {
   errorKind?: ErrorKind;
   /** Set when the server ended the turn itself (it stopped while the turn was running). */
   notice?: string;
+  requirements?: TurnRequirements;
 }
 export interface AgentInfo { enabled: boolean; kind: string; cwd: string; running: string | null; turns: Turn[] }
 export interface ThreadState { turns: Turn[]; running: string | null }

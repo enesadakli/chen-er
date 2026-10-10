@@ -7,6 +7,9 @@ import type { Box } from "../core/geometry.js";
 import { placeMenu, type MenuDimensions, type MenuObstacle } from "./menu-position.js";
 import { AgentPanel } from "./agent.js";
 import type { Turn } from "./agent-logic.js";
+import { NotesTabs } from "./tabs.js";
+import { RequirementsPanel } from "./requirements.js";
+import { requirementFindings, type RequirementsView } from "./requirements-logic.js";
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let state: ViewerState | undefined;
@@ -58,13 +61,38 @@ const notes = new Notes(element("findings"), choose, hover);
 const canvas = new NotebookCanvas(element("canvas"), choose, hover, async (id, point) => {
   await write(point ? "/api/pins" : `/api/pins/${encodeURIComponent(id)}`, point ? "POST" : "DELETE", point ? { pins: { [id]: point } } : undefined);
 }, nodeActions);
-const agent = new AgentPanel({ select: (id) => canvas.selectElement(id), flash: (ids) => canvas.flash(ids) });
+const tabs = new NotesTabs([
+  { name: "notes", tab: element("tab-notes"), panel: element("findings") },
+  { name: "requirements", tab: element("tab-requirements"), panel: element("requirements") },
+  { name: "agent", tab: element("tab-agent"), panel: element("agent") },
+]);
+const agent = new AgentPanel({ select: (id) => canvas.selectElement(id), flash: (ids) => canvas.flash(ids) }, tabs);
 canvas.onSelection = (id) => agent.selected(id);
+let requirementNotes = "[]";
+/** Model findings plus "Requirement R4 is not reflected in the model" for applied lines nothing implements. */
+function allFindings(next: ViewerState) {
+  const { lines, live } = requirements.state;
+  const extra = requirementFindings(lines, live);
+  requirementNotes = JSON.stringify(extra);
+  return findings([...next.diagnostics, ...extra]);
+}
+const requirements = new RequirementsPanel({
+  select: (id) => canvas.selectElement(id),
+  request: (path, init) => agent.request(path, init),
+  cancel: (id) => { void agent.cancelTurn(id); },
+  showAgent: () => tabs.show("agent"),
+  changed: () => {
+    const { lines, live } = requirements.state;
+    if (!state || JSON.stringify(requirementFindings(lines, live)) === requirementNotes) return;
+    list = allFindings(state); notes.show(list, state.yaml, selected);
+  },
+});
+agent.onThread = (thread) => requirements.agent(thread, agent.available);
 function apply(next: ViewerState) {
   // A POST response may arrive after a newer event from the same write.
   if (state && next.updatedAt <= state.updatedAt) return;
   const previous = selected && list.find((f) => f.number === selected);
-  state = next; list = findings(next.diagnostics);
+  state = next; list = allFindings(next);
   selected = previous ? list.find((f) => f.rule === previous.rule && f.path === previous.path && f.message === previous.message)?.number : undefined;
   element("title").textContent = next.title; document.title = `${next.title} · chen-er`;
   element("path").textContent = next.modelPath.split("/").filter(Boolean).at(-1) ?? next.modelPath; element("path").title = next.modelPath;
@@ -87,6 +115,7 @@ function apply(next: ViewerState) {
     }
   }
   agent.diagram(labels);
+  requirements.diagram(next.diagram ? new Set(next.diagram.nodes.map((n) => n.id)) : undefined, labels);
   if (next.computing) status("Computing layout…");
   else if (!pendingWrites) status(connected ? `updated ${new Date(next.updatedAt).toLocaleTimeString([], { hour12: false })}` : "disconnected");
   historyControls();
@@ -127,10 +156,13 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 let delay = 1000;
 function connect() {
   events = new EventSource("/api/events");
-  events.onopen = () => { connected = true; void agent.sync(); delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
+  events.onopen = () => { connected = true; void agent.sync(); void requirements.reload(); delay = 1000; if (state && !pendingWrites) status(state.computing ? "Computing layout…" : `updated ${new Date(state.updatedAt).toLocaleTimeString([], { hour12: false })}`); };
   events.addEventListener("state", (event) => {
     try { apply(JSON.parse((event as MessageEvent<string>).data) as ViewerState); }
     catch { status("Invalid update. Reconnecting…"); events?.close(); retry = setTimeout(connect, delay); }
+  });
+  events.addEventListener("requirements", (event) => {
+    try { requirements.view(JSON.parse((event as MessageEvent<string>).data) as RequirementsView); } catch { /* A malformed event never breaks the diagram stream. */ }
   });
   events.addEventListener("agent-turn", (event) => {
     try { agent.event(JSON.parse((event as MessageEvent<string>).data) as Turn); } catch { /* A malformed agent event never breaks the diagram stream. */ }
