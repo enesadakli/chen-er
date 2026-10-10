@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { serve, type ViewerState } from "../src/app/serve.js";
-import { diagramPositions, layoutPathFor, readPins } from "../src/app/render.js";
+import { diagramPositions, layoutPathFor, quality, readPins } from "../src/app/render.js";
 import { center } from "../src/core/geometry.js";
 import * as layoutService from "../src/core/layout/index.js";
 import { parseModel } from "../src/core/normalize.js";
@@ -28,9 +28,31 @@ async function changed(text: string) {
   throw new Error("Model was not refreshed");
 }
 const post = (path: string, body: unknown) => fetch(viewer!.url + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+function removeAttributePins() {
+  const saved = JSON.parse(readFileSync(layoutPathFor(model), "utf8"));
+  delete saved.pins["A:COURSE.Title"]; delete saved.pins["A:ENROLLS.Semester"];
+  writeFileSync(layoutPathFor(model), JSON.stringify(saved));
+}
 
 describe("automatic viewer re-layout", () => {
-  it("accepts fresh on a structural file edit, persists it with identical pins and restores exact previous layout bytes on undo", async () => {
+  it("keeps incremental for CAMPUS/LOCATED_IN when fixed attribute spokes would cross shapes and edges", async () => {
+    viewer = await serve(model, { port: 0 });
+    const before = readPins(model).options, beforePins = before.pins!;
+    const spy = vi.spyOn(layoutService, "layout");
+    const next = await changed(grown);
+    expect(spy).toHaveBeenCalledTimes(2);
+    const incremental = await spy.mock.results[0]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
+    const fresh = await spy.mock.results[1]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
+    expect(quality(incremental.diagram, beforePins)).toMatchObject({ hierarchyViolations: 4, shapeCrossings: 0, spokeEdgeViolations: 0, edgeCrossings: 0, pinDrift: 0 });
+    expect(quality(fresh.diagram, beforePins)).toMatchObject({ hierarchyViolations: 0, shapeCrossings: 3, spokeEdgeViolations: 2, edgeCrossings: 3, pinDrift: 0 });
+    expect(next).toMatchObject({ autoRelayout: false, history: { canUndo: false, canRedo: false }, quality: { hierarchyViolations: 4, shapeCrossings: 0, spokeEdgeViolations: 0 } });
+    expect(next.diagram).toEqual(incremental.diagram);
+    expect(readPins(model).options.pins).toEqual(beforePins);
+    for (const id of ["E:COURSE", "R:ENROLLS"]) expect(readPins(model).options.positions![id]).toEqual(before.positions![id]);
+    for (const [id, p] of Object.entries(beforePins)) expect(center(next.diagram!.nodes.find((n) => n.id === id)!.box)).toEqual(p);
+  });
+  it("accepts clean fresh for CAMPUS/LOCATED_IN without the two attribute pins and restores exact previous layout bytes on undo", async () => {
+    removeAttributePins();
     viewer = await serve(model, { port: 0 });
     const beforeBytes = readFileSync(layoutPathFor(model)), beforePins = readPins(model).options.pins!;
     expect((await get()).quality!.hierarchyViolations).toBe(3);
@@ -39,7 +61,15 @@ describe("automatic viewer re-layout", () => {
     expect(spy).toHaveBeenCalledTimes(2);
     expect(spy.mock.calls[0]![1]!.positions).toBeDefined();
     expect(spy.mock.calls[1]![1]!.positions).toBeUndefined();
-    expect(next).toMatchObject({ autoRelayout: true, history: { canUndo: true, canRedo: false }, quality: { hierarchyViolations: 0, pinDrift: 0 } });
+    const incremental = await spy.mock.results[0]!.value as Awaited<ReturnType<typeof layoutService.layout>>;
+    expect(quality(incremental.diagram, beforePins)).toMatchObject({ hierarchyViolations: 4, shapeCrossings: 0, spokeEdgeViolations: 0, edgeCrossings: 0, pinDrift: 0 });
+    expect(next).toMatchObject({ autoRelayout: true, history: { canUndo: true, canRedo: false }, quality: {
+      hierarchyViolations: 0, overlaps: 0, shapeCrossings: 0, labelCollisions: 0, labelAmbiguity: 0, labelLoose: 0,
+      labelOnOwnEdge: 0, labelOnAnyEdge: 0, spokeEdgeViolations: 0, spokeLabelViolations: 0, diagonalEnds: 0,
+      attributeEdgeBends: 0, edgeOverlap: 0, tinySegments: 0, endPortCrowding: 0, diamondVertexViolations: 0,
+      doubleEdgeArtifacts: 0, edgeCrossings: 0, pinDrift: 0,
+    } });
+    expect(next.quality!.issues).toEqual([]);
     const accepted = readFileSync(layoutPathFor(model));
     expect(accepted).not.toEqual(beforeBytes);
     expect(readPins(model).options.pins).toEqual(beforePins);
@@ -90,6 +120,7 @@ describe("automatic viewer re-layout", () => {
     expect(readPins(model).options.pins).toEqual(pins);
   });
   it("keeps computing visible while the second sequential candidate is pending", async () => {
+    removeAttributePins();
     viewer = await serve(model, { port: 0 });
     const original = layoutService.layout;
     let entered!: () => void, release!: () => void;
@@ -134,6 +165,7 @@ describe("automatic viewer re-layout", () => {
     abort.abort(); await reading;
   });
   it("defers the structural comparison and all automatic writes until a running turn finishes", async () => {
+    removeAttributePins();
     const bin = join(dir, "wait.mjs"), release = join(dir, "finish");
     writeFileSync(bin, `#!/usr/bin/env node
 import { existsSync } from "node:fs";

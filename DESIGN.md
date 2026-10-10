@@ -109,13 +109,15 @@ labels, roles, cardinalities and map ordering retain incremental behavior. The c
 last successfully rendered model; invalid edits do not advance it. Initial load, engine switch,
 explicit Re-layout and layout-history restore keep their existing behavior.
 
-Fresh wins when it has zero pin drift and fewer total hard violations plus hierarchy violations.
+The decision is severity ordered: fresh must have zero pin drift and must not increase **any individual
+hard metric**. A regression vetoes fresh even if other hard metrics, hierarchy or edge lengths improve.
 The hard counts are `diagonalEnds`, `overlaps`, `shapeCrossings`, `labelCollisions`, `labelAmbiguity`,
 `labelLoose`, `labelOnOwnEdge`, `labelOnAnyEdge`, `pinDrift`, `attributeEdgeBends`, `edgeOverlap`,
-`tinySegments`, `endPortCrowding`, `diamondVertexViolations`, `doubleEdgeArtifacts`, and out-of-canvas
-issues. If totals are equal, fresh must have at least two fewer `edgeCrossings` or a `longEdgeMax`
-at least 20% lower (with a positive incremental value); otherwise incremental wins. These are
-aggregate criteria: an individual metric can regress while the total improves or the tie-break wins.
+`tinySegments`, `endPortCrowding`, `diamondVertexViolations`, `doubleEdgeArtifacts`, `spokeEdgeViolations`,
+`spokeLabelViolations`, and the count of out-of-canvas issues. Only after passing every veto does fresh
+win for fewer `hierarchyViolations`; if hierarchy counts are equal it needs at least two fewer
+`edgeCrossings` or a `longEdgeMax` at least 20% lower (with a positive incremental value). More hierarchy
+violations always lose; ties or hard improvements alone keep incremental. No summed violation score is used.
 Pins are kept verbatim; accepted soft positions are saved normally and the previous layout bytes
 enter session undo history. During a running turn, only incremental previews run, without saving
 positions or advancing the comparison baseline; comparison and saving wait until the turn finishes.

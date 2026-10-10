@@ -8,7 +8,8 @@ All notable changes to chen-er are recorded here. The format follows
 ### Added
 
 - Automatic re-layout in `chen serve` after structural model changes: compare saved positions with
-  a fresh layout, keep pins, and accept fresh only for a clear quality improvement (rule in DESIGN.md).
+  a fresh layout, keep pins, and veto fresh if any individual hard geometry or attribute clearance metric
+  regresses; only then compare hierarchy and crossing/edge-length improvements (rule in DESIGN.md).
   Accepted changes enter layout Undo/Redo history and show “Re-laid out after model change · Undo”
   with a live announcement. Attribute/label edits remain incremental; running turns defer the
   comparison and position save until completion. Position-only saves preserve existing pin precision.

@@ -10,20 +10,17 @@ export function modelStructure(model: NModel): string {
   });
 }
 
-// Hard geometry targets from the quality benchmark, plus canvas bounds.
+// Every hard geometry target is a veto, including attribute clearances and canvas bounds.
 const HARD = ["diagonalEnds", "overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose",
   "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments",
-  "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts"] as const;
-export function layoutViolations(q: QualityReport): number {
-  return HARD.reduce((sum, key) => sum + q[key], q.hierarchyViolations)
-    + q.issues.filter((issue) => issue.kind === "out-of-canvas").length;
-}
+  "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations"] as const;
+const outsideCount = (q: QualityReport) => q.issues.filter((issue) => issue.kind === "out-of-canvas").length;
 
-/** Keep incremental on ties; never accept fresh geometry that drifts a pin. */
+/** Veto any hard regression, then compare hierarchy and only break hierarchy ties with soft metrics. */
 export function preferFresh(incremental: QualityReport, fresh: QualityReport): boolean {
   if (!incremental.implemented || !fresh.implemented || fresh.pinDrift !== 0) return false;
-  const before = layoutViolations(incremental), after = layoutViolations(fresh);
-  if (before !== after) return after < before;
+  if (HARD.some((key) => fresh[key] > incremental[key]) || outsideCount(fresh) > outsideCount(incremental)) return false;
+  if (fresh.hierarchyViolations !== incremental.hierarchyViolations) return fresh.hierarchyViolations < incremental.hierarchyViolations;
   return incremental.edgeCrossings - fresh.edgeCrossings >= 2
     || (incremental.longEdgeMax > 0 && fresh.longEdgeMax <= incremental.longEdgeMax * .8);
 }

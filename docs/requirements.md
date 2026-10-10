@@ -82,7 +82,9 @@ appear in the Notes tab as info findings: "Requirement R4 is not reflected in th
 
 ## Apply turn
 
-When Apply changes entities, relationships or ends, the viewer compares incremental and fresh layouts after the turn finishes, keeping pins and offering layout Undo if fresh wins (decision rule: DESIGN.md).
+When Apply changes entities, relationships or ends, the viewer compares incremental and fresh layouts
+after the turn finishes, keeps pins, vetoes any hard geometry or attribute clearance regression, and
+offers layout Undo if fresh wins on hierarchy or its tie-breaks (decision rule: DESIGN.md).
 
 `POST /api/agent/requirements/apply` with `{ expectedRevision? }` (agent route: needs the token, 404 without
 `--agent`). The server reads the file, takes the non-empty lines that are new or changed, and starts one turn through

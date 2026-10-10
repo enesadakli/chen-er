@@ -30,5 +30,24 @@ describe("automatic re-layout policy", () => {
     expect(preferFresh(before, { ...before, overlaps: before.overlaps + 1, longEdgeMax: 1, edgeCrossings: 0 })).toBe(false);
     expect(preferFresh({ ...before, hierarchyViolations: 10 }, { ...before, pinDrift: 1 })).toBe(false);
     expect(preferFresh({ ...before, longEdgeMax: 0 }, { ...before, longEdgeMax: 0 })).toBe(false);
+    expect(preferFresh(before, { ...before, hierarchyViolations: before.hierarchyViolations + 1, edgeCrossings: 0, longEdgeMax: 1 })).toBe(false);
+    expect(preferFresh({ ...before, overlaps: 1 }, before)).toBe(false);
+  });
+  it.each(["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge",
+    "labelOnAnyEdge", "spokeEdgeViolations", "spokeLabelViolations", "diagonalEnds", "pinDrift",
+    "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations",
+    "doubleEdgeArtifacts"] as const)("vetoes a regression in %s even when hierarchy, other hard metrics and soft metrics improve", async (metric) => {
+    const q = quality((await renderText(STARTER_MODEL)).diagram!);
+    const before = { ...q, hierarchyViolations: 10, edgeCrossings: 10, longEdgeMax: 10, labelCollisions: 2, overlaps: 2 };
+    const fresh = { ...before, hierarchyViolations: 0, edgeCrossings: 0, longEdgeMax: 1, labelCollisions: 0, overlaps: 0,
+      [metric]: before[metric] + 1 };
+    expect(preferFresh(before, fresh)).toBe(false);
+  });
+  it("vetoes out-of-canvas regressions and unmeasured candidates", async () => {
+    const q = quality((await renderText(STARTER_MODEL)).diagram!);
+    const before = { ...q, hierarchyViolations: 10 };
+    expect(preferFresh(before, { ...q, issues: [...q.issues, { kind: "out-of-canvas", ids: ["E:COURSE"], message: "outside" }] })).toBe(false);
+    expect(preferFresh(before, { ...q, implemented: false })).toBe(false);
+    expect(preferFresh({ ...before, implemented: false }, q)).toBe(false);
   });
 });

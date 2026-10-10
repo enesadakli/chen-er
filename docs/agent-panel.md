@@ -94,7 +94,9 @@ chen serve model.er.yaml --agent claude|codex [--agent-cwd <dir>]
 
 ## Snapshot and undo
 
-Structural model changes automatically compare incremental and fresh layouts after the turn finishes, keep all pins, and offer header/status Undo when fresh wins (decision rule: DESIGN.md).
+Structural model changes compare incremental and fresh layouts after the turn finishes, keep all pins,
+veto fresh on any hard geometry or attribute clearance regression, and offer header/status Undo when
+fresh wins on hierarchy or its tie-breaks (decision rule: DESIGN.md).
 
 - Before a turn starts, the server stores the model file bytes (snapshot) for that turn id.
 - After the turn ends, the server stores the post-turn bytes and computes the change set (below).
