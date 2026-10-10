@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { getSchema, lintEr, lintInput, renderEr, renderInput, type ToolIO } from "./tools.js";
+import { getSchema, lintEr, lintInput, mapEr, mapInput, renderEr, renderInput, type ToolIO } from "./tools.js";
 
 const fileIO: ToolIO = {
   readText: (path) => readFile(path, "utf8"),
@@ -36,6 +36,11 @@ export function createServer(io: ToolIO = fileIO): McpServer {
     inputSchema: renderInput,
     annotations: { readOnlyHint: false, destructiveHint: true },
   }, (input) => safely(() => renderEr(input, io)));
+  server.registerTool("map_er", {
+    description: "Map Chen ER YAML to relational tables using steps 1–7 and specialization option 8A. Supply exactly one of model or path. Returns relations, columns, PKs, UNIQUEs, FKs, source ids, step explanations, limitations, diagnostics and Markdown. Refuses invalid models; does not write files.",
+    inputSchema: mapInput,
+    annotations: { readOnlyHint: true },
+  }, (input) => safely(() => mapEr(input, io)));
   return server;
 }
 

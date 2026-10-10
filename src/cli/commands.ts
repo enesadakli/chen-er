@@ -144,3 +144,29 @@ export async function serveCommand(modelPath: string, options: ServeCommandOptio
   const { serve } = await import("../app/serve.js");
   return serve(modelPath, { port: options.port, open: options.open, engine: options.engine, ...(agent ? { agent } : {}) });
 }
+
+export interface MapCommandOptions {
+  format?: import("../core/map/format.js").MappingFormat;
+  out?: string;
+  defaultType?: string;
+}
+
+export async function mapCommand(modelPath: string, options: MapCommandOptions = {}): Promise<CommandResult> {
+  try {
+    const { mapFile, writeMappingOutput } = await import("../app/map.js");
+    const { formatMapping } = await import("../core/map/index.js");
+    const result = mapFile(modelPath);
+    if (!result.mapping) return {
+      exitCode: 1,
+      stdout: options.format === "json" ? JSON.stringify({ diagnostics: result.diagnostics }) : "",
+      stderr: formatDiagnostics(result.diagnostics),
+    };
+    const content = options.format === "json"
+      ? JSON.stringify({ ...result.mapping, diagnostics: result.diagnostics }, null, 2) + "\n"
+      : formatMapping(result.mapping, options.format, options.defaultType);
+    if (options.out) writeMappingOutput(modelPath, options.out, content);
+    return { exitCode: 0, stdout: options.out ?? content.trimEnd(), stderr: formatDiagnostics(result.diagnostics) };
+  } catch (error) {
+    return failure(error);
+  }
+}

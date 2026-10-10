@@ -89,6 +89,7 @@ For a checkout client configuration, replace the checkout path and launch the cl
 | `get_schema` | Returns JSON Schema, a YAML example, notation guidance, lint rules and the correctness disclaimer. |
 | `lint_er` | Takes exactly one of `model` (YAML text) or `path`; optional `disable` rule ids. Returns diagnostics and the disclaimer. |
 | `render_er` | Takes exactly one of `model` or `path`; optional `engine`, `out` and positive PNG `scale` (default 2). Returns a PNG image plus diagnostics, severity counts and written paths. |
+| `map_er` | Takes exactly one of `model` or `path`. Returns relational tables, keys, FKs, step explanations, notes and Markdown; read-only. |
 
 File input loads sibling layout settings. Relative paths resolve against the server's working directory. `render_er` with `out` replaces the SVG and its sibling PNG; without `out`, it writes no files. Invalid models return a tool error and no image.
 
@@ -144,6 +145,7 @@ The package declares the executable name `chen`. In the following commands, use 
 | --- | --- |
 | `chen init model.er.yaml` | Create a starter model (`--empty` for a blank model, `--title <text>` to name it); refuses to overwrite unless `--force` is supplied. |
 | `chen lint model.er.yaml` | Check parsing and model rules; `--json` returns machine-readable diagnostics. |
+| `chen map model.er.yaml --format md` | Map ER elements to tables with course step explanations; formats: text, md, sql, json. |
 | `chen render model.er.yaml --png --report` | Write SVG/PNG and print overlap, crossing and compactness measurements. |
 | `chen render model.er.yaml --engine stress --fresh` | Choose another engine and ignore saved positions; pins still apply. |
 | `chen serve model.er.yaml` | Start the local viewer. |
@@ -152,11 +154,31 @@ The package declares the executable name `chen`. In the following commands, use 
 
 CLI exit codes: 0 success, 1 model errors, 2 usage or I/O failure. Rendering writes beside the model unless `-o` supplies an output path. PNG uses bundled Inter fonts at 2× scale by default; `--scale` changes raster scale.
 
+## From ER to tables
+
+```sh
+chen map model.er.yaml --format md
+chen map model.er.yaml --format sql --default-type TEXT --out tables.sql
+chen map model.er.yaml --format json
+```
+
+Mapping implements steps 1–7 and specialization option 8A. Every table lists the
+step that produced it, later FK additions and the source element ids. Composite
+attributes become simple columns, multivalued attributes get tables, derived
+attributes become notes, and recursive FKs use roles. SQL includes PK, FK,
+UNIQUE and NOT NULL constraints in dependency order; column types are placeholders.
+Constraints requiring assertions/triggers and deterministic naming decisions
+remain visible in notes. Lint errors block mapping; specialization's drawing-only
+`unsupported-eer` rule is excluded for mapping. See [mapping rules and conventions](docs/mapping.md),
+especially the distinction between n-ary multiplicity and this model's own-end
+participation cards. Full fixture outputs: [campus Markdown](docs/mapping/campus.md)
+and [campus SQL](docs/mapping/campus.sql).
+
 ## Model reference and architecture
 
 See the [model reference](docs/model-reference.md) for keys, attributes, cardinalities, weak entities, recursive roles and layout files. The structural contract is [schema/er.schema.json](schema/er.schema.json).
 
-The shared pipeline is `parseModel → lint → layout → renderSvg`; the application layer handles files and PNG conversion. `src/core` is browser-safe and shared by CLI, MCP and viewer. Layout produces final geometry; the SVG renderer draws it without placing shapes. Fonts and text metrics are bundled.
+The shared diagram pipeline is `parseModel → lint → layout → renderSvg`; mapping uses `parseModel → lint → mapModel`. The application layer handles files and PNG conversion. `src/core` is browser-safe and shared by CLI, MCP and viewer. Layout produces final geometry; the SVG renderer draws it without placing shapes. Fonts and text metrics are bundled.
 
 The default engine is `layered`. Its pipeline evaluates semantic placements first and falls back to layered/stress candidates when its quality targets are not met. `stress` also uses this candidate pipeline; `simple` is a separate engine. Pins store node centers in pixels and override automatic placement.
 
@@ -180,6 +202,10 @@ npx vitest run
 Version 0.3.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, the default `layered` engine with semantic placement (1:N hierarchy top-down, diamonds between their entities, participation labels on their own edge) plus `stress` and `simple` alternatives, saved pins and soft positions with stable re-layout, the local viewer, and three MCP tools. Automatic layout still needs visual review on large models: a 26-entity model takes about 20 seconds in 0.3.0 (about 2 seconds on the unreleased main branch) and has many edge crossings. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn. See [CHANGELOG.md](CHANGELOG.md).
 
 Next work: npm publication, faster and clearer layouts for large models (including subject-area diagrams), and EER rendering. These are planned areas, not supported features or release dates.
+
+Unreleased work adds `chen map` and the fourth MCP tool, `map_er`, including EER
+specialization mapping; `chen lint`/rendering still reject specializations because
+they cannot draw them yet.
 
 ## License
 
