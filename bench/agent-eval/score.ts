@@ -27,7 +27,9 @@ export interface Decisions {
   failed: { id: string; kind: DecisionCheck["kind"]; why: string; reason: string }[];
 }
 export interface GoldVariant { name: GoldVariantName; model: NModel }
-export interface EntityMatch extends ItemMatch { matchedBy: "name" | "alias" | "structure" }
+type NameMatch = "name" | "alias" | "folded";
+export interface EntityMatch extends ItemMatch { matchedBy: NameMatch | "structure" }
+export interface AttributeMatch extends ItemMatch { matchedBy: NameMatch | "key" | "tokens" }
 export interface PRF {
   gold: number;
   candidate: number;
@@ -50,7 +52,7 @@ export interface ScoreReport {
   attributeProperties: Accuracy;
   structure: { lintErrorCount: number; errors: ReturnType<typeof lint> };
   trace: { covered: number; total: number; coverage: number; uncovered: string[] } | null;
-  matches: { entities: EntityMatch[]; relationships: ItemMatch[]; attributes: ItemMatch[] };
+  matches: { entities: EntityMatch[]; relationships: ItemMatch[]; attributes: AttributeMatch[] };
   details: {
     unmatchedGold: { entities: string[]; relationships: string[]; attributes: string[] };
     extraCandidate: { entities: string[]; relationships: string[]; attributes: string[] };
@@ -67,14 +69,44 @@ const compare = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
 const sorted = <T extends Named>(items: readonly T[]): T[] => [...items].sort((a, b) => compare(a.id, b.id));
 const ratio = (correct: number, total: number): number => total ? correct / total : 1;
 
-/** Unicode case folding preserves accents; spaces and underscores are insignificant. */
-export const normalizeName = (name: string): string => name.normalize("NFC").toLowerCase().replace(/\u0307/g, "").replace(/[_\s]/gu, "");
+const foldLetters = (name: string): string => name.normalize("NFKD").replace(/\p{M}/gu, "").replace(/ı/g, "i");
+const plainName = (name: string): string => name.normalize("NFC").toLowerCase().replace(/\u0307/g, "").replace(/[_\s-]/gu, "");
+/** Matching only: fold accents and Turkish I; ignore spaces, underscores and hyphens. */
+export const normalizeName = (name: string): string => foldLetters(name).toLowerCase().replace(/[_\s-]/gu, "");
 
-function nameMatches(gold: string, candidate: string, aliases: Record<string, string[]> = {}, scopes: string[] = []): boolean {
-  if (normalizeName(gold) === normalizeName(candidate)) return true;
+function nameMatch(gold: string, candidate: string, aliases: Record<string, string[]> = {}, scopes: string[] = []): NameMatch | undefined {
+  if (plainName(gold) === plainName(candidate)) return "name";
   const keys = new Set([gold, ...scopes].map(normalizeName));
-  return Object.entries(aliases).some(([key, values]) => keys.has(normalizeName(key)) &&
-    values.some((alias) => normalizeName(alias) === normalizeName(candidate)));
+  if (Object.entries(aliases).some(([key, values]) => keys.has(normalizeName(key)) &&
+    values.some((alias) => normalizeName(alias) === normalizeName(candidate)))) return "alias";
+  return normalizeName(gold) === normalizeName(candidate) ? "folded" : undefined;
+}
+const nameMatches = (gold: string, candidate: string, aliases?: Record<string, string[]>, scopes?: string[]): boolean =>
+  nameMatch(gold, candidate, aliases, scopes) !== undefined;
+const nameRank = (match: NameMatch | undefined): number => match === "name" ? 0 : match === "alias" ? 1 : match === "folded" ? 2 : 3;
+
+function commonPrefix(gold: string, candidate: string): number {
+  const g = normalizeName(gold), c = normalizeName(candidate);
+  let length = 0;
+  while (length < Math.min(g.length, c.length) && g[length] === c[length]) length++;
+  return length;
+}
+
+function nameTokens(name: string): string[] {
+  return foldLetters(name).replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+    .replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2").match(/\p{L}+|\p{N}+/gu)?.map((token) => token.toLowerCase()) ?? [];
+}
+
+function tokenMatches(gold: string, candidate: string): boolean {
+  const g = normalizeName(gold), c = normalizeName(candidate);
+  const [shorter, longer] = g.length <= c.length ? [g, c] : [c, g];
+  if (shorter.length < 3) return false;
+  if (longer.startsWith(shorter) || longer.endsWith(shorter)) return true;
+  const gt = nameTokens(gold), ct = nameTokens(candidate);
+  return gt.length > 0 && gt.length === ct.length && gt.every((token, i) => {
+    const other = ct[i]!;
+    return Math.min(token.length, other.length) >= 2 && (token.startsWith(other) || other.startsWith(token));
+  });
 }
 
 export function precisionRecallF1(gold: number, candidate: number, matched: number): PRF {
@@ -82,19 +114,24 @@ export function precisionRecallF1(gold: number, candidate: number, matched: numb
     f1: gold + candidate ? 2 * matched / (gold + candidate) : 1 };
 }
 
-function greedy<T extends Named>(gold: readonly T[], candidate: readonly T[], accepts: (g: T, c: T) => boolean): Pair<T>[] {
-  const available = sorted(candidate), pairs: Pair<T>[] = [];
-  for (const g of sorted(gold)) {
-    const choices = available.filter((c) => accepts(g, c)).sort((a, b) =>
-      Number(normalizeName(g.name) === normalizeName(b.name)) - Number(normalizeName(g.name) === normalizeName(a.name)) || compare(a.id, b.id));
-    const c = choices[0];
-    if (c) { pairs.push({ gold: g, candidate: c }); available.splice(available.indexOf(c), 1); }
-  }
-  return pairs;
+function namedPairs<T extends Named>(gold: readonly T[], candidate: readonly T[], match: (g: T, c: T) => NameMatch | undefined): (Pair<T> & { matchedBy: NameMatch })[] {
+  const choices = gold.flatMap((g) => candidate.flatMap((c) => {
+    const matchedBy = match(g, c);
+    return matchedBy ? [{ gold: g, candidate: c, matchedBy }] : [];
+  }));
+  choices.sort((a, b) => nameRank(a.matchedBy) - nameRank(b.matchedBy) ||
+    commonPrefix(b.gold.name, b.candidate.name) - commonPrefix(a.gold.name, a.candidate.name) ||
+    compare(a.gold.id, b.gold.id) || compare(a.candidate.id, b.candidate.id));
+  const usedGold = new Set<string>(), usedCandidate = new Set<string>();
+  return choices.filter((p) => {
+    if (usedGold.has(p.gold.id) || usedCandidate.has(p.candidate.id)) return false;
+    usedGold.add(p.gold.id); usedCandidate.add(p.candidate.id);
+    return true;
+  });
 }
 
 function entityPairs(gold: NModel, candidate: NModel, aliases: Aliases): Pair<NEntity>[] {
-  const pairs = greedy(gold.entities, candidate.entities, (g, c) => nameMatches(g.name, c.name, aliases.entities));
+  const pairs: Pair<NEntity>[] = namedPairs(gold.entities, candidate.entities, (g, c) => nameMatch(g.name, c.name, aliases.entities));
   const usedGold = new Set(pairs.map((p) => p.gold.id)), usedCandidate = new Set(pairs.map((p) => p.candidate.id));
   const choices: (Pair<NEntity> & { jaccard: number })[] = [];
   for (const g of sorted(gold.entities).filter((e) => !usedGold.has(e.id))) {
@@ -121,8 +158,26 @@ function entityPairs(gold: NModel, candidate: NModel, aliases: Aliases): Pair<NE
   return pairs.sort((a, b) => compare(a.gold.id, b.gold.id));
 }
 
-function attributePairs(gold: readonly NAttribute[], candidate: readonly NAttribute[], aliases: Aliases): Pair<NAttribute>[] {
-  const pairs = greedy(gold, candidate, (g, c) => nameMatches(g.name, c.name, aliases.attributes, [g.id, g.id.slice(2)]));
+type AttributePair = Pair<NAttribute> & { matchedBy: AttributeMatch["matchedBy"] };
+function attributePairs(gold: readonly NAttribute[], candidate: readonly NAttribute[], aliases: Aliases): AttributePair[] {
+  const pairs: AttributePair[] = namedPairs(gold, candidate, (g, c) => nameMatch(g.name, c.name, aliases.attributes, [g.id, g.id.slice(2)]));
+  const usedGold = new Set(pairs.map((p) => p.gold.id)), usedCandidate = new Set(pairs.map((p) => p.candidate.id));
+  const unmatchedGold = gold.filter((a) => !usedGold.has(a.id)), unmatchedCandidate = candidate.filter((a) => !usedCandidate.has(a.id));
+  const gKeys = unmatchedGold.filter((a) => a.key || a.partial), cKeys = unmatchedCandidate.filter((a) => a.key || a.partial);
+  if (gKeys.length === 1 && cKeys.length === 1) {
+    pairs.push({ gold: gKeys[0]!, candidate: cKeys[0]!, matchedBy: "key" });
+    usedGold.add(gKeys[0]!.id); usedCandidate.add(cKeys[0]!.id);
+  }
+  const choices = unmatchedGold.flatMap((g) => unmatchedCandidate.filter((c) =>
+    g.multivalued === c.multivalued && tokenMatches(g.name, c.name)).map((c) => ({ gold: g, candidate: c })));
+  choices.sort((a, b) => commonPrefix(b.gold.name, b.candidate.name) - commonPrefix(a.gold.name, a.candidate.name) ||
+    compare(a.gold.id, b.gold.id) || compare(a.candidate.id, b.candidate.id));
+  for (const choice of choices) {
+    if (usedGold.has(choice.gold.id) || usedCandidate.has(choice.candidate.id)) continue;
+    pairs.push({ ...choice, matchedBy: "tokens" });
+    usedGold.add(choice.gold.id); usedCandidate.add(choice.candidate.id);
+  }
+  pairs.sort((a, b) => compare(a.gold.id, b.gold.id));
   return pairs.flatMap((pair) => [pair, ...attributePairs(pair.gold.parts, pair.candidate.parts, aliases)]);
 }
 
@@ -134,7 +189,7 @@ function relationshipPairs(gold: NModel, candidate: NModel, entities: Pair<NEnti
     const target = signature(g.ends.map((end) => `gold:${end.entity}`));
     const choices = available.filter((c) => signature(c.ends.map((end) => entityMap.has(end.entity)
       ? `gold:${entityMap.get(end.entity)!}` : `candidate:${end.entity}`)) === target);
-    choices.sort((a, b) => Number(nameMatches(g.name, b.name, aliases.relationships)) - Number(nameMatches(g.name, a.name, aliases.relationships)) ||
+    choices.sort((a, b) => nameRank(nameMatch(g.name, a.name, aliases.relationships)) - nameRank(nameMatch(g.name, b.name, aliases.relationships)) ||
       attributePairs(g.attrs, b.attrs, aliases).length - attributePairs(g.attrs, a.attrs, aliases).length || compare(a.id, b.id));
     const c = choices[0];
     if (c) { pairs.push({ gold: g, candidate: c }); available.splice(available.indexOf(c), 1); }
@@ -364,8 +419,8 @@ export function scoreModels(gold: NModel, candidate: NModel, aliases: Aliases = 
     structure: { lintErrorCount: errors.length, errors },
     trace: doc ? { covered: doc.items.length - uncovered.length, total: doc.items.length, coverage: ratio(doc.items.length - uncovered.length, doc.items.length), uncovered } : null,
     matches: { entities: entities.map((p) => ({ gold: p.gold.id, candidate: p.candidate.id,
-      matchedBy: normalizeName(p.gold.name) === normalizeName(p.candidate.name) ? "name" :
-        nameMatches(p.gold.name, p.candidate.name, aliases.entities) ? "alias" : "structure" })), relationships: ids(relationships), attributes: ids(attrs) },
+      matchedBy: nameMatch(p.gold.name, p.candidate.name, aliases.entities) ?? "structure" })), relationships: ids(relationships),
+      attributes: attrs.map((p) => ({ gold: p.gold.id, candidate: p.candidate.id, matchedBy: p.matchedBy })) },
     details: {
       unmatchedGold: { entities: missing(gold.entities, entities, "gold"), relationships: missing(gold.relationships, relationships, "gold"), attributes: missing(goldAttrs, attrs, "gold") },
       extraCandidate: { entities: missing(candidate.entities, entities, "candidate"), relationships: missing(candidate.relationships, relationships, "candidate"), attributes: missing(candidateAttrs, attrs, "candidate") },
