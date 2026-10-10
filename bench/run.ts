@@ -38,6 +38,8 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
 
 /** Large models live apart from the general fixtures: they are guarded on hard metrics and their baselines only. */
 export const isLargeInput = (input: string): boolean => resolve(input).startsWith(resolve("bench/fixtures/large") + "/");
+/** One default-engine layout of a large fixture; the bench measures it, the test only with CHEN_PERF=1. */
+export const LARGE_LAYOUT_MS = 4000;
 // Known limitations of large models: one spoke beside a parallel end edge, a wide canvas and
 // unstable attribute edits (an extra attribute moved an entity by up to 169 px at the baseline).
 const largeSpokeLimits: Record<string, { spokeEdgeViolations: number; spokeLabelViolations: number }> = {
@@ -100,6 +102,7 @@ export function guardFailures({ input, diagram, q, hierarchyMinimum, elapsed, st
   const hard = { diagonalEnds: q.diagonalEnds, overlaps: q.overlaps, shapeCrossings: q.shapeCrossings, labelCollisions: q.labelCollisions, labelAmbiguity: q.labelAmbiguity, labelLoose: q.labelLoose, labelOnOwnEdge: q.labelOnOwnEdge, pinDrift: q.pinDrift, attributeEdgeBends: q.attributeEdgeBends, edgeOverlap: q.edgeOverlap, tinySegments: q.tinySegments, endPortCrowding: q.endPortCrowding, diamondVertexViolations: q.diamondVertexViolations, doubleEdgeArtifacts: q.doubleEdgeArtifacts };
   for (const [name, value] of Object.entries(hard)) if (value) failures.push(`${name}: ${value}`);
   if (!large && (input.startsWith("bench/fixtures/") || input.endsWith("/library.er.yaml")) && (q.aspect < 0.5 || q.aspect > 2 || q.meanEdgeRatio > 3.5)) failures.push(`shape: aspect ${q.aspect}, meanEdgeRatio ${q.meanEdgeRatio}`);
+  if (large && elapsed >= LARGE_LAYOUT_MS) failures.push(`large model layout took ${elapsed.toFixed(0)} ms (limit ${LARGE_LAYOUT_MS})`);
   if (input.endsWith("/university-curriculum.er.yaml") && (q.aspect < 0.6 || q.aspect > 1.8 || q.meanEdgeRatio > 3.5 || q.longestEdgeRatio > 7 || Math.max(diagram.width, diagram.height) > 2800 || q.edgeCrossings > 2 || q.diamondOffset > 0.15 || q.axisAligned < 0.6 || q.routeDetourMax > 1.6 || q.routeDetourMean > 1.2 || q.endBendsMax > 2 || elapsed >= 2000)) failures.push("university acceptance");
   return failures;
 }
