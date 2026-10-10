@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1199" height="1298" viewBox="0 0 1199 1298" font-family="Inter, Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g fill="none" stroke="#1f2328" stroke-width="1.5" stroke-linejoin="round">
+<g data-id="edge:WORKS_FOR#0" class="er-edge"><polyline points="589,434 565,434 565,406 516,406"/></g>
+<g data-id="edge:WORKS_FOR#1" class="er-edge"><polyline points="743,434 767,434 767,406 897.5,406"/></g>
+<g data-id="edge:MANAGES#0" class="er-edge"><polyline points="592.5,350 568.5,350 568.5,378 516,378"/></g>
+<g data-id="edge:MANAGES#1" class="er-edge"><polyline points="739.5,350 763.5,350 763.5,378 897.5,378"/></g>
+<g data-id="edge:CONTROLS#0" class="er-edge"><polyline points="966,660 966,415"/></g>
+<g data-id="edge:CONTROLS#1" class="er-edge"><polyline points="966,724 966,969"/></g>
+<g data-id="edge:WORKS_ON#0" class="er-edge"><polyline points="686.5,644 436,644 436,415"/></g>
+<g data-id="edge:WORKS_ON#1" class="er-edge"><polyline points="762,676 762,822.5 920,822.5 920,969"/></g>
+<g data-id="edge:SUPERVISES#supervisor" class="er-edge"><polyline points="436,117.3 436,369"/></g>
+<g data-id="edge:SUPERVISES#subordinate" class="er-edge"><polyline points="296,117.3 296,369"/></g>
+<g data-id="edge:DEPENDENT_OF#0" class="er-edge"><polyline points="366,660 366,415"/></g>
+<g data-id="edge:DEPENDENT_OF#1" class="er-edge"><polyline points="364,724 364,969"/><polyline points="368,724 368,969"/></g>
+<g data-id="edge:A:DEPARTMENT.Name" class="er-edge"><polyline points="1034.5,369 1037,348"/></g>
+<g data-id="edge:A:DEPARTMENT.Number" class="er-edge"><polyline points="1034.5,379 1069,379"/></g>
+<g data-id="edge:A:DEPARTMENT.Locations" class="er-edge"><polyline points="1034.5,415 1065.4,421.5"/></g>
+<g data-id="edge:A:DEPARTMENT.ManagerStartDate" class="er-edge"><polyline points="988,369 988,286"/></g>
+<g data-id="edge:A:PROJECT.Name" class="er-edge"><polyline points="1021,1015 1026.3,1039.1"/></g>
+<g data-id="edge:A:PROJECT.Number" class="er-edge"><polyline points="1021,1005 1057,1005"/></g>
+<g data-id="edge:A:PROJECT.Location" class="er-edge"><polyline points="1021,969 1050,964.4"/></g>
+<g data-id="edge:A:EMPLOYEE.Name" class="er-edge"><polyline points="226,369 226,333"/></g>
+<g data-id="edge:A:EMPLOYEE.Name.First" class="er-edge"><polyline points="194,326.4 160.1,337.5"/></g>
+<g data-id="edge:A:EMPLOYEE.Name.MiddleInitial" class="er-edge"><polyline points="187.8,310.4 152.1,305.2"/></g>
+<g data-id="edge:A:EMPLOYEE.Name.Last" class="er-edge"><polyline points="223.1,299 208.9,215.9"/></g>
+<g data-id="edge:A:EMPLOYEE.SSN" class="er-edge"><polyline points="216,405 180.5,405"/></g>
+<g data-id="edge:A:EMPLOYEE.Address" class="er-edge"><polyline points="226,415 226,451"/></g>
+<g data-id="edge:A:EMPLOYEE.Salary" class="er-edge"><polyline points="497,415 497,436"/></g>
+<g data-id="edge:A:EMPLOYEE.Sex" class="er-edge"><polyline points="386,369 386,334"/></g>
+<g data-id="edge:A:EMPLOYEE.BirthDate" class="er-edge"><polyline points="291,415 291,499"/></g>
+<g data-id="edge:A:DEPENDENT.FirstName" class="er-edge"><polyline points="301,1015 301,1040"/></g>
+<g data-id="edge:A:DEPENDENT.Sex" class="er-edge"><polyline points="300.5,1005 264.5,1005"/></g>
+<g data-id="edge:A:DEPENDENT.BirthDate" class="er-edge"><polyline points="300.5,969 270.4,963"/></g>
+<g data-id="edge:A:DEPENDENT.Relationship" class="er-edge"><polyline points="431.5,1015 436.3,1037"/></g>
+<g data-id="edge:A:WORKS_ON.HoursPerWeek" class="er-edge"><polyline points="783.5,621.1 808.4,594.6"/></g>
+</g>
+<g data-id="E:DEPARTMENT" class="er-entity"><rect x="897.5" y="369" width="137" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="966" y="392" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Department</text></g>
+<g data-id="E:PROJECT" class="er-entity"><rect x="911" y="969" width="110" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="966" y="992" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Project</text></g>
+<g data-id="E:EMPLOYEE" class="er-entity"><rect x="216" y="369" width="300" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="366" y="392" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Employee</text></g>
+<g data-id="E:DEPENDENT" class="er-entity"><rect x="300.5" y="969" width="131" height="46" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><rect x="305.5" y="974" width="121" height="36" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="366" y="992" font-size="16" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Dependent</text></g>
+<g data-id="R:WORKS_FOR" class="er-relationship"><polygon points="666,402 743,434 666,466 589,434" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="666" y="434" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Works for</text></g>
+<g data-id="R:MANAGES" class="er-relationship"><polygon points="666,318 739.5,350 666,382 592.5,350" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="666" y="350" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Manages</text></g>
+<g data-id="R:CONTROLS" class="er-relationship"><polygon points="966,660 1036.5,692 966,724 895.5,692" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="966" y="692" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Controls</text></g>
+<g data-id="R:WORKS_ON" class="er-relationship"><polygon points="762,612 837.5,644 762,676 686.5,644" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="762" y="644" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Works on</text></g>
+<g data-id="R:SUPERVISES" class="er-relationship"><polygon points="366,80 450,112 366,144 282,112" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><text x="366" y="112" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Supervises</text></g>
+<g data-id="R:DEPENDENT_OF" class="er-relationship"><polygon points="366,660 462,692 366,724 270,692" fill="#eef1f4" stroke="#1f2328" stroke-width="1.5"/><polygon points="366,667 441,692 366,717 291,692" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="366" y="692" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Dependent of</text></g>
+<g data-id="A:DEPARTMENT.Name" class="er-attribute"><ellipse cx="1039" cy="331" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1039" y="331" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text><line x1="1019.6" y1="339.7" x2="1058.4" y2="339.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:DEPARTMENT.Number" class="er-attribute"><ellipse cx="1118" cy="379" rx="49" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1118" y="379" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Number</text><line x1="1091.5" y1="387.7" x2="1144.5" y2="387.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:DEPARTMENT.Locations" class="er-attribute"><ellipse cx="1111" cy="431" rx="55" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><ellipse cx="1111" cy="431" rx="51" ry="13" fill="none" stroke="#1f2328" stroke-width="1.5"/><text x="1111" y="431" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Locations</text></g>
+<g data-id="A:DEPARTMENT.ManagerStartDate" class="er-attribute"><ellipse cx="988" cy="269" rx="87.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="988" y="269" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">ManagerStartDate</text></g>
+<g data-id="A:PROJECT.Name" class="er-attribute"><ellipse cx="1030" cy="1056" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1030" y="1056" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text><line x1="1010.6" y1="1064.7" x2="1049.4" y2="1064.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:PROJECT.Number" class="er-attribute"><ellipse cx="1106" cy="1005" rx="49" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1106" y="1005" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Number</text><line x1="1079.5" y1="1013.7" x2="1132.5" y2="1013.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:PROJECT.Location" class="er-attribute"><ellipse cx="1096" cy="957" rx="51" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="1096" y="957" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Location</text></g>
+<g data-id="A:EMPLOYEE.Name" class="er-attribute"><ellipse cx="226" cy="316" rx="40.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="226" y="316" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Name</text></g>
+<g data-id="A:EMPLOYEE.Name.First" class="er-attribute"><ellipse cx="131" cy="347" rx="35" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="131" y="347" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">First</text></g>
+<g data-id="A:EMPLOYEE.Name.MiddleInitial" class="er-attribute"><ellipse cx="96" cy="297" rx="64" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="96" y="297" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">MiddleInitial</text></g>
+<g data-id="A:EMPLOYEE.Name.Last" class="er-attribute"><ellipse cx="206" cy="199" rx="34" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="206" y="199" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Last</text></g>
+<g data-id="A:EMPLOYEE.SSN" class="er-attribute"><ellipse cx="146" cy="405" rx="34.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="146" y="405" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">SSN</text><line x1="131.7" y1="413.7" x2="160.3" y2="413.7" stroke="#1f2328" stroke-width="1.2"/></g>
+<g data-id="A:EMPLOYEE.Address" class="er-attribute"><ellipse cx="226" cy="468" rx="50" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="226" y="468" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Address</text></g>
+<g data-id="A:EMPLOYEE.Salary" class="er-attribute"><ellipse cx="497" cy="453" rx="42" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="497" y="453" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Salary</text></g>
+<g data-id="A:EMPLOYEE.Sex" class="er-attribute"><ellipse cx="386" cy="317" rx="32.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="386" y="317" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Sex</text></g>
+<g data-id="A:EMPLOYEE.BirthDate" class="er-attribute"><ellipse cx="291" cy="516" rx="53.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="291" y="516" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BirthDate</text></g>
+<g data-id="A:DEPENDENT.FirstName" class="er-attribute"><ellipse cx="301" cy="1057" rx="57" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="301" y="1057" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">FirstName</text><line x1="267.1" y1="1065.7" x2="334.9" y2="1065.7" stroke="#1f2328" stroke-width="1.2" stroke-dasharray="4 3"/></g>
+<g data-id="A:DEPENDENT.Sex" class="er-attribute"><ellipse cx="232" cy="1005" rx="32.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="232" y="1005" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Sex</text></g>
+<g data-id="A:DEPENDENT.BirthDate" class="er-attribute"><ellipse cx="225" cy="954" rx="53.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="225" y="954" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">BirthDate</text></g>
+<g data-id="A:DEPENDENT.Relationship" class="er-attribute"><ellipse cx="440" cy="1054" rx="64.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="440" y="1054" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">Relationship</text></g>
+<g data-id="A:WORKS_ON.HoursPerWeek" class="er-attribute"><ellipse cx="824" cy="578" rx="75.5" ry="17" fill="#ffffff" stroke="#1f2328" stroke-width="1.5"/><text x="824" y="578" font-size="14" font-weight="400" text-anchor="middle" dominant-baseline="central" fill="#1f2328">HoursPerWeek</text></g>
+<g data-id="label:edge:WORKS_FOR#0:cardinality" class="er-label"><text x="537" y="395" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:WORKS_FOR#1:cardinality" class="er-label"><text x="874" y="395" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:MANAGES#0:cardinality" class="er-label"><text x="541" y="367" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:MANAGES#1:cardinality" class="er-label"><text x="876.5" y="367" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:CONTROLS#0:cardinality" class="er-label"><text x="945" y="430" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:CONTROLS#1:cardinality" class="er-label"><text x="983" y="954" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="label:edge:WORKS_ON#0:cardinality" class="er-label"><text x="415" y="430" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:WORKS_ON#1:cardinality" class="er-label"><text x="939.5" y="954" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,N)</text></g>
+<g data-id="label:edge:SUPERVISES#supervisor:cardinality" class="er-label"><text x="457" y="354" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:SUPERVISES#supervisor:role" class="er-label"><text x="473.5" y="321" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">supervisor</text></g>
+<g data-id="label:edge:SUPERVISES#subordinate:cardinality" class="er-label"><text x="314.5" y="354" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,1)</text></g>
+<g data-id="label:edge:SUPERVISES#subordinate:role" class="er-label"><text x="320" y="321" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#57606a" font-style="italic">report</text></g>
+<g data-id="label:edge:DEPENDENT_OF#0:cardinality" class="er-label"><text x="345" y="430" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(0,N)</text></g>
+<g data-id="label:edge:DEPENDENT_OF#1:cardinality" class="er-label"><text x="385" y="954" font-size="13" text-anchor="middle" dominant-baseline="central" fill="#1f2328">(1,1)</text></g>
+<g data-id="title" class="er-label"><text x="32" y="52" font-size="20" font-weight="700" fill="#1f2328">Company conceptual model</text></g>
+<g data-id="note:0" class="er-label"><text x="32" y="1136" font-size="13" fill="#57606a">ManagerStartDate belongs to the department&#39;s current management assignment; exactly one manager makes it a single-valued department attribute.</text></g>
+<g data-id="note:1" class="er-label"><text x="32" y="1156" font-size="13" fill="#57606a">WORKS_FOR records employee membership; MANAGES records management responsibility. Both relationships are required and do not duplicate a fact.</text></g>
+<g data-id="note:2" class="er-label"><text x="32" y="1176" font-size="13" fill="#57606a">The model covers one company; Company is the scope, not a separately identified entity.</text></g>
+<g data-id="note:3" class="er-label"><text x="32" y="1196" font-size="13" fill="#57606a">Each department has several distinct locations (at least two); version 1 multivalued attributes cannot encode a minimum count.</text></g>
+<g data-id="note:4" class="er-label"><text x="32" y="1216" font-size="13" fill="#57606a">A dependent&#39;s first name is assumed unique within its employee&#39;s dependents; its full identifier is employee SSN plus FirstName.</text></g>
+<g data-id="note:5" class="er-label"><text x="32" y="1236" font-size="13" fill="#57606a">No upper bound on departments managed by an employee was specified, so MANAGES uses employee participation 0..N.</text></g>
+<g data-id="note:6" class="er-label"><text x="32" y="1256" font-size="13" fill="#57606a">Managers need not work for the department they manage; no such constraint was specified.</text></g>
+<g data-id="note:7" class="er-label"><text x="32" y="1276" font-size="13" fill="#57606a">A direct supervisor is another employee, excluding self-supervision; this inequality is a domain constraint not encoded by cardinality.</text></g>
+</svg>

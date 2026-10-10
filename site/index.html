@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chen-er: Chen ER diagrams from a YAML model</title>
+<meta name="description" content="Write the conceptual model in YAML, or let a coding agent write it, and get a laid-out Chen diagram with (min,max) participation, course-aware lint and the relational schema.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#14171a">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/Inter_700Bold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="desk">
+  <div class="desk-inner">
+    <a class="wordmark" href="./" aria-label="chen-er, home">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="1.75" y="7.75" width="9.5" height="8.5"/><path d="M11.25 12h2.5"/><path d="M18.25 7.25 22.75 12l-4.5 4.75L13.75 12z"/></svg>
+      <span>chen-er</span>
+    </a>
+    <nav class="desk-nav" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#gallery">Gallery</a>
+      <a href="#agent">Agent workflow</a>
+      <a href="#mcp">MCP</a>
+    </nav>
+    <a class="desk-source" href="https://github.com/enesadakli/chen-er">GitHub</a>
+  </div>
+</header>
+
+<main id="main" class="page">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">Chen ER diagrams for database courses, written as YAML.</h1>
+      <p class="lead">Describe the conceptual model in a YAML file, or let your coding agent write it. <span class="nowrap">chen-er</span> lays it out in textbook Chen notation with (min,max) participation, checks it against ER rules and course conventions, and maps it to relational tables with the reasoning for every step.</p>
+
+      <div class="install">
+        <div class="terminal install-line">
+          <span class="prompt" aria-hidden="true">$</span>
+          <code id="install-cmd">npm install -g chen-erd</code>
+          <button class="copy" type="button" data-copy="install-cmd" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8.75" y="8.75" width="11.5" height="11.5" rx="1.5"/><path d="M15.25 8.75v-3.5a1.5 1.5 0 0 0-1.5-1.5h-8.5a1.5 1.5 0 0 0-1.5 1.5v8.5a1.5 1.5 0 0 0 1.5 1.5h3.5"/></svg>
+            <span class="copy-label">Copy</span>
+          </button>
+        </div>
+        <p class="install-note">Installs the <code>chen</code> command. Node.js 24 or later. For a single render without installing: <code>npx chen-erd render model.er.yaml</code></p>
+        <p class="sr-only" aria-live="polite" id="copy-status"></p>
+      </div>
+
+      <p class="actions">
+        <a class="button primary" href="https://github.com/enesadakli/chen-er">Source on GitHub</a>
+        <a class="button" href="https://www.npmjs.com/package/chen-erd">chen-erd on npm</a>
+      </p>
+      <p class="meta">Version 0.4.0 · MIT License · CLI, local viewer and MCP server</p>
+    </div>
+
+    <figure class="hero-media" id="demo">
+      <a class="sheet diagram-link demo-frame" id="demo-link" href="assets/company-project.svg">
+        <img id="demo-media" src="assets/company-project.svg" data-demo="assets/demo.gif" width="1092" height="878"
+             alt="Chen diagram of company projects: EMPLOYEE mentors other employees and contributes hours per week to PROJECT; COMPANY sponsors PROJECT; weak entity TASK is identified by PROJECT through CONTAINS.">
+      </a>
+      <figcaption id="demo-caption">
+        <span>Rendered by <code>chen render</code> from <code>examples/company-project.er.yaml</code>, 40 lines of YAML.</span>
+        <button class="text-button" type="button" id="demo-play" hidden>Play the recording</button>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="how" id="how" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <p class="section-lead">The model file is the only thing anyone writes. Nobody places coordinates: the layout engine draws, lint checks, and the mapper turns the same file into tables.</p>
+
+    <ol class="steps">
+      <li class="step">
+        <div class="step-text">
+          <h3>Write the requirements</h3>
+          <p>Start from the task, one plain sentence per line. In the viewer's Requirements tab the lines autosave to <code>model.er.requirements.md</code>, a Markdown list that reads well in Obsidian and in a PDF.</p>
+          <div class="terminal">
+            <pre><code><span class="prompt" aria-hidden="true">$ </span>chen init university.er.yaml --empty --title "University"
+<span class="prompt" aria-hidden="true">$ </span>chen serve university.er.yaml --agent claude</code></pre>
+          </div>
+        </div>
+        <div class="step-figure">
+          <div class="ruled" role="group" aria-label="Requirements tab, example lines from docs/requirements.md">
+            <p class="ruled-file">university.er.requirements.md <span>saved</span></p>
+            <ol class="req-list">
+              <li><span class="req-no">R1</span><span class="req-text">Every course is offered by exactly one department.</span><span class="req-state">new</span></li>
+              <li><span class="req-no">R2</span><span class="req-text">Rooms have a capacity.</span><span class="req-state">new</span></li>
+              <li><span class="req-no">R3</span><span class="req-text">A student enrolls in many courses.</span><span class="req-state">new</span></li>
+              <li class="req-next"><span class="req-no">R4</span><span class="req-text">Next requirement</span></li>
+            </ol>
+          </div>
+        </div>
+      </li>
+
+      <li class="step step-wide">
+        <div class="step-text">
+          <h3>Write the model in YAML</h3>
+          <p>Entities, keys, weak entities, composite, multivalued and derived attributes, relationship attributes, recursive roles and n-ary relationships stay explicit in the source. Each <code>card</code> is the participation of the entity at that end.</p>
+          <p class="fine">Left: the complete <a href="https://github.com/enesadakli/chen-er/blob/main/examples/library.er.yaml">examples/library.er.yaml</a>. Right: what <code>chen render</code> draws from it, unedited.</p>
+        </div>
+        <div class="pair">
+          <div class="sheet code-sheet">
+            <p class="sheet-label">library.er.yaml</p>
+            <pre class="yaml" tabindex="0" aria-label="library.er.yaml, 33 lines"><code><span class="ln">version: 1</span>
+<span class="ln">title: Library</span>
+<span class="ln">entities:</span>
+<span class="ln">  BOOK:</span>
+<span class="ln">    attrs: [ISBN, Title, {name: Authors, multivalued: true}, Year]</span>
+<span class="ln">    keys: [[ISBN]]</span>
+<span class="ln">  COPY:</span>
+<span class="ln">    weak: true</span>
+<span class="ln">    attrs: [CopyNo, Shelf]</span>
+<span class="ln">    partialKey: [CopyNo]</span>
+<span class="ln">  MEMBER:</span>
+<span class="ln">    attrs: [MemberId, {name: Name, parts: [First, Last]}, Email, {name: Age, derived: true}]</span>
+<span class="ln">    keys: [[MemberId], [Email]]</span>
+<span class="ln">  PUBLISHER:</span>
+<span class="ln">    attrs: [PubName, City]</span>
+<span class="ln">    keys: [[PubName]]</span>
+<span class="ln">relationships:</span>
+<span class="ln">  COPY_OF:</span>
+<span class="ln">    identifies: COPY</span>
+<span class="ln">    ends:</span>
+<span class="ln">      - {entity: BOOK, card: 0..N}</span>
+<span class="ln">      - {entity: COPY, card: 1..1}</span>
+<span class="ln">  BORROWS:</span>
+<span class="ln">    ends:</span>
+<span class="ln">      - {entity: MEMBER, card: 0..N}</span>
+<span class="ln">      - {entity: COPY, card: 0..N}</span>
+<span class="ln">    attrs: [LoanDate, DueDate]</span>
+<span class="ln">  PUBLISHES:</span>
+<span class="ln">    ends:</span>
+<span class="ln">      - {entity: PUBLISHER, card: 0..N}</span>
+<span class="ln">      - {entity: BOOK, card: 1..1}</span>
+<span class="ln">notes:</span>
+<span class="ln">  - "A copy only exists as a copy of a book."</span></code></pre>
+          </div>
+          <figure class="sheet diagram-sheet">
+            <a class="diagram-link" href="assets/library.svg">
+              <img src="assets/library.svg" width="901" height="868" loading="lazy"
+                   alt="Library diagram: PUBLISHER publishes BOOK; BOOK has the multivalued attribute Authors; weak entity COPY with partial key CopyNo is identified by BOOK through the double diamond COPY_OF; MEMBER borrows COPY with LoanDate and DueDate; MEMBER has composite Name (First, Last), two candidate keys and derived Age.">
+            </a>
+            <figcaption><a href="assets/library.svg">Open the SVG full size</a></figcaption>
+          </figure>
+        </div>
+      </li>
+
+      <li class="step">
+        <div class="step-text">
+          <h3>Render and lint</h3>
+          <p><code>chen render</code> writes SVG, and PNG with <code>--png</code>, measured against the bundled Inter font, so the figure goes into homework as it is. <code>chen lint</code> checks 19 rules: broken ER structure, course conventions such as a weak entity without a partial key or a generic relationship name, and modelling suspicions such as one fact stored on two paths. Every finding carries a source position, a rule id and a repair hint, so an agent can fix its own mistakes.</p>
+        </div>
+        <div class="step-figure">
+          <div class="terminal">
+            <p class="terminal-label">Actual output for docs/lint-example.er.yaml, exit code 1</p>
+            <pre><code><span class="prompt" aria-hidden="true">$ </span>chen lint lint-example.er.yaml
+<span class="t-error">error</span>:4:11 [weak-without-identifying] Weak entity TASK has no identifying relationship.
+  <span class="t-dim">hint: Add a relationship connecting TASK to its owner and set identifies to TASK.</span>
+<span class="t-dim">0 errors does not mean the model is right; it means nothing obviously wrong was found.</span></code></pre>
+          </div>
+        </div>
+      </li>
+
+      <li class="step">
+        <div class="step-text">
+          <h3>Map to tables, then report</h3>
+          <p><code>chen map</code> applies the ER-to-relational algorithm of Elmasri and Navathe, chapter 9: steps 1 to 7 and specialization option 8A. Every table names the step that produced it. Output as text, Markdown, SQL or JSON. <code>chen report</code> puts requirements, diagram, model, traceability, lint and schema into one Markdown or printable HTML document.</p>
+          <p class="fine">Mapping rules and conventions: <a href="https://github.com/enesadakli/chen-er/blob/main/docs/mapping.md">docs/mapping.md</a></p>
+        </div>
+        <div class="step-figure">
+          <div class="terminal">
+            <p class="terminal-label">Excerpt of the actual output for the library model</p>
+            <pre><code><span class="prompt" aria-hidden="true">$ </span>chen map library.er.yaml
+BOOK(ISBN [PK], Title, Year, PUBLISHER_PubName)
+PUBLISHER_PubName → PUBLISHER(PubName) [NOT NULL]
+<span class="t-dim">Step 4: R:PUBLISHES is 1:N (E:PUBLISHER 0..N, E:BOOK 1..1); FK on E:BOOK, the max=1 (relational N-side) end.</span>
+
+COPY(BOOK_ISBN [PK], CopyNo [PK], Shelf)
+BOOK_ISBN → BOOK(ISBN) [NOT NULL]
+<span class="t-dim">Step 2: E:COPY is weak, identified by R:COPY_OF; PK = owner PK(s) + partial key.</span>
+
+BOOK_Authors(BOOK_ISBN [PK], Authors [PK])
+<span class="t-dim">Step 6: A:BOOK.Authors is multivalued; PK = owner PK + stored simple value components.</span>
+
+<span class="t-dim">- A:MEMBER.Age: derived attribute omitted; compute it from stored data.</span></code></pre>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="gallery" id="gallery" aria-labelledby="gallery-title">
+    <h2 id="gallery-title">Gallery</h2>
+    <p class="section-lead">Each figure was drawn by <code>chen render</code> from a model in the repository, with no hand placement. Select a figure to open the SVG full size.</p>
+
+    <div class="plates">
+      <figure class="plate plate-wide">
+        <a class="sheet diagram-link" href="assets/campus.svg">
+          <img src="assets/campus.svg" width="1669" height="1318" loading="lazy"
+               alt="Hospital operations: Hospital Campus has wards and employs Staff Member; Care Ward has rooms; Patient Room has beds; Registered Patient is treated by staff; weak entity Admission Record is identified by the patient, occupies a bed and is attended and discharged by staff; staff supervise trainees and are rostered on Duty Shift.">
+        </a>
+        <figcaption>
+          <strong>Hospital operations</strong>
+          <span>8 entities · 12 relationships · 109 lines of YAML</span>
+          <a href="https://github.com/enesadakli/chen-er/blob/main/bench/fixtures/campus.er.yaml">bench/fixtures/campus.er.yaml</a>
+        </figcaption>
+      </figure>
+
+      <figure class="plate plate-portrait plate-fill">
+        <a class="sheet diagram-link" href="assets/turkish-labels.svg">
+          <img src="assets/turkish-labels.svg" width="485" height="910" loading="lazy" lang="tr"
+               alt="Türkçe etiketli diyagram: BÖLÜM, zayıf varlık DERS PROGRAMI'nı TANIMLAR ilişkisiyle tanımlar; ÖĞRENCİ, DERS PROGRAMI'nı Rolü niteliğiyle İZLER; ÖĞRENCİ'nin çok değerli TelefonNumaraları niteliği vardır.">
+        </a>
+        <figcaption>
+          <strong lang="tr">Türkçe ve uzun etiketler</strong>
+          <span>3 entities · 2 relationships · 27 lines of YAML; ı, İ, ğ, ş measured exactly</span>
+          <a href="https://github.com/enesadakli/chen-er/blob/main/bench/fixtures/turkish-labels.er.yaml">bench/fixtures/turkish-labels.er.yaml</a>
+        </figcaption>
+      </figure>
+
+      <figure class="plate plate-tall">
+        <a class="sheet diagram-link" href="assets/hub-company.svg">
+          <img src="assets/hub-company.svg" width="1199" height="1298" loading="lazy"
+               alt="Company conceptual model: Employee works for and manages Department, works on Project with HoursPerWeek and supervises other employees with supervisor and report roles; Department controls Project and has multivalued Locations; weak entity Dependent is identified by Employee through Dependent of.">
+        </a>
+        <figcaption>
+          <strong>Company conceptual model</strong>
+          <span>4 entities · 6 relationships · 73 lines of YAML</span>
+          <a href="https://github.com/enesadakli/chen-er/blob/main/bench/fixtures/hub-company.er.yaml">bench/fixtures/hub-company.er.yaml</a>
+        </figcaption>
+      </figure>
+
+      <figure class="plate plate-ternary plate-fill">
+        <a class="sheet diagram-link" href="assets/ternary.svg">
+          <img src="assets/ternary.svg" width="886" height="599" loading="lazy"
+               alt="Workshop bookings: one ternary diamond BOOKS connects HOST, TOPIC and ROOM, each with participation (0,N); StartsAt is an attribute of BOOKS.">
+        </a>
+        <figcaption>
+          <strong>Workshop bookings, a ternary relationship</strong>
+          <span>3 entities · 1 relationship · 17 lines of YAML</span>
+          <a href="https://github.com/enesadakli/chen-er/blob/main/examples/ternary.er.yaml">examples/ternary.er.yaml</a>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="agent" id="agent" aria-labelledby="agent-title">
+    <h2 id="agent-title">Agent workflow</h2>
+    <p class="section-lead">The teacher grades the method, not only the picture. <code>chen serve</code> keeps the reasoning next to the diagram, and the report keeps it on paper.</p>
+
+    <div class="agent-grid">
+      <div class="agent-notes">
+        <div class="note">
+          <h3>Requirements tab</h3>
+          <p>Start the viewer with <code class="nowrap">--agent claude</code> or <code class="nowrap">--agent codex</code>. <strong>Apply to model</strong> sends the new and changed lines to your installed, logged-in Claude Code or Codex CLI, which edits the YAML; the diagram reloads beside it. No API key is involved, and the viewer itself never writes the model.</p>
+        </div>
+        <div class="note">
+          <h3>Traceability</h3>
+          <p>Each requirement is linked to the elements that implement it, checked against the model. A line that nothing implements is marked, in words and a glyph rather than colour alone.</p>
+          <div class="ruled ruled-compact" role="group" aria-label="Applied requirements, example from docs/requirements.md">
+            <ol class="req-list">
+              <li><span class="req-no">R1</span><span class="req-text">Every course is offered by exactly one department.</span>
+                <span class="req-trace"><span class="arrow" aria-hidden="true">→</span> <span class="el">COURSE</span>, <span class="el">DEPARTMENT</span>, <span class="el">OFFERS</span>. COURSE takes part in OFFERS with 1..1.</span></li>
+              <li><span class="req-no">R2</span><span class="req-text">Rooms have a capacity.</span>
+                <span class="req-trace req-missing"><span aria-hidden="true">△</span> not covered. Not reflected in the model.</span></li>
+            </ol>
+          </div>
+        </div>
+        <div class="note">
+          <h3>Method report</h3>
+          <p><code>chen report model.er.yaml --format html</code> writes one self-contained, printable A4 file: requirements, ER diagram, model, traceability, lint and relational schema. The example on the right comes from the hospital model; its eight requirements were written by hand and never applied, so the report honestly lists them as not applied yet.</p>
+          <p><a class="button" href="examples/campus.report.html">Open the example report</a></p>
+        </div>
+      </div>
+
+      <figure class="report-frame">
+        <div class="sheet report-sheet">
+          <iframe src="examples/campus.report.html" title="Example method report for the hospital operations model" loading="lazy"></iframe>
+        </div>
+        <figcaption>Unedited output of <code>chen report docs/report/campus.er.yaml --format html</code>.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="mcp" id="mcp" aria-labelledby="mcp-title">
+    <h2 id="mcp-title">MCP server</h2>
+    <p class="section-lead">The package also installs <code>chen-er-mcp</code>, a stdio MCP server. Add it to your client's configuration and the agent can check and draw its own models.</p>
+
+    <div class="mcp-grid">
+      <div class="terminal">
+        <p class="terminal-label">MCP client configuration, after <code>npm install -g chen-erd</code></p>
+        <pre><code>{
+  "mcpServers": {
+    "chen-er": {
+      "command": "chen-er-mcp"
+    }
+  }
+}</code></pre>
+      </div>
+      <dl class="tools">
+        <div><dt><code>get_schema</code></dt><dd>JSON Schema, a YAML example, notation guidance and the lint rules.</dd></div>
+        <div><dt><code>lint_er</code></dt><dd>Diagnostics for YAML text or a file path.</dd></div>
+        <div><dt><code>render_er</code></dt><dd>A PNG of the diagram plus diagnostics; optionally writes SVG and PNG.</dd></div>
+        <div><dt><code>map_er</code></dt><dd>Relational tables, keys, foreign keys and step explanations. Read-only.</dd></div>
+        <div><dt><code>report_er</code></dt><dd>The method report as Markdown or HTML. Writes nothing.</dd></div>
+      </dl>
+    </div>
+    <p class="fine">The repository also ships an <a href="https://github.com/enesadakli/chen-er/blob/main/skills/er-diagram/SKILL.md">er-diagram skill</a> that describes the loop: write YAML, lint, fix, render, inspect, revise.</p>
+  </section>
+</main>
+
+<footer class="page-footer">
+  <div class="footer-inner">
+    <p class="footer-mark">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="1.75" y="7.75" width="9.5" height="8.5"/><path d="M11.25 12h2.5"/><path d="M18.25 7.25 22.75 12l-4.5 4.75L13.75 12z"/></svg>
+      chen-er 0.4.0
+    </p>
+    <ul class="footer-links">
+      <li><a href="https://github.com/enesadakli/chen-er">GitHub</a></li>
+      <li><a href="https://www.npmjs.com/package/chen-erd">npm</a></li>
+      <li><a href="https://github.com/enesadakli/chen-er/blob/main/CHANGELOG.md">Changelog</a></li>
+      <li><a href="https://github.com/enesadakli/chen-er/blob/main/LICENSE">MIT License</a></li>
+    </ul>
+    <p class="footer-fine">Diagrams are drawn in Inter, bundled under the <a href="assets/fonts/OFL.txt">SIL Open Font License 1.1</a>. A clean lint result does not establish that a model is correct for its domain.</p>
+  </div>
+</footer>
+</body>
+</html>
