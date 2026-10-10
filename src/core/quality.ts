@@ -2,8 +2,8 @@ import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
 import { clearanceQuality, type ClearanceQuality } from "./layout/semantic-clearance.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
-import { labelAmbiguityReasons, labelGeometry, labelLooseReasons, labelOnOwnEdge } from "./layout/label-geometry.js";
-import { center, type Diagram, type Point } from "./geometry.js";
+import { labelAmbiguityReasons, labelGeometry, labelLooseReasons, labelOnOwnEdge, linesBox } from "./layout/label-geometry.js";
+import { center, intersects, type Diagram, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
@@ -69,9 +69,13 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
     for (const other of labels.slice(i + 1)) if (shapesOverlap(shape, boxShape(other.box))) add("label-collision", [l.id, other.id]);
     for (const e of edges) if (e.id !== l.edge && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, shape))) add("label-collision", [l.id, e.id]);
   }
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const bounds = new Map([...lines].map(([id, ls]) => [id, linesBox(ls)]));
   for (let i = 0; i < edges.length; i++) for (const other of edges.slice(i + 1)) {
     const e = edges[i]!;
-    const shared = nodes.filter((n) => [e.from, e.to].includes(n.id) && [other.from, other.to].includes(n.id));
+    // Segments more than a pixel apart never intersect.
+    if (!intersects(bounds.get(e.id)!, bounds.get(other.id)!, 1)) continue;
+    const shared = () => [...new Set([e.from, e.to])].filter((id) => id === other.from || id === other.to).flatMap((id) => byId.get(id) ?? []);
     const crossing = lines.get(e.id)!.some(([a, b]) => lines.get(other.id)!.some(([c, d]) => {
       const hit = segmentIntersection(a, b, c, d);
       if (!hit) return false;
@@ -79,7 +83,7 @@ export function assessQuality(diagram: Diagram, pins: Record<string, Point> = {}
       const endpoints = paths.get(e.id)!.flatMap((ps) => [ps[0]!, ps.at(-1)!]);
       const otherEndpoints = paths.get(other.id)!.flatMap((ps) => [ps[0]!, ps.at(-1)!]);
       if (endpoints.some((p) => distance(p, hit) < 1e-7) && otherEndpoints.some((p) => distance(p, hit) < 1e-7)) return false;
-      return !shared.some((n) => pointInside(hit, n));
+      return !shared().some((n) => pointInside(hit, n));
     }));
     if (crossing) add("edge-crossing", [e.id, other.id]);
   }

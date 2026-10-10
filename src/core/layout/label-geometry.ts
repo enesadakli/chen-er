@@ -42,7 +42,7 @@ export function labelAmbiguityReasons(box: Box, edge: DEdge, edges: DEdge[], geo
   const along = length ? ((c.x - end.x) * (previous.x - end.x) + (c.y - end.y) * (previous.y - end.y)) / length : Infinity;
   const reasons: string[] = [];
   if (own > 14 + 1e-7) reasons.push("more than 14px from entity-end segment");
-  if (edges.some((other) => other.kind === "end" && other.id !== edge.id && (geometry?.lines.get(other.id) ?? drawnPaths(other).flatMap(segments)).some(([a, b]) => boxSegmentDistance(box, a, b) < own - 1e-7))) reasons.push("closer to another end edge");
+  if (edges.some((other) => other.kind === "end" && other.id !== edge.id && (!geometry?.bounds.has(other.id) || boxDistance(box, geometry.bounds.get(other.id)!) < own + 1e-6) && (geometry?.lines.get(other.id) ?? drawnPaths(other).flatMap(segments)).some(([a, b]) => boxSegmentDistance(box, a, b) < own - 1e-7))) reasons.push("closer to another end edge");
   if (Math.abs(along) > 60 + 1e-7) reasons.push("more than 60px along the edge from entity end");
   return reasons;
 }
@@ -55,15 +55,25 @@ export interface LabelGeometry {
   edges: ReadonlyMap<string, DEdge>;
   lines: ReadonlyMap<string, [Point, Point][]>;
   first: ReadonlyMap<string, [Point, Point][]>;
+  /** Bounding box of each end's drawn lines; a box farther away than a threshold skips the edge. */
+  bounds: ReadonlyMap<string, Box>;
   shapes: { node: DNode; outline?: [Point, Point][] }[];
+}
+
+export function linesBox(lines: [Point, Point][]): Box {
+  const xs = lines.flatMap(([a, b]) => [a.x, b.x]), ys = lines.flatMap(([a, b]) => [a.y, b.y]);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 export function labelGeometry(nodes: DNode[], edges: DEdge[], paths?: ReadonlyMap<string, Point[][]>): LabelGeometry {
   const ends = edges.filter((edge) => edge.kind === "end");
   const drawn = new Map(ends.map((edge) => [edge.id, paths?.get(edge.id) ?? drawnPaths(edge)]));
+  const lines = new Map(ends.map((edge) => [edge.id, drawn.get(edge.id)!.flatMap(segments)]));
   return {
     edges: new Map(edges.map((edge) => [edge.id, edge])),
-    lines: new Map(ends.map((edge) => [edge.id, drawn.get(edge.id)!.flatMap(segments)])),
+    lines,
+    bounds: new Map([...lines].map(([id, ls]) => [id, linesBox(ls)])),
     first: new Map(ends.map((edge) => [edge.id, drawn.get(edge.id)!.filter((path) => path.length >= 2)
       .map((path) => [path.at(-2)!, path.at(-1)!] as [Point, Point])])),
     shapes: nodes.map((node) => ({ node })),
@@ -87,7 +97,7 @@ export function labelLooseReasons(label: DLabel, edge: DEdge, geometry: LabelGeo
   if (own > 8 + 1e-7) reasons.push("more than 8px from entity-end segment");
   if (stopAtFirst && reasons.length) return reasons;
   const required = 2 * own - 1e-7;
-  for (const [id, lines] of geometry.lines) if (id !== edge.id && lines.some(([a, b]) => boxSegmentDistance(label.box, a, b) < required)) {
+  for (const [id, lines] of geometry.lines) if (id !== edge.id && boxDistance(label.box, geometry.bounds.get(id)!) < required + 1e-6 && lines.some(([a, b]) => boxSegmentDistance(label.box, a, b) < required)) {
     reasons.push("another end edge is less than twice as far away");
     if (stopAtFirst) return reasons;
     break;
