@@ -6,9 +6,9 @@ The explanations are original summaries of the course algorithm; the public
 fixtures supply all examples here.
 
 ```sh
-npx tsx src/cli/index.ts map bench/fixtures/campus.er.yaml --format md
-npx tsx src/cli/index.ts map bench/fixtures/campus.er.yaml --format sql --out campus.sql
-npx tsx src/cli/index.ts map bench/fixtures/ternary.er.yaml --format json
+npx chen-erd map docs/report/campus.er.yaml --format md
+npx chen-erd map docs/report/campus.er.yaml --format sql --out campus.sql
+npx chen-erd map examples/ternary.er.yaml --format json
 chen map model.er.yaml --format sql --default-type 'VARCHAR(100)'
 ```
 
@@ -124,7 +124,7 @@ constraints remain notes.
 
 ## Public fixture examples
 
-`bench/fixtures/campus.er.yaml` is named campus but models hospital operations.
+`docs/report/campus.er.yaml` is named campus but models hospital operations.
 Its 11 output tables illustrate steps 1–6. `ADMISSION` uses the patient's identity
 plus `AdmittedOn`; its two references to STAFF are named `ATTENDS_StaffId` and
 `DISCHARGES_StaffId`, so both meanings are visible without a numeric suffix.
@@ -157,7 +157,7 @@ sequence and Markdown explanations are checked-in snapshots:
 [campus Markdown](mapping/campus.md) and
 [campus SQL](mapping/campus.sql).
 
-`bench/fixtures/ternary.er.yaml` produces the three entity tables and a step 7
+The source-checkout fixture `bench/fixtures/ternary.er.yaml` produces the three entity tables and a step 7
 `SUPPLY` table. All ends are many, so its PK is
 `(SUPPLIER_SupplierNo, PROJECT_ProjectNo, PART_PartNo)`, with one FK per end and
 `Quantity` as a relationship attribute. A part's `1..N` participation still needs

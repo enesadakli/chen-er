@@ -6,10 +6,12 @@ chen-er turns YAML database models into Chen entity–relationship diagrams, che
 
 [SVG](docs/company-project.svg) · [YAML source](examples/company-project.er.yaml)
 
-Try it from a checkout with dependencies installed (Node.js 24):
+Use Node.js 24 or newer. Install the npm package `chen-erd` to get the `chen` command (the project name remains chen-er):
 
 ```sh
-npx tsx src/cli/index.ts render examples/company-project.er.yaml -o docs/company-project.svg --png
+npm install -g chen-erd
+chen init model.er.yaml
+chen render model.er.yaml --png
 ```
 
 ## Write YAML → get a diagram
@@ -40,7 +42,7 @@ relationships:
 An identifying relationship is required for a weak entity. Run the checked-in, intentionally invalid [lint example](docs/lint-example.er.yaml):
 
 ```sh
-npx tsx src/cli/index.ts lint docs/lint-example.er.yaml
+npx chen-erd lint docs/lint-example.er.yaml
 ```
 
 Actual CLI output (exit code 1):
@@ -57,28 +59,20 @@ Diagnostics include source positions, rule ids, severity and repair hints. There
 
 The repository [er-diagram skill](skills/er-diagram/SKILL.md) describes the loop: write YAML, lint, fix, render, inspect the PNG, then revise the model. Pins are human-owned; the viewer handles placement corrections. Add that directory to your client's skill search path.
 
-Start the stdio MCP server from the checkout:
+Start the stdio MCP server:
 
 ```sh
-npx tsx src/mcp/server.ts
+npx -y -p chen-erd chen-er-mcp
 ```
 
-From an installed package (`npm install chen-er`), run the server with Node:
-
-```sh
-node node_modules/chen-er/bin/chen-mcp.js
-```
-
-and configure the client with `"command": "node"` and `"args": ["/absolute/path/to/project/node_modules/chen-er/bin/chen-mcp.js"]`.
-
-For a checkout client configuration, replace the checkout path and launch the client from an environment where `tsx` resolves:
+Configure your MCP client:
 
 ```json
 {
   "mcpServers": {
     "chen-er": {
       "command": "npx",
-      "args": ["tsx", "/absolute/path/to/chen-er/src/mcp/server.ts"]
+      "args": ["-y", "-p", "chen-erd", "chen-er-mcp"]
     }
   }
 }
@@ -90,18 +84,19 @@ For a checkout client configuration, replace the checkout path and launch the cl
 | `lint_er` | Takes exactly one of `model` (YAML text) or `path`; optional `disable` rule ids. Returns diagnostics and the disclaimer. |
 | `render_er` | Takes exactly one of `model` or `path`; optional `engine`, `out` and positive PNG `scale` (default 2). Returns a PNG image plus diagnostics, severity counts and written paths. |
 | `map_er` | Takes exactly one of `model` or `path`. Returns relational tables, keys, FKs, step explanations, notes and Markdown; read-only. |
+| `report_er` | Takes exactly one of `model` or `path`. Returns a course method report as Markdown or HTML; read-only. |
 
 File input loads sibling layout settings. Relative paths resolve against the server's working directory. `render_er` with `out` replaces the SVG and its sibling PNG; without `out`, it writes no files. Invalid models return a tool error and no image.
 
 ## Local viewer
 
-`chen serve` serves the viewer on loopback at `http://127.0.0.1:5178` by default. From source:
+`chen serve` serves the viewer on loopback at `http://127.0.0.1:5178` by default:
 
 ```sh
-npx tsx src/cli/index.ts serve examples/company-project.er.yaml
+chen serve model.er.yaml
 ```
 
-Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `company-project.er.layout.json`; previous positions keep subsequent layouts stable. Attribute pins are `{dx, dy}` offsets from the immediate parent centre (composite parts use their parent oval); entity/relationship pins remain absolute `{x, y}` centres. Attributes follow their parent on drop and during fresh layout. Legacy absolute attribute pins remain exact on read and convert without a jump on the next layout-file write, using the current drawing; offsets retain full precision. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
+Open the printed URL. Saves to the YAML or sibling layout file refresh the diagram. Pan and zoom, inspect linked findings, drag shapes to pin them, switch layout engines and export SVG/PNG. The viewer saves pins and previous positions in `model.er.layout.json`; previous positions keep subsequent layouts stable. Attribute pins are `{dx, dy}` offsets from the immediate parent centre (composite parts use their parent oval); entity/relationship pins remain absolute `{x, y}` centres. Attributes follow their parent on drop and during fresh layout. Legacy absolute attribute pins remain exact on read and convert without a jump on the next layout-file write, using the current drawing; offsets retain full precision. Relayout clears those soft positions while retaining pins. `--open` opens the browser; `--port` changes the port. Stop with Ctrl+C.
 
 Click an entity or relationship to open its actions. Selection emphasizes all ends and labels of connected relationships; **Focus** fits that neighborhood without changing the layout. The viewer does not edit the model; it writes only the layout file and the requirements file. An agent or your text editor changes the YAML, and the viewer refreshes.
 
@@ -117,21 +112,27 @@ The **Requirements** tab holds the task's requirements, one plain sentence per l
 
 ## Install and quick start
 
-Use Node.js 24. To use the packed package in another project (verified with a clean install of the tarball; the registry release is pending):
+Install globally, then use `chen`:
 
 ```sh
-npm install chen-er        # or: npm install ./chen-er-0.1.0.tgz
-npx chen init model.er.yaml
-npx chen lint model.er.yaml
-npx chen render model.er.yaml --png
+npm install -g chen-erd
+chen init model.er.yaml
+chen lint model.er.yaml
+chen render model.er.yaml --png
 ```
 
-To start from your own requirements, use `npx chen init model.er.yaml --empty --title "University"`.
+For a one-off invocation, use `npx chen-erd render model.er.yaml`.
+For a local project, use `npm install chen-erd`, then `npx chen` or `npx chen-erd`.
+Both CLI aliases run the same executable. See [package verification](docs/npm-readiness.md)
+for the 0.4.0 tarball checks and the outstanding CLI version mismatch.
+
+To start from your own requirements, use `chen init model.er.yaml --empty --title "University"`.
 This creates a valid title-only model; add requirements in the viewer and use **Apply to model** with `chen serve --agent`.
 Without `--empty`, init keeps the Course enrollment example. `--title <text>` works with either starter.
 
-From a checkout, install the checkout's dependencies with `npm ci`, then the one-command render above runs without a build. This README documents source and built-checkout usage; npm publication is pending the [packaging checklist](docs/npm-readiness.md).
+### From source
 
+In a checkout, run `npm ci`, then `npx tsx src/cli/index.ts <command>`.
 To use the built CLI:
 
 ```sh
@@ -139,7 +140,7 @@ npm run build
 node bin/chen.js render examples/ternary.er.yaml -o docs/ternary.svg --png
 ```
 
-The package declares the executable name `chen`. In the following commands, use `node bin/chen.js` in a built checkout, or `npx tsx src/cli/index.ts` from source:
+The installed package provides `chen`, `chen-erd` and `chen-er-mcp`.
 
 | Command | Result |
 | --- | --- |
@@ -207,13 +208,19 @@ npx vitest run
 
 ## Status and roadmap
 
-Version 0.3.0 implements YAML parsing, rule diagnostics, SVG/PNG rendering, the default `layered` engine with semantic placement (1:N hierarchy top-down, diamonds between their entities, participation labels on their own edge) plus `stress` and `simple` alternatives, saved pins and soft positions with stable re-layout, the local viewer, and three MCP tools. Automatic layout still needs visual review on large models: a 26-entity model takes about 20 seconds in 0.3.0 (about 2 seconds on the unreleased main branch) and has many edge crossings. EER `specializations` are reserved in the schema but currently rejected with `unsupported-eer` and are not drawn. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.4.0 packages the CLI, local viewer and five MCP tools under the npm
+name `chen-erd`. It includes YAML validation, SVG/PNG rendering, saved pins and
+soft positions, relational mapping and course method reports. The default
+`layered` engine uses semantic placement with layered/stress fallback candidates;
+`stress` and `simple` are also available. Automatic layouts still need visual
+review, particularly on large models with many edge crossings.
 
-Next work: npm publication, faster and clearer layouts for large models (including subject-area diagrams), and EER rendering. These are planned areas, not supported features or release dates.
+EER `specializations` support relational mapping, but lint/rendering still report
+`unsupported-eer` because specialization diagrams are not drawn. See the
+[change log](https://github.com/enesadakli/chen-er/blob/main/CHANGELOG.md).
 
-Unreleased work adds `chen map` and the fourth MCP tool, `map_er`, including EER
-specialization mapping; `chen lint`/rendering still reject specializations because
-they cannot draw them yet.
+Next work includes clearer layouts for large models and EER rendering.
+These are planned areas, not supported features or release dates.
 
 ## License
 
