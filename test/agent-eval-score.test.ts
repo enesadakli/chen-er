@@ -52,10 +52,14 @@ describe("requirements model scoring", () => {
     perfect(scoreModels(model(basic), model(candidate), { entities: { EMPLOYEE: ["STAFF", "WORKER"] }, attributes: { "EMPLOYEE.Id": ["StaffId"] } }));
   });
 
-  it("ignores case, underscores and spaces while retaining accents", () => {
+  it("folds accents and Turkish I and ignores case, underscores, hyphens and spaces", () => {
     expect(normalizeName("Flight_Leg")).toBe(normalizeName("flight leg"));
+    expect(normalizeName("Flight-Leg")).toBe(normalizeName("flight leg"));
     expect(normalizeName("MÜŞTERİ")).toBe(normalizeName("Müşteri"));
-    expect(normalizeName("ÜRÜN")).not.toBe(normalizeName("URUN"));
+    expect(normalizeName("ÜRÜN")).toBe(normalizeName("URUN"));
+    expect(["I", "İ", "ı", "i"].map(normalizeName)).toEqual(["i", "i", "i", "i"]);
+    expect(normalizeName("DemirbaşNo".normalize("NFD"))).toBe("demirbasno");
+    expect(normalizeName("Address")).not.toBe(normalizeName("AdmissionDate"));
     const candidate = structuredClone(basic);
     candidate.entities.employee = candidate.entities.EMPLOYEE!;
     delete candidate.entities.EMPLOYEE;

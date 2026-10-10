@@ -1,0 +1,28 @@
+# Chen ER model, version 1. Run chen lint before rendering.
+version: 1
+title: "Kütüphane ağı"
+entities:
+  SUBE: {attrs: [SubeKodu, Ad], keys: [[SubeKodu]]}
+  KITAP: {attrs: [KitapNo, Baslik, Yazar], keys: [[KitapNo]]}
+  KOPYA: {weak: true, attrs: [DemirbasNo], partialKey: [DemirbasNo]}
+  UYE: {attrs: [UyeNo, Ad, {name: Telefon, multivalued: true}], keys: [[UyeNo]]}
+relationships:
+  BULUNUR:
+    identifies: KOPYA
+    ends:
+      - {entity: SUBE, card: "0..N"}
+      - {entity: KOPYA, card: "1..1"}
+  KOPYASI:
+    ends:
+      - {entity: KITAP, card: "0..N"}
+      - {entity: KOPYA, card: "1..1"}
+  ODUNC:
+    ends:
+      - {entity: KOPYA, card: "0..1"}
+      - {entity: UYE, card: "0..N"}
+    attrs: [OduncTarihi]
+  REFERANS:
+    ends:
+      - {entity: UYE, role: ReferansGosteren, id: gosteren, card: "0..1"}
+      - {entity: UYE, role: ReferansGosterilen, id: gosterilen, card: "0..N"}
+notes: []

@@ -53,11 +53,11 @@ precisionRecallF1(gold: number, candidate: number, matched: number): PRF
 
 Pass models normalized with `parseModel` from `src/core/normalize.ts`; parse failures are a runner concern. Input objects are never mutated. The JSON report provides counts, matches, unmatched gold ids, extra candidate ids, key/property mistakes, degree errors and incorrect cardinalities with expected and actual `(min,max)` values.
 
-Matching is deterministic:
+Matching is deterministic. Matching names use NFKD, remove combining marks, fold Turkish dotted/dotless I to `i`, lowercase and ignore spaces, underscores and hyphens. Display names and model ids remain unchanged.
 
-1. Names are Unicode-normalized, case-insensitive and underscore/whitespace-insensitive. Accents remain significant. Entity matching first traverses gold ids lexically and greedily selects a unique candidate, preferring normalized equality to an alias, then lexical candidate id. For remaining entities, flattened normalized attribute-name sets use gold attribute aliases. A structural pair qualifies with Jaccard similarity ≥ 0.5 and at least two shared names, or with an equal nonempty key attribute-name set (including partial keys). Qualifying pairs are consumed greedily by descending Jaccard, then gold id, then candidate id. Empty keys cannot create a match. Each entity match records `matchedBy: "name" | "alias" | "structure"`. Similar generic attributes can produce ambiguous structural matches; this fallback is evidence of similarity, not proof of equivalence.
-2. Relationships require an equal **multiset** of matched participant entities, preserving repeated recursive participants. Names do not gate matching. Within that participant set, name/alias agreement wins, followed by recursive attribute-name overlap, then lexical id.
-3. Attributes match only within matched owners and matched composite parents, by name/alias. Every composite parent and every nested part counts as one attribute. Moving parts to top level does not match them. Derived/multivalued flags are assessed in `attributeProperties`, separately from attribute-name F1.
+1. Entities first match by case/separator-insensitive name, alias, then folded-name equality, before any structural fallback. Name pairs are consumed greedily by pass, descending folded common-prefix length, gold id, then candidate id. For remaining entities, flattened folded attribute-name sets use gold attribute aliases. A structural pair qualifies with Jaccard similarity ≥ 0.5 and at least two shared names, or with an equal nonempty key attribute-name set (including partial keys). Qualifying pairs are consumed greedily by descending Jaccard, then gold id, then candidate id. Empty keys cannot create a match. Each entity match records `matchedBy: "name" | "alias" | "folded" | "structure"`. Similar generic attributes can produce ambiguous structural matches; this fallback is evidence of similarity, not proof of equivalence.
+2. Relationships require an equal **multiset** of matched participant entities, preserving repeated recursive participants. Names do not gate matching. Within that participant set, name, alias and folded-name agreement win in that order, followed by recursive attribute-match overlap, then lexical id. Folded names never bypass the participant condition.
+3. Attributes match only within matched owners and matched composite parents, in these passes: name, alias, folded-name equality, key role, then tokens. After folded equality, key role matches only when each side has exactly one unmatched attribute marked as a key or partial key. Token matching requires equal multivalued flags (derived is ignored) and a shorter folded name of at least three characters. It accepts a whole-name prefix/suffix (`Telefon`/`Telefonlar`, `Code`/`CourseCode`), or equal token counts where every corresponding token is a prefix of the other of at least two characters (`RegNo`/`RegistrationNo`, `ProfNo`/`ProfessorNo`). Tokens split CamelCase, acronym boundaries, digits and separators after accent folding, before lowercasing. Within a pass, pairs are consumed greedily by descending folded common-prefix length, gold id, then candidate id; every attribute matches once. The same passes recurse into matched parents. Each match records `matchedBy: "name" | "alias" | "folded" | "key" | "tokens"`. `No` alone cannot earn a token match, unrelated `Address`/`AdmissionDate` do not match, and two unmatched key attributes on either side disable the key-role pass. Every composite parent and every nested part counts as one attribute. Moving parts to top level does not match them. Exact/alias/folded matches still expose derived/multivalued mistakes in `attributeProperties`; only token matching gates on multivalued compatibility.
 4. Ends pair by matched entity. Recursive ends prefer equal roles, then equal stable id suffixes, then candidate end index. Cardinality values never influence pairing. Renamed roles and ids therefore fall back to order; the metric cannot infer their meaning.
 
 Optional `aliases.json` maps a **gold** name to acceptable candidate names:
@@ -142,6 +142,20 @@ overall = (entity F1 + relationship F1 + attribute F1
 ```
 
 The explicit formula remains comparable with previous results. Natural decision checks bring selected property and structure choices into `overall`; the full `attributeProperties`, lint and trace metrics remain supplementary. A high overall score does not prove every requirement is correct. Notes, display labels, types and ordering constraints are outside matching. Keep the set and formula fixed when comparing scores.
+
+## Offline rescore
+
+Recompute saved attempts with the current scorer without running either CLI:
+
+```sh
+node_modules/.bin/tsx bench/agent-eval/rescore.ts --help
+node_modules/.bin/tsx bench/agent-eval/rescore.ts bench/agent-eval/results/<batch>
+node_modules/.bin/tsx bench/agent-eval/rescore.ts bench/agent-eval/results/<batch> --out /tmp/chen-rescored
+```
+
+The command parses `<agent>-<scenario>-<run>/` directory names (including hyphenated scenarios), reparses `model.er.yaml` and `model.er.requirements.md`, and scores against every current gold variant with current aliases and decision checks. Unknown scenarios, invalid run metadata or missing artifacts fail before reports are written. Unparseable models produce `null` scores.
+
+By default it writes `score.rescored.json` beside each old score and `summary.rescored.md` in the results directory, using `summary.ts` and the status and wall time from `run.json`. Failed attempts retain their zero contribution to summary means even when their saved model scores perfectly. Mixed-agent directories receive a separate summary section for each agent. `--out` writes only the rescored files under the destination, preserving attempt subdirectory names. It never modifies `run.json`, `score.json`, `summary.md` or model/requirements artifacts; existing rescored files may be overwritten. Rescoring uses today's matching rules, so keep the original reports when comparing historical results.
 
 ## Add a scenario
 
