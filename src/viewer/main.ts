@@ -209,7 +209,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Escape" && closeMenus()) { e.preventDefault(); e.stopPropagation(); return; }
-  if (e.key === "Escape") actions.hidden = true;
+  if (e.key === "Escape") canvas.closeActions();
   if (e.ctrlKey || e.metaKey || e.altKey || editing) return;
   if (e.key === "Escape") { selected = undefined; notes.select(); canvas.clear(); return; }
   if (e.target instanceof Element && e.target.closest("button, a, summary") && [" ", "Enter"].includes(e.key)) return;

@@ -31,6 +31,16 @@ export interface Turn {
 export interface AgentInfo { enabled: boolean; kind: string; cwd: string; running: string | null; turns: Turn[] }
 export interface ThreadState { turns: Turn[]; running: string | null }
 
+export class InFlight {
+  private pending = new Set<string>();
+  has(id: string) { return this.pending.has(id); }
+  begin(id: string): boolean {
+    if (this.has(id)) return false;
+    this.pending.add(id); return true;
+  }
+  end(id: string) { this.pending.delete(id); }
+}
+
 export const MAX_TEXT = 4000;
 export const MAX_SELECTION = 20;
 export const EXAMPLES = [

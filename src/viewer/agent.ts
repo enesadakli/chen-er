@@ -1,6 +1,6 @@
 import {
   agentName, applyTurn, canSend, changeNote, composerKey, EXAMPLES, elapsedSeconds, flashIds, labelFor,
-  loadThread, MAX_TEXT, outcome, selectionChips, takeToken, undoableTurn,
+  InFlight, loadThread, MAX_TEXT, outcome, selectionChips, takeToken, undoableTurn,
   type AgentInfo, type ThreadState, type Turn,
 } from "./agent-logic.js";
 import type { NotesTabs } from "./tabs.js";
@@ -43,6 +43,7 @@ export class AgentPanel {
   private notices = new Map<string, string>();
   private ticker?: ReturnType<typeof setInterval>;
   private sending = false;
+  private inFlight = new InFlight();
   private unread = false;
   private panel = element("agent");
   private list = element("agent-thread");
@@ -205,20 +206,25 @@ export class AgentPanel {
 
   cancelTurn(id: string) { return this.cancel(id); }
   private async cancel(id: string) {
+    if (!this.inFlight.begin(id)) return;
     try {
+      this.render();
       const res = await this.request(`/api/agent/turns/${encodeURIComponent(id)}/cancel`, { method: "POST" });
       if (!res.ok) this.note(id, await errorText(res, "Cancel failed."));
     } catch { this.note(id, "Cannot reach chen serve."); }
+    finally { this.inFlight.end(id); this.render(); }
   }
   private async undo(id: string) {
-    this.note(id, "Undoing…");
+    if (!this.inFlight.begin(id)) return;
     try {
+      this.note(id, "Undoing…");
       const res = await this.request(`/api/agent/turns/${encodeURIComponent(id)}/undo`, { method: "POST" });
       if (!res.ok) { this.note(id, await errorText(res, "Undo failed.")); return; }
       this.note(id, "");
       const turn = this.thread.turns.find((t) => t.id === id);
       if (turn && turn.status === "ok") this.event({ ...turn, status: "undone" });
     } catch { this.note(id, "Cannot reach chen serve."); }
+    finally { this.inFlight.end(id); this.render(); }
   }
   private note(id: string, text: string) {
     if (text) this.notices.set(id, text); else this.notices.delete(id);
@@ -254,7 +260,7 @@ export class AgentPanel {
     for (const [id, entry] of this.rendered) if (!ids.has(id)) { entry.node.remove(); this.rendered.delete(id); }
     let previous: HTMLElement | null = null;
     for (const turn of turns) {
-      const key = JSON.stringify([turn, undoable === turn.id, this.notices.get(turn.id) ?? "", [...this.labels.entries()].length]);
+      const key = JSON.stringify([turn, undoable === turn.id, this.inFlight.has(turn.id), this.notices.get(turn.id) ?? "", [...this.labels.entries()].length]);
       let entry = this.rendered.get(turn.id);
       if (!entry || entry.key !== key) {
         const node = this.turn(turn, undoable === turn.id);
@@ -317,6 +323,7 @@ export class AgentPanel {
       const seconds = el("span", "elapsed"); seconds.dataset.started = turn.startedAt;
       const cancel = el("button", undefined, "Cancel"); cancel.type = "button"; cancel.dataset.focus = "cancel";
       cancel.title = "Cancel (Esc)";
+      cancel.disabled = this.inFlight.has(turn.id);
       cancel.addEventListener("click", () => { void this.cancel(turn.id); });
       line.append(el("span", "pencil", `${name} is working…`), " ", seconds, cancel);
       article.append(line);
@@ -362,6 +369,7 @@ export class AgentPanel {
     if (undoable) {
       const row = el("p", "turn-actions");
       const undo = el("button", undefined, "Undo agent change"); undo.type = "button"; undo.dataset.focus = "undo";
+      undo.disabled = this.inFlight.has(turn.id);
       undo.addEventListener("click", () => { void this.undo(turn.id); });
       row.append(undo); article.append(row);
     }

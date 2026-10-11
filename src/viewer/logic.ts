@@ -5,6 +5,9 @@ import type { ViewerDiagnostic } from "../app/serve.js";
 export const severities: Severity[] = ["error", "warning", "course", "heuristic", "info"];
 export const glyphs: Record<Severity, string> = { error: "✕", warning: "!", course: "△", heuristic: "○", info: "•" };
 export interface Finding extends ViewerDiagnostic { number: number }
+export function closeActionsOnFocus(open: boolean, selected: string | undefined, id: string): boolean {
+  return open && id !== selected;
+}
 export function findings(diagnostics: readonly ViewerDiagnostic[]): Finding[] {
   return diagnostics.map((d, index) => ({ d, index }))
     .sort((a, b) => severities.indexOf(a.d.severity) - severities.indexOf(b.d.severity) || a.index - b.index)

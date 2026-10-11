@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { parseModel } from "../src/core/normalize.js";
 import { diagnosticTarget } from "../src/app/targets.js";
-import { findings, snap, targetBox, yamlExcerpt } from "../src/viewer/logic.js";
+import { closeActionsOnFocus, findings, snap, targetBox, yamlExcerpt } from "../src/viewer/logic.js";
 import { renderText, STARTER_MODEL } from "../src/app/render.js";
 
 describe("viewer pure logic", () => {
+  it("closes open actions when focus selects a different node", () => {
+    expect(closeActionsOnFocus(true, "E:STUDENT", "R:ENROLLS")).toBe(true);
+    expect(closeActionsOnFocus(true, undefined, "E:STUDENT")).toBe(true);
+  });
+  it("keeps actions open when focus returns to the selected node", () => {
+    expect(closeActionsOnFocus(true, "E:STUDENT", "E:STUDENT")).toBe(false);
+  });
+  it("does not close actions that are already closed", () => {
+    expect(closeActionsOnFocus(false, "E:STUDENT", "R:ENROLLS")).toBe(false);
+  });
   it("snaps diagram centers to 8px and allows free movement", () => {
     expect(snap({ x: 11, y: -11 })).toEqual({ x: 8, y: -8 });
     expect(snap({ x: 11.25, y: 19.5 }, true)).toEqual({ x: 11.25, y: 19.5 });
