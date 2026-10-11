@@ -1,13 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
   agentName, applyTurn, canSend, changeNote, changeNoteText, composerKey, elapsedSeconds, flashIds, labelFor,
-  loadThread, outcome, selectionChips, takeToken, undoableTurn, MAX_TEXT, type Turn,
+  InFlight, loadThread, outcome, selectionChips, takeToken, undoableTurn, MAX_TEXT, type Turn,
 } from "../src/viewer/agent-logic.js";
 
 const turn = (id: string, patch: Partial<Turn> = {}): Turn => ({
   id, text: `request ${id}`, selection: [], startedAt: `2026-10-10T12:00:0${id}Z`, status: "running", steps: [], ...patch,
 });
 const labels = new Map([["E:STUDENT", "STUDENT"], ["R:ENROLLS", "ENROLLS"], ["A:STUDENT.BirthDate", "Birth date"]]);
+
+describe("turn action guard", () => {
+  it("ignores a second action while the same turn is pending", () => {
+    const pending = new InFlight();
+    expect(pending.has("1")).toBe(false);
+    expect(pending.begin("1")).toBe(true);
+    expect(pending.has("1")).toBe(true);
+    expect(pending.begin("1")).toBe(false);
+    expect(pending.has("1")).toBe(true);
+  });
+  it("allows different turns independently and releases only the finished turn", () => {
+    const pending = new InFlight();
+    expect(pending.begin("1")).toBe(true);
+    expect(pending.begin("2")).toBe(true);
+    pending.end("1");
+    expect(pending.has("1")).toBe(false);
+    expect(pending.begin("1")).toBe(true);
+    expect(pending.begin("2")).toBe(false);
+  });
+});
 
 describe("agent turn reducer", () => {
   it("loads turns in start order and keeps the running id", () => {

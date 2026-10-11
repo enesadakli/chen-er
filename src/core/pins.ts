@@ -1,6 +1,8 @@
 import { center, type Diagram, type Pin, type Pins, type Point, type RelativePin } from "./geometry.js";
 import type { NAttribute, NModel } from "./normalize.js";
 
+export class MissingPinDiagramError extends Error {}
+
 export const isRelativePin = (pin: Pin): pin is RelativePin => "dx" in pin;
 export const pinPoint = (pin: Pin, parent: Point): Point => isRelativePin(pin)
   ? { x: parent.x + pin.dx, y: parent.y + pin.dy } : pin;
@@ -26,6 +28,7 @@ export function relativeAttributePins(pins: Pins, diagram?: Diagram): Pins {
   const centres = new Map(diagram?.nodes.map((n) => [n.id, center(n.box)]));
   return Object.fromEntries(Object.entries(pins).map(([id, pin]) => {
     if (!id.startsWith("A:") || isRelativePin(pin)) return [id, pin];
+    if (!diagram) throw new MissingPinDiagramError(`Current diagram required to convert attribute pin ${id}.`);
     const parent = centres.get(parents.get(id) ?? "");
     // Orphan pins cannot affect the current drawing and are kept until their node returns.
     if (!parent && diagram && !centres.has(id)) return [id, pin];

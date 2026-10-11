@@ -1,7 +1,7 @@
 import { relativeAttributePins } from "../core/pins.js";
 import type { ViewerState } from "../app/serve.js";
 import { center, type Box, type Pin, type Point } from "../core/geometry.js";
-import { glyphs, snap, targetBox, type Finding } from "./logic.js";
+import { closeActionsOnFocus, glyphs, snap, targetBox, type Finding } from "./logic.js";
 import type { MenuDimensions, MenuObstacle } from "./menu-position.js";
 import { selectionNeighborhood } from "./selection.js";
 
@@ -140,7 +140,10 @@ export class NotebookCanvas {
         group?.setAttribute("tabindex", "0");
         group?.setAttribute("role", "button");
         group?.setAttribute("aria-label", `${node.kind} ${node.label}${state.pins[node.id] ? ', pinned' : ''}. ${node.kind !== "attribute" ? "Enter opens actions; " : ""}arrow keys move; Delete unpins.`);
-        group?.addEventListener("focus", () => { this.selected = node.id; this.drawOverlay(); });
+        group?.addEventListener("focus", () => {
+          if (closeActionsOnFocus(this.actionsOpen, this.selected, node.id)) this.closeActions();
+          this.selected = node.id; this.drawOverlay();
+        });
         group?.addEventListener("pointerenter", () => {
           this.hovered = node.id;
           const finding = this.list.find((f) => f.target === node.id);
