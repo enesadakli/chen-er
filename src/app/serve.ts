@@ -10,6 +10,7 @@ import { DEFAULT_ENGINE, layout } from "../core/layout/index.js";
 import { renderSvg } from "../core/render/svg.js";
 import type { QualityReport } from "../core/quality.js";
 import { LayoutFile } from "../core/schema.js";
+import { MissingPinDiagramError } from "../core/pins.js";
 import { diagramPositions, layoutPathFor, lintText, quality, readPins, svgToPng, formatLayoutFile, type LayoutFilePatch } from "./render.js";
 import { diagnosticTarget } from "./targets.js";
 import { fileBytes, GuardError, replaceBytes, revision } from "./file-guard.js";
@@ -275,7 +276,12 @@ export async function serve(model: string, options: ServeOptions = {}) {
     if (expected && !same(snapshot(), expected)) throw new HttpError(409, "The files changed externally during layout.");
     const before = fileBytes(pinsPath);
     const current = before ? LayoutFile.parse(JSON.parse(before.toString("utf8"))) : { pins: {} };
-    const text = formatLayoutFile(current, patch, diagram ?? undefined);
+    let text: string;
+    try { text = formatLayoutFile(current, patch, diagram ?? undefined); }
+    catch (error) {
+      if (error instanceof MissingPinDiagramError) throw new HttpError(409, "Fix the model before changing pins: legacy attribute pins need the current diagram to convert.");
+      throw error;
+    }
     if (expected && revision(fileBytes(modelPath)) !== revision(expected.model)) throw new HttpError(409, "The model changed externally during layout.");
     replaceBytes(pinsPath, before, Buffer.from(text));
     lastWrite = text;

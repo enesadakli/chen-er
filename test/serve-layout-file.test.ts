@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,6 +19,20 @@ afterEach(async () => {
 });
 
 describe("serve layout-file diagnostic", () => {
+  it("returns 409 without changing legacy attribute pins when the model cannot parse", async () => {
+    await viewer.close();
+    writeFileSync(model, "not: [valid");
+    const path = layoutPathFor(model);
+    const bytes = Buffer.from(JSON.stringify({ version: 1, pins: { "A:STUDENT.Name": { x: 120, y: 80 }, "E:STUDENT": { x: 300, y: 200 } } }));
+    writeFileSync(path, bytes);
+    viewer = await serve(model, { port: 0 });
+    const state = await (await fetch(`${viewer.url}/api/state`)).json() as ViewerState;
+    expect(state.diagram).toBeNull();
+    const response = await fetch(`${viewer.url}/api/pins/${encodeURIComponent("E:STUDENT")}`, { method: "DELETE" });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "Fix the model before changing pins: legacy attribute pins need the current diagram to convert." });
+    expect(readFileSync(path)).toEqual(bytes);
+  });
   it("reports a failed position save as a warning", async () => {
     unlinkSync(layoutPathFor(model));
     chmodSync(dir, 0o500);

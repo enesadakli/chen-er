@@ -38,6 +38,7 @@ chen serve model.er.yaml --agent claude|codex [--agent-cwd <dir>]
 - Every `/api/agent/*` request must carry header `X-Chen-Token: <token>` and, when an `Origin` header is present, it
   must equal `http://127.0.0.1:<port>` or `http://localhost:<port>`. The `Host` header must be `127.0.0.1:<port>`
   or `localhost:<port>`. Otherwise respond 403 without detail.
+- The `/api/events` SSE stream requires no token: it also broadcasts agent turns and requirements, which are on disk anyway in `<model>.er.agent.json` and `<model>.er.requirements.md`; the server listens only on 127.0.0.1 and checks Host/Origin.
 - Agent routes return 404 when the server runs without `--agent`.
 
 ## Agent invocation (claude)

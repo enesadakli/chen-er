@@ -8,7 +8,7 @@ import { layout } from "../src/core/layout/index.js";
 import { parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 import { LayoutFile } from "../src/core/schema.js";
-import { pinPoint, relativeAttributePins } from "../src/core/pins.js";
+import { MissingPinDiagramError, pinPoint, relativeAttributePins } from "../src/core/pins.js";
 
 const text = `version: 1
 entities:
@@ -99,6 +99,7 @@ describe("parent-relative attribute pins", () => {
     }
   });
   it("requires displayed geometry instead of guessing a legacy attribute parent's centre", () => {
+    expect(() => formatLayoutFile({ pins: { "A:PERSON.Name": { x: 1, y: 2 } } }, {})).toThrow(MissingPinDiagramError);
     expect(() => formatLayoutFile({ pins: { "A:PERSON.Name": { x: 1, y: 2 } } }, {})).toThrow("Current diagram required");
   });
 });

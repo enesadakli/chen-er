@@ -87,7 +87,19 @@ describe("agent change set", () => {
     expect(changeSet(BASE, after)).toEqual({ added: ["A:STUDENT.BirthDate"], removed: ["R:HAS"], modified: ["E:COURSE", "R:ENROLLS"] });
     expect(changeSet(BASE, BASE)).toEqual({ added: [], removed: [], modified: [] });
     expect(changeSet(BASE, "version: [\n")).toEqual({ added: [], removed: [], modified: [], parseError: true });
-    expect(changeSet(null, BASE).parseError).toBe(true);
+  });
+  it("reports every node as added when the previous model is missing", () => {
+    expect(changeSet(null, BASE)).toEqual({ added: ["E:STUDENT", "A:STUDENT.StudentId", "A:STUDENT.Name", "E:COURSE", "A:COURSE.CourseId", "R:ENROLLS", "R:HAS"], removed: [], modified: [] });
+  });
+  it("reports every node as removed when the next model is missing", () => {
+    expect(changeSet(BASE, null)).toEqual({ added: [], removed: ["E:STUDENT", "A:STUDENT.StudentId", "A:STUDENT.Name", "E:COURSE", "A:COURSE.CourseId", "R:ENROLLS", "R:HAS"], modified: [] });
+  });
+  it("reports a parse error for invalid YAML on either side", () => {
+    expect(changeSet("not: [valid", BASE)).toEqual({ added: [], removed: [], modified: [], parseError: true });
+    expect(changeSet(BASE, "not: [valid")).toEqual({ added: [], removed: [], modified: [], parseError: true });
+  });
+  it("treats two missing models as empty", () => {
+    expect(changeSet(null, null)).toEqual({ added: [], removed: [], modified: [] });
   });
 });
 

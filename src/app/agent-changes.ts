@@ -27,8 +27,8 @@ export function nodeSignatures(model: NModel): Map<string, string> {
 export function changeSet(before: string | null, after: string | null): ChangeSet {
   const a = before === null ? undefined : parseModel(before).model;
   const b = after === null ? undefined : parseModel(after).model;
-  if (!a || !b) return { added: [], removed: [], modified: [], parseError: true };
-  const old = nodeSignatures(a), next = nodeSignatures(b);
+  if ((before !== null && !a) || (after !== null && !b)) return { added: [], removed: [], modified: [], parseError: true };
+  const old = a ? nodeSignatures(a) : new Map<string, string>(), next = b ? nodeSignatures(b) : new Map<string, string>();
   const added: string[] = [], removed: string[] = [], modified: string[] = [];
   for (const [id, signature] of next) {
     const previous = old.get(id);
