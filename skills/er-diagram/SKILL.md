@@ -8,13 +8,28 @@ description: Draw or check ER diagrams in Chen notation, database conceptual mod
 Write `model.er.yaml`. Run `chen lint model.er.yaml`, fix errors, then run
 `chen render model.er.yaml --png --report`. Open the PNG and inspect labels,
 participation, crossings and attribute ownership. Rename or restructure ambiguous
-facts; pin a node in `model.er.layout.json` when placement needs correction. Repeat.
+facts and repeat. Pins in `model.er.layout.json` are human-owned: the human corrects placement by dragging in the viewer. Do not write pins or soft positions.
+Install with `npm install -g chen-erd` (provides `chen`), or replace `chen`
+with `npx chen-erd` for one-off commands, for example
+`npx chen-erd render model.er.yaml`. Start MCP with
+`npx -y -p chen-erd chen-er-mcp`.
 With a source checkout, replace `chen` with `npx tsx src/cli/index.ts`.
+
+For relational design, run `chen map model.er.yaml --format md` after checking
+the model; use `--format sql --default-type TEXT --out tables.sql` for SQL or
+`--format json` for table metadata. Each table explains its producing course
+step (1–7, specialization option 8A) and later FK additions. Read notes for
+unenforced constraints, name collisions and the n-ary participation caveat in
+`docs/mapping.md`. SQL types are placeholders. Fix errors before mapping.
 
 If the CLI is unavailable, call MCP `get_schema`, then `lint_er`, then `render_er`.
 Supply exactly one of `model` (YAML text) or `path` (server-side file path).
 Inspect the returned PNG. Use `path` to load sibling layout pins; `out` writes
 both an SVG and a sibling PNG.
+
+MCP `map_er` accepts the same exactly-one-of `model`/`path` source and returns
+JSON relations, keys, FKs, explanations, notes, diagnostics and `md`, without
+writing files. Mapping supports specializations; rendering still does not.
 
 ## Model cheat sheet
 
@@ -80,10 +95,12 @@ total participation and partial key. Avoid generic relationship names like
 check domain meaning, keys and participation yourself. Version 1 reserves
 `specializations` for EER but does not draw them.
 
-Pins use stable node ids and center coordinates in pixels:
+Human-owned pins use stable node ids. Entity/relationship pins are absolute centres in pixels; attribute pins are `{dx, dy}` offsets from the immediate parent centre (composite parts use the parent attribute oval):
 
 ```json
-{"version":1,"engine":"layered","pins":{"E:BOOK":{"x":240,"y":160}}}
+{"version":1,"engine":"layered","pins":{"E:BOOK":{"x":240,"y":160},"A:BOOK.Title":{"dx":40,"dy":-64}}}
 ```
 
 Use `E:<Entity>`, `R:<Relationship>` or `A:<Owner>.<attr>[.<part>]` as pin keys.
+
+Legacy absolute attribute pins remain exact on read and migrate without a jump on the next viewer layout-file write. CLI `--report` and MCP `render_er` with `report: true` report pin drift against the actual parent plus offset. Rendering does not write or migrate pins.

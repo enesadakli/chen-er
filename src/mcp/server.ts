@@ -4,7 +4,9 @@ import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { getSchema, lintEr, lintInput, renderEr, renderInput, type ToolIO } from "./tools.js";
+import { getSchema, lintEr, lintInput, mapEr, mapInput, renderEr, renderInput, type ToolIO } from "./tools.js";
+import { reportEr, reportInput } from "./tools.js";
+import { packageVersion } from "../app/version.js";
 
 const fileIO: ToolIO = {
   readText: (path) => readFile(path, "utf8"),
@@ -20,7 +22,7 @@ async function safely(run: () => CallToolResult | Promise<CallToolResult>): Prom
 }
 
 export function createServer(io: ToolIO = fileIO): McpServer {
-  const server = new McpServer({ name: "chen-er", version: "0.1.0" });
+  const server = new McpServer({ name: "chen-er", version: packageVersion });
   server.registerTool("get_schema", {
     description: "Get the authoritative draft-2020-12 ER model schema, annotated YAML example, notation cheat sheet and available lint rules. Start here before writing a model.",
     inputSchema: {},
@@ -32,10 +34,20 @@ export function createServer(io: ToolIO = fileIO): McpServer {
     annotations: { readOnlyHint: true },
   }, (input) => safely(() => lintEr(input, io)));
   server.registerTool("render_er", {
-    description: "Render Chen ER YAML and return a PNG image for visual inspection plus JSON diagnostics and written paths. Supply exactly one of model or path. File input loads sibling .er.layout.json pins (set noPins to ignore them); diagnostics then include a pins-degrade-layout warning when the saved pins make the drawing clearly worse, and notes says which engine the layout file chose. Optional out writes SVG and PNG, replacing existing files. Inspect the image and revise the model or pins as needed.",
+    description: "Render Chen ER YAML and return a PNG image for visual inspection plus JSON diagnostics and written paths. Supply exactly one of model or path. File input loads human-owned sibling .er.layout.json pins: entities/relationships are absolute, attributes relative to their immediate parent (legacy absolute attributes remain supported; set noPins to ignore the file). Set report for geometry quality; diagnostics then include a pins-degrade-layout warning when the saved pins make the drawing clearly worse, and notes says which engine the layout file chose. Optional out writes SVG and PNG, replacing existing files. Inspect the image and revise the model as needed; pins are edited by the human in the viewer.",
     inputSchema: renderInput,
     annotations: { readOnlyHint: false, destructiveHint: true },
   }, (input) => safely(() => renderEr(input, io)));
+  server.registerTool("map_er", {
+    description: "Map Chen ER YAML to relational tables using steps 1–7 and specialization option 8A. Supply exactly one of model or path. Returns relations, columns, PKs, UNIQUEs, FKs, source ids, step explanations, limitations, diagnostics and Markdown. Refuses invalid models; does not write files.",
+    inputSchema: mapInput,
+    annotations: { readOnlyHint: true },
+  }, (input) => safely(() => mapEr(input, io)));
+  server.registerTool("report_er", {
+    description: "Build a course method report: requirements when present, ER diagram, model, traceability, lint and relational schema. Supply exactly one of model or path; format is md (default) or self-contained html. Markdown directs the caller to render_er for the diagram. Returns report text and diagnostics without writing files.",
+    inputSchema: reportInput,
+    annotations: { readOnlyHint: true },
+  }, (input) => safely(() => reportEr(input, io)));
   return server;
 }
 

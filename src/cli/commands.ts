@@ -101,9 +101,9 @@ export function schemaCommand(): CommandResult {
   }
 }
 
-export function initCommand(file = "model.er.yaml", options: { force?: boolean } = {}): CommandResult {
+export function initCommand(file = "model.er.yaml", options: { force?: boolean; empty?: boolean; title?: string } = {}): CommandResult {
   try {
-    initFile(file, options.force);
+    initFile(file, options.force, options);
     return { exitCode: 0, stdout: file, stderr: "" };
   } catch (error) {
     return failure(error);
@@ -124,9 +124,65 @@ export interface ServeCommandOptions {
   port?: number;
   open?: boolean;
   engine?: LayoutOptions["engine"];
+  /** `claude` or `codex` enables the agent panel with that CLI. */
+  agent?: string;
+  agentCwd?: string;
+}
+
+/** Maps CLI flags to the server's agent options; throws a usage message for unsupported combinations. */
+export function agentOptions(options: Pick<ServeCommandOptions, "agent" | "agentCwd">): { kind: "claude" | "codex"; cwd?: string } | undefined {
+  if (options.agent === undefined) {
+    if (options.agentCwd !== undefined) throw new Error("--agent-cwd requires --agent claude or --agent codex.");
+    return undefined;
+  }
+  if (options.agent !== "claude" && options.agent !== "codex") throw new Error(`Unknown agent: ${options.agent}. Use --agent claude or --agent codex.`);
+  return { kind: options.agent, ...(options.agentCwd !== undefined ? { cwd: options.agentCwd } : {}) };
 }
 
 export async function serveCommand(modelPath: string, options: ServeCommandOptions = {}) {
+  const agent = agentOptions(options);
   const { serve } = await import("../app/serve.js");
-  return serve(modelPath, options);
+  return serve(modelPath, { port: options.port, open: options.open, engine: options.engine, ...(agent ? { agent } : {}) });
+}
+
+export interface MapCommandOptions {
+  format?: import("../core/map/format.js").MappingFormat;
+  out?: string;
+  defaultType?: string;
+}
+
+export async function mapCommand(modelPath: string, options: MapCommandOptions = {}): Promise<CommandResult> {
+  try {
+    const { mapFile, writeMappingOutput } = await import("../app/map.js");
+    const { formatMapping } = await import("../core/map/index.js");
+    const result = mapFile(modelPath);
+    if (!result.mapping) return {
+      exitCode: 1,
+      stdout: options.format === "json" ? JSON.stringify({ diagnostics: result.diagnostics }) : "",
+      stderr: formatDiagnostics(result.diagnostics),
+    };
+    const content = options.format === "json"
+      ? JSON.stringify({ ...result.mapping, diagnostics: result.diagnostics }, null, 2) + "\n"
+      : formatMapping(result.mapping, options.format, options.defaultType);
+    if (options.out) writeMappingOutput(modelPath, options.out, content);
+    return { exitCode: 0, stdout: options.out ?? content.trimEnd(), stderr: formatDiagnostics(result.diagnostics) };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export interface ReportCommandOptions {
+  format?: import("../app/report.js").ReportFormat;
+  out?: string;
+  pins?: boolean;
+}
+
+export async function reportCommand(modelPath: string, options: ReportCommandOptions = {}): Promise<CommandResult> {
+  try {
+    const { writeReport } = await import("../app/report.js");
+    const result = await writeReport(modelPath, { format: options.format, out: options.out, noPins: options.pins === false });
+    return { exitCode: result.doc ? 0 : 1, stdout: result.paths.join("\n"), stderr: formatDiagnostics(result.diagnostics) };
+  } catch (error) {
+    return failure(error);
+  }
 }

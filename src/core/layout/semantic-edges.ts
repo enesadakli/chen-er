@@ -1,6 +1,7 @@
-import { center, type Box, type DEdge, type Diagram, type DNode, type Point } from "../geometry.js";
+import { center, intersects, type Box, type DEdge, type Diagram, type DNode, type Point } from "../geometry.js";
 import { style } from "../style.js";
 import { distance, segmentIntersection, segments } from "./shapes.js";
+import { linesBox } from "./label-geometry.js";
 
 export const MIN_ROUTE_SEGMENT = 16;
 export const MIN_END_SEPARATION = 16;
@@ -23,6 +24,15 @@ export function visibleEdgePaths(edge: DEdge): Point[][] {
   }));
 }
 
+const visibleCache = new WeakMap<Point[], { plain?: [Point, Point][]; double?: [Point, Point][] }>();
+/** Rendered segments of an edge. Point arrays are replaced, never mutated, so they key the cache. */
+export function visibleSegments(edge: DEdge): [Point, Point][] {
+  let entry = visibleCache.get(edge.points);
+  if (!entry) visibleCache.set(edge.points, entry = {});
+  const kind = edge.double ? "double" : "plain";
+  return entry[kind] ??= visibleEdgePaths(edge).flatMap(segments);
+}
+
 export function orthogonalPath(points: Point[]): boolean {
   return points.length >= 2 && segments(points).every(([a, b]) => Math.abs(a.x - b.x) <= EPS || Math.abs(a.y - b.y) <= EPS);
 }
@@ -37,7 +47,8 @@ export function reverses(points: Point[]): boolean {
 }
 
 export function edgesOverlap(a: DEdge, b: DEdge): boolean {
-  return visibleEdgePaths(a).flatMap(segments).some(([p, q]) => visibleEdgePaths(b).flatMap(segments).some(([r, s]) => segmentIntersection(p, q, r, s) === "overlap"));
+  const other = visibleSegments(b);
+  return visibleSegments(a).some(([p, q]) => other.some(([r, s]) => segmentIntersection(p, q, r, s) === "overlap"));
 }
 
 export function dominantVertex(diamond: DNode, entity: DNode): { point: Point; normal: Point } | undefined {
@@ -133,11 +144,12 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
   const byId = new Map(diagram.nodes.map((n) => [n.id, n]));
   let edgeOverlap = 0, tinySegments = 0, endPortCrowding = 0, diamondVertexViolations = 0, doubleEdgeArtifacts = 0;
   const visible = new Map(diagram.edges.map((e) => [e.id, visibleEdgePaths(e).flatMap(segments)]));
+  const bounds = new Map([...visible].map(([id, lines]) => [id, linesBox(lines)]));
   for (let i = 0; i < diagram.edges.length; i++) {
     const e = diagram.edges[i]!;
     const lines = visible.get(e.id)!;
     if (lines.some(([a, b], j) => lines.slice(j + 1).some(([c, d]) => segmentIntersection(a, b, c, d) === "overlap"))) edgeOverlap++;
-    for (const other of diagram.edges.slice(i + 1)) if (lines.some(([a, b]) => visible.get(other.id)!.some(([c, d]) => segmentIntersection(a, b, c, d) === "overlap"))) edgeOverlap++;
+    for (const other of diagram.edges.slice(i + 1)) if (intersects(bounds.get(e.id)!, bounds.get(other.id)!, 1) && lines.some(([a, b]) => visible.get(other.id)!.some(([c, d]) => segmentIntersection(a, b, c, d) === "overlap"))) edgeOverlap++;
     tinySegments += tinyRouteSegments(e);
     if (e.kind !== "end") continue;
     if (orthogonalPath(e.points)) {

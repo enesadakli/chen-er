@@ -1,4 +1,4 @@
-import type { Box, LayoutResult, Point } from "../geometry.js";
+import type { Box, LayoutResult, Pins } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { assessQuality, type QualityReport } from "../quality.js";
 import type { Cluster } from "./clusters.js";
@@ -6,6 +6,15 @@ import { layoutScore } from "./compact.js";
 import { placeSemantically, type SemanticPlacement } from "./semantic.js";
 
 export interface Spacing { columns: number; rows: number }
+
+/**
+ * Candidate budget for the spacing and Z-route searches. One build costs roughly the square of the
+ * model size, so beyond 12 entities a search keeps a share that shrinks with the square, never below
+ * one candidate. Large drawings rarely pass those searches' route limits anyway. Counts depend only
+ * on the model, so the same input always gives the same drawing.
+ */
+export const searchBudget = (count: number, model: NModel): number =>
+  Math.max(1, Math.ceil(count * Math.min(1, (12 / Math.max(1, model.entities.length)) ** 2)));
 
 /** A bounded grid at or below the default cell size; the default always comes first. */
 function spacingCandidates(base: number): Spacing[] {
@@ -41,11 +50,12 @@ const fullSpacingAccepted = (q: QualityReport): boolean =>
  * Bounded spacing search for larger unpinned models. Candidates are ranked on the skeleton; the
  * first one whose full drawing passes the limits wins, otherwise the default grid stays.
  */
-export function chooseSpacing(clusters: Cluster[], model: NModel, placement: SemanticPlacement, base: number, reserved: Box[], pins: Record<string, Point>,
+export function chooseSpacing(clusters: Cluster[], model: NModel, placement: SemanticPlacement, base: number, reserved: Box[], pins: Pins,
   build: (cs: Cluster[]) => LayoutResult): { spacing: Spacing; initial?: LayoutResult } {
   const fallback = { spacing: { columns: base, rows: base } };
   if (Object.keys(pins).length || model.entities.length <= 4) return fallback;
-  const ranked = spacingCandidates(base).map((candidate) => {
+  const candidates = spacingCandidates(base);
+  const ranked = candidates.slice(0, searchBudget(candidates.length, model)).map((candidate) => {
     placeSemantically(clusters, model, placement, candidate.columns, reserved, candidate.rows);
     return { candidate, score: skeletonSpacingScore(build(withoutAttributes(clusters)), model) };
   }).filter((c) => c.score < SKELETON_LIMIT).sort((a, b) => a.score - b.score);

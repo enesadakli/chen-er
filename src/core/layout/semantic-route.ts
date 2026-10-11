@@ -4,7 +4,7 @@ import { attributeSize } from "../style.js";
 import { recursiveDeparture, type EndPort } from "./anchors.js";
 import { attributeNode } from "./attributes.js";
 import type { Cluster } from "./clusters.js";
-import { dominantVertex, edgesOverlap, MIN_ROUTE_SEGMENT, reverses, visibleEdgePaths } from "./semantic-edges.js";
+import { dominantVertex, MIN_ROUTE_SEGMENT, reverses, visibleEdgePaths, visibleSegments } from "./semantic-edges.js";
 import { simplify } from "./route.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
@@ -23,6 +23,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   ].filter((tip) => !vertex || distance(tip, vertex.point) < 1e-6).sort((a, d) => distance(a, b) - distance(d, b));
   const goal = { x: b.x + port.normal.x * 64, y: b.y + port.normal.y * 64 };
   const paths: Point[][] = [];
+  const priorLines = prior.flatMap(visibleSegments);
   for (const tip of tips) {
     const a = { x: tip.x, y: tip.y }, start = { x: a.x + tip.nx * 24, y: a.y + tip.ny * 24 };
     paths.push([a, { x: b.x, y: a.y }, b], [a, { x: a.x, y: b.y }, b]);
@@ -43,18 +44,26 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   }
   let best: Point[] | undefined, score = Infinity;
   for (const path of paths) {
-    const ps = simplify(path), candidate = { ...edge, points: ps }, copies = visibleEdgePaths(candidate), lines = copies.flatMap(segments);
+    const ps = simplify(path), copies = visibleEdgePaths({ ...edge, points: ps }), lines = copies.flatMap(segments);
     const first = ps[0]!, second = ps[1], last = ps.at(-1)!, before = ps.at(-2);
     const tip = tips.find((p) => distance(p, first) < 1e-6);
     if (!tip || !second || !before || (second.x - first.x) * tip.nx + (second.y - first.y) * tip.ny <= 1e-6
       || (before.x - last.x) * port.normal.x + (before.y - last.y) * port.normal.y <= 1e-6) continue;
     if (reverses(ps) || [ps, ...copies].some((ps) => segments(ps).some(([a, b]) => distance(a, b) < MIN_ROUTE_SEGMENT - 1e-6))) continue;
-    if (prior.some((other) => edgesOverlap(candidate, other))) continue;
-    if (lines.some(([a, b]) => nodes.some((n) => segmentThrough(a, b, n)))) continue;
-    if (lines.some(([a, b]) => foreign.some((n) => segmentThrough(a, b, n.kind === "relationship" && diamondClearance < 6 ? { ...n, box: { x: n.box.x - diamondClearance, y: n.box.y - diamondClearance, w: n.box.w + diamondClearance * 2, h: n.box.h + diamondClearance * 2 } }
+    // Crossings only add cost, so a path already longer than the best one cannot win.
+    const base = segments(ps).reduce((s, [a, b]) => s + distance(a, b), 0) + ps.length * 8 + Math.max(0, ps.length - 4) * 1000;
+    if (base >= score) continue;
+    // Shapes and segments outside the candidate's bounds (plus the largest clearance) cannot touch it.
+    const xs = lines.flatMap(([a, b]) => [a.x, b.x]), ys = lines.flatMap(([a, b]) => [a.y, b.y]);
+    const bounds = { x: Math.min(...xs) - 8, y: Math.min(...ys) - 8, w: Math.max(...xs) - Math.min(...xs) + 16, h: Math.max(...ys) - Math.min(...ys) + 16 };
+    const near = priorLines.filter(([p, q]) => Math.max(p.x, q.x) >= bounds.x && Math.min(p.x, q.x) <= bounds.x + bounds.w && Math.max(p.y, q.y) >= bounds.y && Math.min(p.y, q.y) <= bounds.y + bounds.h);
+    const nearNodes = nodes.filter((n) => intersects(n.box, bounds));
+    if (lines.some(([a, b]) => near.some(([p, q]) => segmentIntersection(a, b, p, q) === "overlap"))) continue;
+    if (lines.some(([a, b]) => nearNodes.some((n) => segmentThrough(a, b, n)))) continue;
+    if (lines.some(([a, b]) => nearNodes.some((n) => n.id !== edge.from && n.id !== edge.to && segmentThrough(a, b, n.kind === "relationship" && diamondClearance < 6 ? { ...n, box: { x: n.box.x - diamondClearance, y: n.box.y - diamondClearance, w: n.box.w + diamondClearance * 2, h: n.box.h + diamondClearance * 2 } }
       : boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 }))) || reserved.some((r) => segmentThrough(a, b, boxShape(r))))) continue;
     let crossings = 0;
-    for (const other of prior) for (const [a, b] of lines) for (const [p, q] of visibleEdgePaths(other).flatMap(segments)) {
+    for (const [a, b] of lines) for (const [p, q] of near) {
       const hit = segmentIntersection(a, b, p, q);
       if (hit === "overlap") crossings += 8;
       else if (hit && ![ps[0]!, ps.at(-1)!].some((p) => distance(p, hit) < 1e-7)) crossings++;

@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { renderFile, renderText, svgToPng } from "../app/render.js";
+import { quality, readPins, renderFile, renderText, svgToPng } from "../app/render.js";
 import { hasErrors, type Diagnostic } from "../core/diagnostics.js";
 import { lint, RULES, LINT_DISCLAIMER } from "../core/lint/index.js";
 import { parseModel } from "../core/normalize.js";
 import { Model } from "../core/schema.js";
+import { mapText } from "../app/map.js";
+import { mappingMarkdown } from "../core/map/index.js";
 
 const source = {
   model: z.string().optional().describe("Complete .er.yaml model text. Supply exactly one of model or path."),
@@ -18,11 +20,24 @@ export const lintInput = z.object({
   disable: z.array(z.string()).optional().describe("Lint rule ids to skip; structural parsing errors cannot be disabled."),
 }).strict().refine(exactlyOne, "Supply exactly one of model or path.");
 
+export const mapInput = z.object(source).strict().refine(exactlyOne, "Supply exactly one of model or path.");
+
+export async function mapEr(input: z.infer<typeof mapInput>, io: ToolIO): Promise<CallToolResult> {
+  const args = mapInput.parse(input);
+  const result = mapText(args.model ?? await io.readText(args.path!));
+  return textResult({
+    ...(result.mapping ? { ...result.mapping, md: mappingMarkdown(result.mapping) } : {}),
+    diagnostics: result.diagnostics,
+    disclaimer: LINT_DISCLAIMER,
+  }, !result.mapping);
+}
+
 export const renderInput = z.object({
   ...source,
   engine: z.enum(["layered", "stress", "simple"]).optional(),
   out: z.string().regex(/\.svg$/i).optional().describe("Optional SVG output path. Also writes a sibling PNG; existing files are replaced."),
   scale: z.number().finite().positive().optional().describe("PNG zoom factor; default 2. Does not change SVG geometry."),
+  report: z.boolean().optional().describe("Include geometry quality, with attribute pin drift measured against parent centres plus offsets."),
   noPins: z.boolean().optional().describe("Ignore the sibling .er.layout.json (pins, soft positions, stored engine). Only applies to path input."),
 }).strict().refine(exactlyOne, "Supply exactly one of model or path.");
 
@@ -82,6 +97,8 @@ export async function renderEr(input: z.infer<typeof renderInput>, io: ToolIO): 
   if (!result.svg || hasErrors(diagnostics)) {
     return textResult({ diagnostics, summary: summary(diagnostics), notes: result.notes ?? [], writtenPaths: [], disclaimer: LINT_DISCLAIMER }, true);
   }
+  const report = args.report && result.diagram
+    ? quality(result.diagram, args.path && !args.noPins ? readPins(args.path).options.pins : {}) : undefined;
   const png = svgToPng(result.svg, args.scale);
   const writtenPaths: string[] = [];
   if (args.out) {
@@ -93,8 +110,23 @@ export async function renderEr(input: z.infer<typeof renderInput>, io: ToolIO): 
   }
   return {
     content: [
-      { type: "text", text: JSON.stringify({ diagnostics, summary: summary(diagnostics), notes: result.notes ?? [], writtenPaths, disclaimer: LINT_DISCLAIMER }) },
+      { type: "text", text: JSON.stringify({ diagnostics, summary: summary(diagnostics), notes: result.notes ?? [], writtenPaths, ...(report ? { quality: report } : {}), disclaimer: LINT_DISCLAIMER }) },
       { type: "image", data: png.toString("base64"), mimeType: "image/png" },
     ],
   };
+}
+
+export const reportInput = z.object({
+  ...source,
+  format: z.enum(["md", "html"]).optional(),
+}).strict().refine(exactlyOne, "Supply exactly one of model or path.");
+
+export async function reportEr(input: z.infer<typeof reportInput>, _io: ToolIO): Promise<CallToolResult> {
+  const args = reportInput.parse(input);
+  const { reportText, reportFile, reportContent } = await import("../app/report.js");
+  const result = args.model !== undefined ? await reportText(args.model) : await reportFile(args.path!);
+  return textResult({
+    ...(result.doc ? { report: reportContent(result, args.format ?? "md") } : {}),
+    diagnostics: result.diagnostics,
+  }, !result.doc);
 }

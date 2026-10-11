@@ -1,4 +1,6 @@
-import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Point } from "../geometry.js";
+import { isRelativePin, pinPoint } from "../pins.js";
+import { labelIntersectsLines } from "./label-geometry.js";
+import { anchor, boxAround, center, intersects, type DEdge, type DLabel, type DNode, type Pins, type Point } from "../geometry.js";
 import type { NAttribute } from "../normalize.js";
 import { attributeSize } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
@@ -10,11 +12,12 @@ import type { Cluster } from "./clusters.js";
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 interface Fan { nodes: DNode[]; edges: DEdge[]; angle: number }
 
-export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = []): boolean {
+export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = [], pins: Pins = {}): boolean {
   const nodeCount = nodes.length, edgeCount = edges.length;
   const entities = nodes.filter((n) => n.kind === "entity").map((n) => center(n.box));
   const centroid = { x: entities.reduce((s, p) => s + p.x, 0) / (entities.length || 1), y: entities.reduce((s, p) => s + p.y, 0) / (entities.length || 1) };
   const skeleton = edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points));
+  const portAnchors = [...endPorts.entries()].map(([id, port]) => ({ owner: edges.find((e) => e.id === id)?.to, anchor: port.anchor }));
   for (const c of clusters) {
     const p = center(c.node.box), outward = p.x === centroid.x && p.y === centroid.y ? -Math.PI / 2 : Math.atan2(p.y - centroid.y, p.x - centroid.x);
     const chosen: number[] = [];
@@ -34,7 +37,8 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
   return true;
 
   function plan(attr: NAttribute, parent: DNode, preferred: number, chosen: number[], pendingNodes: DNode[], pendingEdges: DEdge[], rings: number): Fan | undefined {
-    const pc = center(parent.box), size = attributeSize(attr.label, metrics), fixed = nodes.find((n) => n.id === attr.id);
+    const pc = center(parent.box), size = attributeSize(attr.label, metrics), pin = pins[attr.id];
+    const fixed = nodes.find((n) => n.id === attr.id) ?? (pin && isRelativePin(pin) ? attributeNode(attr, pinPoint(pin, pc), metrics, true) : undefined);
     const angles = Array.from({ length: 72 }, (_, i) => preferred + i * Math.PI / 36).sort((a, b) => {
       const score = (t: number) => angleDistance(t, preferred) + chosen.reduce((s, u) => s + Math.max(0, 0.45 - angleDistance(t, u)) * 12, 0);
       return score(a) - score(b) || a - b;
@@ -68,11 +72,13 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
     const others = [...nodes, ...pendingNodes].filter((n) => n.id !== node.id);
     if (others.some((n) => intersects(box, n.box, 14)) || labels.some((l) => intersects(box, l.box, 8))) return false;
     if (others.some((n) => n.id !== parent.id && segmentThrough(a, b, boxShape(n.box)))) return false;
-    if (labels.some((l) => segmentThrough(a, b, boxShape({ x: l.box.x - 5, y: l.box.y - 5, w: l.box.w + 10, h: l.box.h + 10 })))) return false;
-    if ([...endPorts.entries()].some(([id, port]) => edges.find((e) => e.id === id)?.to === parent.id && distance(a, port.anchor) < 14)) return false;
+    if (labels.some((l) => labelIntersectsLines(l.box, [[a, b]], 5))) return false;
+    if (portAnchors.some((port) => port.owner === parent.id && distance(a, port.anchor) < 14)) return false;
     if (skeleton.some(([p, q]) => segmentThrough(p, q, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(a, b, p, q))) return false;
+    const pool = new Map<string, DNode>();
+    for (const n of [...nodes, ...pendingNodes]) if (!pool.has(n.id)) pool.set(n.id, n);
     return ![...edges, ...pendingEdges].filter((e) => e.kind !== "end").some((other) => {
-      const from = [...nodes, ...pendingNodes].find((n) => n.id === other.from)!, to = [...nodes, ...pendingNodes].find((n) => n.id === other.to)!;
+      const from = pool.get(other.from)!, to = pool.get(other.to)!;
       const [p, q] = attributeAnchors(from, to);
       return segmentThrough(p, q, boxShape(box)) || (other.from !== parent.id && other.to !== parent.id && !!segmentIntersection(a, b, p, q));
     });
@@ -117,7 +123,7 @@ export function attributeNode(a: NAttribute, p: Point, metrics: TextMetrics, pin
   return { id: a.id, kind: "attribute", label: a.label, box: boxAround(p, size.w, size.h), double: a.multivalued, pinned, attr: { key: a.key, partial: a.partial, multivalued: a.multivalued, derived: a.derived } };
 }
 
-export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map()): void {
+export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), pins: Pins = {}): void {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const skeleton = edges.filter((e) => e.kind === "end").flatMap((e) => segments(e.points).map(([a, b]) => ({ a, b })));
   for (const c of clusters) {
@@ -133,6 +139,11 @@ export function placeRadialAttributes(clusters: Cluster[], nodes: DNode[], edges
   function place(a: NAttribute, parent: DNode, preferred: number, radius: number, used: number[], chosen: number[]) {
     const pc = center(parent.box), size = attributeSize(a.label, metrics);
     let node = byId.get(a.id);
+    const pin = pins[a.id];
+    if (!node && pin && isRelativePin(pin)) {
+      node = attributeNode(a, pinPoint(pin, pc), metrics, true);
+      nodes.push(node); byId.set(node.id, node);
+    }
     let angle = preferred;
     if (!node) {
       const candidates = Array.from({ length: 72 }, (_, i) => -Math.PI + i * Math.PI / 36).sort((a, b) => {
