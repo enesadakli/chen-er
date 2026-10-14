@@ -3,6 +3,7 @@ import { absolutePins, isRelativePin, pinPoint } from "../pins.js";
 import { boxAround, center, intersects, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Pins, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
 import { assessQuality, type QualityReport } from "../quality.js";
+import { style } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
 import { alignDiamondPorts, fanEndAnchors, placeRecursive } from "./anchors.js";
 import { attributeNode, placeAttributes, placeRadialAttributes } from "./attributes.js";
@@ -19,6 +20,9 @@ import { repairEdgeNodeClearance, routeEdge } from "./route.js";
 import { distance } from "./shapes.js";
 import { chooseSpacing, searchBudget } from "./semantic-spacing.js";
 
+// Keep fallback provenance internal; a quality score cannot distinguish fan modes.
+const radialFallbacks = new WeakSet<LayoutResult>();
+
 export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine {
   return async (model, metrics, options) => {
     const pins = options.pins ?? {};
@@ -34,8 +38,23 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       const reserved = pinnedAttributes.map((n) => n.box);
       const spacing = chooseSpacing(clusters, model, placement, base, reserved, pins, semanticBuild);
       placeSemantically(clusters, model, placement, spacing.spacing.columns, reserved, spacing.spacing.rows);
+      const initialClusters = clusters.map((c) => ({ ...c, node: { ...c.node, box: { ...c.node.box } } }));
       result = refineClearance(clusters, semanticBuild, pins, model, spacing.initial);
       result = reduceZRoutes(clusters, semanticBuild, pins, model, result);
+      // A failed fan can replace every attribute with a distant radial placement,
+      // then canvas translation moves every entity. Retry only that expensive case
+      // (spokes longer than a grid cell), starting from the unchanged entity cells.
+      if (radialFallbacks.has(result) && assessQuality(result.diagram, pins, model).attributeSpokeMax * style.attribute.height > base) {
+        const recoveryBuild = (cs: Cluster[]) => buildDiagram(cs, pinnedAttributes, model, metrics, name, true, pins, true);
+        let recovered = refineClearance(initialClusters, recoveryBuild, pins, model);
+        recovered = reduceZRoutes(initialClusters, recoveryBuild, pins, model, recovered);
+        const after = assessQuality(recovered.diagram, pins, model);
+        if (Number.isFinite(layoutScore(after)) && !after.spokeEdgeViolations && !after.spokeLabelViolations
+          && recovered.diagram.width * recovered.diagram.height < result.diagram.width * result.diagram.height) {
+          result = recovered;
+          clusters.forEach((c, i) => { c.node.box = { ...initialClusters[i]!.node.box }; });
+        }
+      }
       const hierarchy = hierarchyDag(model.entities.map((e) => e.id), hierarchyPairs(modelRelations(model)));
       if (!Object.keys(pins).length && model.entities.length <= 4 && new Set(placement.columns.values()).size > 1 && hierarchy.pairs.length && !hierarchy.cyclic.size) {
         result = compactRows(result, clusters, placement.ranks, semanticBuild, model);
@@ -192,7 +211,7 @@ function reduceZRoutes(clusters: Cluster[], build: (cs: Cluster[]) => LayoutResu
   return best;
 }
 
-function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NModel, metrics: TextMetrics, name: string, semantic = false, pins: Pins = {}): LayoutResult {
+function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NModel, metrics: TextMetrics, name: string, semantic = false, pins: Pins = {}, deferLabels = false): LayoutResult {
   clusters = clusters.map((c) => ({ ...c, node: { ...c.node, box: { ...c.node.box } } }));
   for (const c of clusters) if (!c.node.pinned) {
     const p = center(c.node.box);
@@ -235,7 +254,8 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
     preliminary.push(e);
   }
   let radialFan = !semantic || nodes.some((n) => n.pinned) || clusters.some((c) => c.attrs.filter((a) => a.parts.length).length > 1);
-  if (!radialFan) radialFan = !placeAttributes(clusters, nodes, edges, metrics, endPorts, placeLabels(model, nodes, edges, metrics), pins);
+  const attemptedFan = !radialFan;
+  if (!radialFan) radialFan = !placeAttributes(clusters, nodes, edges, metrics, endPorts, placeLabels(model, nodes, edges, metrics), pins, deferLabels);
   if (radialFan) {
     if (semantic) semanticAttributes(clusters, nodes, edges, metrics, endPorts);
     placeRadialAttributes(clusters, nodes, edges, metrics, endPorts, pins);
@@ -279,5 +299,7 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
       }
     }
   }
-  return finalize({ nodes, edges, labels, title: model.title, notes: model.notes, engine: name });
+  const result = finalize({ nodes, edges, labels, title: model.title, notes: model.notes, engine: name });
+  if (attemptedFan && radialFan) radialFallbacks.add(result);
+  return result;
 }

@@ -31,6 +31,9 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   // routeDetourMax 1.1653 -> 1.3129 and attributeSpokeMax 1.0735 -> 1.5882.
   "campus": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.312937062937063, attributeSpokeMax: 1.588235294117647, emptyAreaRatio: 0.9206378769430194 },
   "university-curriculum": { zRoutes: 6, edgeCrossings: 1, endBendsMax: 2, routeDetourMax: 1.336048879837067, attributeSpokeMax: 3.395548640169282, emptyAreaRatio: 0.923729974724041 },
+  // Measured after the attribute-fallback stability fix; private model content stays local.
+  "fa": { zRoutes: 11, edgeCrossings: 6, endBendsMax: 4, routeDetourMax: 1.6547029702970295, attributeSpokeMax: 9.170101392566268, emptyAreaRatio: 0.935028758299801 },
+  "parcel-distribution": { zRoutes: 11, edgeCrossings: 5, endBendsMax: 2, routeDetourMax: 1.328695652173913, attributeSpokeMax: 8.906866334285509, emptyAreaRatio: 0.9386681457203191 },
   // Large public stand-in for the private 26-entity stress model (26 entities, 36 relationships, 99 attributes).
   // Baseline on 2026-10-10: 15.3 s, 5902x2166, longEdgeMax 14.8, meanEdgeRatio 4.21, aspect 2.72.
   "transit-network": { zRoutes: 23, edgeCrossings: 33, endBendsMax: 4, routeDetourMax: 1.4473007712082262, attributeSpokeMax: 2.4699099166345944, emptyAreaRatio: 0.9480016750096972 },
@@ -108,7 +111,7 @@ export function guardFailures({ input, diagram, q, hierarchyMinimum, elapsed, st
 }
 
 /** Fixtures the guards apply to: bench fixtures and public examples, plus the private model when present. */
-export const guardInputs = (): string[] => ["bench/fixtures", "examples", "examples/private", "bench/fixtures/large"].flatMap((dir) =>
+export const guardInputs = (): string[] => ["bench/fixtures", "examples", "examples/private", "bench/fixtures/large", "bench/fixtures/mid"].flatMap((dir) =>
   existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".er.yaml")).sort().map((file) => join(dir, file)) : [],
 );
 

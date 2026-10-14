@@ -12,7 +12,7 @@ import type { Cluster } from "./clusters.js";
 const angleDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 interface Fan { nodes: DNode[]; edges: DEdge[]; angle: number }
 
-export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = [], pins: Pins = {}): boolean {
+export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdge[], metrics: TextMetrics, endPorts: Map<string, EndPort> = new Map(), labels: DLabel[] = [], pins: Pins = {}, deferLabels = false): boolean {
   const nodeCount = nodes.length, edgeCount = edges.length;
   const entities = nodes.filter((n) => n.kind === "entity").map((n) => center(n.box));
   const centroid = { x: entities.reduce((s, p) => s + p.x, 0) / (entities.length || 1), y: entities.reduce((s, p) => s + p.y, 0) / (entities.length || 1) };
@@ -22,7 +22,10 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
     const p = center(c.node.box), outward = p.x === centroid.x && p.y === centroid.y ? -Math.PI / 2 : Math.atan2(p.y - centroid.y, p.x - centroid.x);
     const chosen: number[] = [];
     for (const a of [...c.attrs].sort((a, b) => b.parts.length - a.parts.length)) {
-      const fan = plan(a, c.node, outward, chosen, [], [], 40);
+      // Provisional labels will be placed again after final routing. On recovery,
+      // keep accepted fans and defer only label/spoke conflicts, never oval clearance.
+      const fan = plan(a, c.node, outward, chosen, [], [], 40)
+        ?? (deferLabels ? plan(a, c.node, outward, chosen, [], [], 40, true) : undefined);
       if (!fan) {
         nodes.splice(nodeCount);
         edges.splice(edgeCount);
@@ -36,7 +39,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
 
   return true;
 
-  function plan(attr: NAttribute, parent: DNode, preferred: number, chosen: number[], pendingNodes: DNode[], pendingEdges: DEdge[], rings: number): Fan | undefined {
+  function plan(attr: NAttribute, parent: DNode, preferred: number, chosen: number[], pendingNodes: DNode[], pendingEdges: DEdge[], rings: number, retry = false): Fan | undefined {
     const pc = center(parent.box), size = attributeSize(attr.label, metrics), pin = pins[attr.id];
     const fixed = nodes.find((n) => n.id === attr.id) ?? (pin && isRelativePin(pin) ? attributeNode(attr, pinPoint(pin, pc), metrics, true) : undefined);
     const angles = Array.from({ length: 72 }, (_, i) => preferred + i * Math.PI / 36).sort((a, b) => {
@@ -49,7 +52,7 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
         const angle = Math.atan2(target.y - pc.y, target.x - pc.x);
         const node = fixed ?? attributeNode(attr, target, metrics, false);
         const edge: DEdge = { id: `edge:${attr.id}`, kind: attr.parent ? "part" : "attribute", from: parent.id, to: attr.id, points: attributeAnchors(parent, node), double: false };
-        if (!fixed && !clear(node, parent, edge, pendingNodes, pendingEdges)) continue;
+        if (!fixed && !clear(node, parent, edge, pendingNodes, pendingEdges, retry)) continue;
         const fan: Fan = { nodes: [node], edges: [edge], angle };
         const childAngles: number[] = [];
         let complete = true;
@@ -66,13 +69,13 @@ export function placeAttributes(clusters: Cluster[], nodes: DNode[], edges: DEdg
     return undefined;
   }
 
-  function clear(node: DNode, parent: DNode, edge: DEdge, pendingNodes: DNode[], pendingEdges: DEdge[]): boolean {
+  function clear(node: DNode, parent: DNode, edge: DEdge, pendingNodes: DNode[], pendingEdges: DEdge[], retry: boolean): boolean {
     const [a, b] = edge.points as [Point, Point], box = node.box;
     if (distance(a, b) < MIN_ROUTE_SEGMENT) return false;
     const others = [...nodes, ...pendingNodes].filter((n) => n.id !== node.id);
     if (others.some((n) => intersects(box, n.box, 14)) || labels.some((l) => intersects(box, l.box, 8))) return false;
     if (others.some((n) => n.id !== parent.id && segmentThrough(a, b, boxShape(n.box)))) return false;
-    if (labels.some((l) => labelIntersectsLines(l.box, [[a, b]], 5))) return false;
+    if (!retry && labels.some((l) => labelIntersectsLines(l.box, [[a, b]], 5))) return false;
     if (portAnchors.some((port) => port.owner === parent.id && distance(a, port.anchor) < 14)) return false;
     if (skeleton.some(([p, q]) => segmentThrough(p, q, boxShape({ x: box.x - 8, y: box.y - 8, w: box.w + 16, h: box.h + 16 })) || segmentIntersection(a, b, p, q))) return false;
     const pool = new Map<string, DNode>();
