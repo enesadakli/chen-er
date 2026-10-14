@@ -2,7 +2,7 @@ import { nextRequirementId } from "../core/requirements.js";
 import { agentName, elapsedSeconds, labelFor, type ThreadState, type Turn } from "./agent-logic.js";
 import {
   applyResult, applySummary, applyTurns, editorKey, lineLabels, lineState, oneLine, pasteLines, receiveView,
-  savePayload, traceLinks, type EditResult, type Line, type RequirementsView,
+  revealDelta, savePayload, traceLinks, type EditResult, type Line, type RequirementsView,
 } from "./requirements-logic.js";
 
 const SAVE_DELAY = 600;
@@ -64,7 +64,11 @@ export class RequirementsPanel {
     this.apply.addEventListener("click", () => { void this.applyNow(); });
     element("req-load").addEventListener("click", () => { void this.reload(true); });
     element("req-keep").addEventListener("click", () => { void this.keepMine(); });
-    new ResizeObserver(() => { for (const row of this.rows.values()) this.grow(row.input); }).observe(this.list);
+    new ResizeObserver(() => {
+      for (const row of this.rows.values()) this.grow(row.input);
+      const active = document.activeElement;
+      if (active instanceof HTMLTextAreaElement && this.list.contains(active)) this.reveal(active);
+    }).observe(this.list);
     window.addEventListener("pagehide", () => { if (this.dirty()) void this.save(true); });
   }
 
@@ -211,8 +215,8 @@ export class RequirementsPanel {
       this.grow(row.input);
     });
     element("req-empty").hidden = this.lines.some((l) => l.text.trim());
-    if (focus) this.focus(focus.index, focus.caret, focus.end);
     this.drawStatus(); this.drawApply();
+    if (focus) this.focus(focus.index, focus.caret, focus.end);
     this.host.changed();
   }
 
@@ -225,6 +229,7 @@ export class RequirementsPanel {
     const body = el("div", "req-body"); body.append(input, meta);
     item.append(number, body);
     input.addEventListener("keydown", (e) => this.key(e, input));
+    input.addEventListener("focus", () => this.reveal(input));
     input.addEventListener("input", () => {
       const index = this.lines.findIndex((l) => l.id === id);
       if (index < 0) return;
@@ -234,7 +239,7 @@ export class RequirementsPanel {
       this.lines[index] = { ...this.lines[index]!, text };
       const trailing = index === this.lines.length - 1 && text.trim();
       if (trailing) this.lines.push({ id: this.fresh(), text: "" });
-      this.render(); this.schedule();
+      this.render(); this.reveal(input); this.schedule();
     });
     input.addEventListener("paste", (e) => {
       const clip = e.clipboardData?.getData("text/plain") ?? "";
@@ -267,8 +272,20 @@ export class RequirementsPanel {
     const line = this.lines[index];
     const input = line && this.rows.get(line.id)?.input;
     if (!input) return;
-    if (document.activeElement !== input) input.focus({ preventScroll: false });
+    if (document.activeElement !== input) input.focus({ preventScroll: true });
     input.setSelectionRange(caret, end);
+    this.reveal(input);
+  }
+
+  private reveal(input: HTMLTextAreaElement) {
+    const notes = input.closest<HTMLElement>(".notes");
+    if (!notes || !input.getClientRects().length) return;
+    const rect = notes.getBoundingClientRect();
+    const top = rect.top + notes.clientTop;
+    const bottom = top + notes.clientHeight;
+    const bar = notes.querySelector<HTMLElement>(".req-apply")?.getBoundingClientRect();
+    const delta = revealDelta(input.getBoundingClientRect(), { top, bottom: bar?.height ? Math.min(bottom, bar.top) : bottom });
+    if (delta) notes.scrollTop += delta;
   }
 
   private singleRow(input: HTMLTextAreaElement) {

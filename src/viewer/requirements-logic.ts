@@ -15,6 +15,14 @@ export interface KeyInput {
 }
 export interface RequirementsView { file: string; exists: boolean; revision: string; title?: string; items: Requirement[]; agent: string | null }
 
+/** Minimum scroll change to clear the sticky bar; oversized rows keep their bottom visible. */
+export function revealDelta(row: { top: number; bottom: number }, view: { top: number; bottom: number }, margin = 8): number {
+  const bottom = view.bottom - margin;
+  if (row.bottom - row.top > bottom - view.top || row.bottom > bottom) return row.bottom - bottom;
+  if (row.top < view.top) return row.top - view.top;
+  return 0;
+}
+
 const empty = (line: Line | undefined) => !!line && !line.text.trim();
 const copy = (lines: readonly Line[]) => lines.map((line) => ({ ...line }));
 

@@ -3,13 +3,42 @@ import { textHash } from "../src/core/requirements.js";
 import type { Turn } from "../src/viewer/agent-logic.js";
 import {
   applyResult, applySummary, applyTurns, editorKey, ensureTrailing, lineLabels, mergeState, oneLine, pasteLines,
-  receiveView, requirementFindings, savePayload, splitPaste, traceLinks, type KeyInput, type Line, type RequirementsView,
+  receiveView, requirementFindings, revealDelta, savePayload, splitPaste, traceLinks, type KeyInput, type Line, type RequirementsView,
 } from "../src/viewer/requirements-logic.js";
 
 const ids = () => { let n = 100; return () => `r${++n}`; };
 const lines = (...texts: string[]): Line[] => texts.map((text, i) => ({ id: `r${i + 1}`, text }));
 const key = (k: string, start: number, patch: Partial<KeyInput> = {}): KeyInput => ({ key: k, start, end: start, singleRow: true, ...patch });
 const texts = (result: { lines: Line[] } | undefined) => result?.lines.map((l) => l.text);
+
+describe("requirement visibility above the apply bar", () => {
+  const view = { top: 100, bottom: 300 };
+  it("does not scroll a fully visible row, including the exact boundaries", () => {
+    expect(revealDelta({ top: 140, bottom: 180 }, view)).toBe(0);
+    expect(revealDelta({ top: 100, bottom: 292 }, view)).toBe(0);
+  });
+  it("scrolls down only enough to put the bottom eight pixels above the bar", () => {
+    const row = { top: 270, bottom: 320 };
+    const delta = revealDelta(row, view);
+    expect(delta).toBe(28);
+    expect(row.bottom - delta).toBe(view.bottom - 8);
+  });
+  it("scrolls up only enough to bring the top into view", () => {
+    expect(revealDelta({ top: 80, bottom: 120 }, view)).toBe(-20);
+  });
+  it("aligns oversized rows at the bottom, even when that requires scrolling up", () => {
+    expect(revealDelta({ top: 80, bottom: 350 }, view)).toBe(58);
+    expect(revealDelta({ top: 20, bottom: 250 }, view)).toBe(-42);
+    expect(revealDelta({ top: 50, bottom: 292 }, view)).toBe(0);
+  });
+  it("treats the bottom margin as part of the space needed to fit a row", () => {
+    expect(revealDelta({ top: 95, bottom: 290 }, view)).toBe(-2);
+  });
+  it("accepts a custom margin", () => {
+    expect(revealDelta({ top: 270, bottom: 300 }, view, 12)).toBe(12);
+    expect(revealDelta({ top: 100, bottom: 300 }, view, 0)).toBe(0);
+  });
+});
 
 describe("requirements editor keys", () => {
   it("Enter on a non-empty line opens the next line, splitting at the caret", () => {
