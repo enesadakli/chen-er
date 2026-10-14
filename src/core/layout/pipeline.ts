@@ -1,3 +1,4 @@
+import type { Diagnostic } from "../diagnostics.js";
 import { absolutePins, isRelativePin, pinPoint } from "../pins.js";
 import { boxAround, center, intersects, type DEdge, type DLabel, type DNode, type LayoutEngine, type LayoutResult, type Pins, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
@@ -44,15 +45,21 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       result = buildDiagram(clusters, pinnedAttributes, model, metrics, name, false, pins);
     }
     const quality = assessQuality(result.diagram, pins, model);
-    const pinConflict = (issue: (typeof quality.issues)[number]) => issue.ids.some((id) => !!pins[id]) || (issue.kind === "out-of-canvas" && Object.keys(pins).length > 0);
-    for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && pinConflict(issue)) result.diagnostics.push({
-      rule: "pin-conflict", severity: "warning", message: `Keeping exact pins causes ${issue.message}.`, hint: "Move the conflicting pin to free space inside the canvas.",
-    });
-    for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && !pinConflict(issue)) result.diagnostics.push({
-      rule: "layout-conflict", severity: "warning", message: issue.message, hint: "Allow more space around this node or adjust the layout pins.",
-    });
+    result.diagnostics.push(...layoutConflictDiagnostics(quality, pins));
     return result;
   };
+}
+
+export function layoutConflictDiagnostics(quality: QualityReport, pins: Pins): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const pinConflict = (issue: (typeof quality.issues)[number]) => issue.ids.some((id) => !!pins[id]) || (issue.kind === "out-of-canvas" && Object.keys(pins).length > 0);
+  for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && pinConflict(issue)) diagnostics.push({
+    rule: "pin-conflict", severity: "warning", message: `Keeping exact pins causes ${issue.message}.`, hint: "Move the conflicting pin to free space inside the canvas.",
+  });
+  for (const issue of quality.issues) if (issue.kind !== "edge-crossing" && !pinConflict(issue)) diagnostics.push({
+    rule: "layout-conflict", severity: "warning", message: issue.message, hint: "Allow more space around this node or adjust the layout pins.",
+  });
+  return diagnostics;
 }
 
 function clearanceRouteScore(result: LayoutResult, id: string, dx: number, dy: number, model: NModel): number {

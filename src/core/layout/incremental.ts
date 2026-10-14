@@ -1,10 +1,17 @@
 import { absolutePins, attributeParents } from "../pins.js";
-import { boxAround, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Pins, type Point } from "../geometry.js";
+import { boxAround, center, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Pins, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
 import { attributeSize, entitySize, relationshipSize } from "../style.js";
 import { assessQuality } from "../quality.js";
 import { boxGap, MIN_OVAL_LABEL_CLEARANCE } from "./semantic-clearance.js";
 import type { TextMetrics } from "../text/metrics.js";
+import { fanEndAnchors } from "./anchors.js";
+import { finalize } from "./finalize.js";
+import { labelIntersectsLines } from "./label-geometry.js";
+import { drawnPaths, segments } from "./shapes.js";
+import { placeLabels } from "./labels.js";
+import { layoutConflictDiagnostics } from "./pipeline.js";
+import { repairAttributeSpokes } from "./semantic-spokes.js";
 
 /**
  * Incremental layout: keep the previous drawing and change as little as possible.
@@ -21,6 +28,7 @@ import type { TextMetrics } from "../text/metrics.js";
 const CLEARANCE = 36;
 const ATTRIBUTE_HALO = 130;
 const MAX_ROUNDS = 24;
+const HARD_METRICS = ["diagonalEnds", "overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "edgeCrossings", "spokeEdgeViolations", "hierarchyViolations"] as const;
 
 export async function incrementalLayout(
   engine: LayoutEngine,
@@ -93,21 +101,46 @@ export async function incrementalLayout(
   }
 
   let result = await engine(model, metrics, { ...options, pins: { ...fixed, ...attributePins }, positions: undefined });
-  // Saved attribute positions are soft: release only a blocking oval when fixed geometry has no label slot.
-  // Real pins and every entity/relationship position remain fixed during these retries.
+  // Saved attribute positions are soft: repair blocking spokes locally before retrying oval placement.
+  // Real pins and every entity/relationship position remain fixed.
   let quality = assessQuality(result.diagram, pins, model);
+  if (quality.labelOnAnyEdge) {
+    const movable = result.diagram.edges.filter((edge) => edge.kind !== "end" && fixed[edge.to] && !pins[edge.to]);
+    const movableIds = new Set(movable.map((edge) => edge.id));
+    const targets = placeLabels(model, result.diagram.nodes, result.diagram.edges.filter((edge) => !movableIds.has(edge.id)), metrics);
+    const released = new Set(movable.filter((edge) => targets.some((label) =>
+      labelIntersectsLines(label.box, drawnPaths(edge).flatMap(segments), 3))).map((edge) => edge.to));
+    if (released.size) {
+      const nodes = result.diagram.nodes.map((node) => ({ ...node, box: { ...node.box }, pinned: !released.has(node.id) }));
+      const edges = result.diagram.edges.map((edge) => ({ ...edge, points: [...edge.points] }));
+      const ports = fanEndAnchors(nodes, edges, pins);
+      // Only soft blockers move; the accepted skeleton and every real pin stay exact.
+      if (repairAttributeSpokes(nodes, edges, ports, targets, false, { ...fixed, ...attributePins })) {
+        for (const node of nodes) node.pinned = result.diagram.nodes.find((original) => original.id === node.id)!.pinned ?? false;
+        const labels = placeLabels(model, nodes, edges, metrics);
+        const candidate = finalize({ nodes, edges, labels, title: model.title, notes: model.notes, engine: result.diagram.meta.engine });
+        const next = assessQuality(candidate.diagram, pins, model);
+        if (next.labelOnAnyEdge < quality.labelOnAnyEdge && next.spokeLabelViolations <= quality.spokeLabelViolations
+          && HARD_METRICS.every((key) => next[key] <= quality[key])) {
+          candidate.diagnostics = layoutConflictDiagnostics(next, pins);
+          result = candidate;
+          quality = next;
+          for (const node of nodes) if (released.has(node.id)) fixed[node.id] = center(node.box);
+        }
+      }
+    }
+  }
   if (quality.spokeLabelViolations) {
     const ends = new Map(result.diagram.edges.filter((e) => e.kind === "end").map((e) => [e.id, e.to]));
     const blockedOwners = new Set(result.diagram.labels.filter((l) => result.diagram.nodes.some((n) =>
       n.kind === "attribute" && boxGap(n.box, l.box) < MIN_OVAL_LABEL_CLEARANCE)).map((l) => ends.get(l.edge)));
-    const hard = ["diagonalEnds", "overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "edgeCrossings", "spokeEdgeViolations", "hierarchyViolations"] as const;
     for (const [id, owner] of owners) {
       if (pins[id] || !fixed[id] || !blockedOwners.has(owner)) continue;
       const released = { ...fixed };
       delete released[id];
       const candidate = await engine(model, metrics, { ...options, pins: { ...released, ...attributePins }, positions: undefined });
       const next = assessQuality(candidate.diagram, pins, model);
-      if (next.spokeLabelViolations >= quality.spokeLabelViolations || hard.some((key) => next[key] > quality[key])) continue;
+      if (next.spokeLabelViolations >= quality.spokeLabelViolations || HARD_METRICS.some((key) => next[key] > quality[key])) continue;
       delete fixed[id];
       result = candidate;
       quality = next;
