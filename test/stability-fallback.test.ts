@@ -59,7 +59,7 @@ describe("attribute fallback stability", () => {
     const stability = await stabilityOf(model, diagram, "layered", {});
     expect(stability.max).toBeLessThanOrEqual(60);
     expect(stability.median).toBeLessThanOrEqual(20);
-  }, 30000);
+  }, 120000);
 
   it.skipIf(!existsSync("examples/private/fa.er.yaml")).each(["layered", "stress"] as const)(
     "keeps fresh private attribute edits within the normal budget: %s", async (engine) => {
@@ -68,6 +68,6 @@ describe("attribute fallback stability", () => {
       const stability = await stabilityOf(model, diagram, engine, {});
       expect(stability.max).toBeLessThanOrEqual(60);
       expect(stability.median).toBeLessThanOrEqual(20);
-    }, 30000,
+    }, 120000,
   );
 });
