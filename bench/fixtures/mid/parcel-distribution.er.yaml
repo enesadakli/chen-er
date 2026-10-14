@@ -1,0 +1,57 @@
+version: 1
+title: Parcel distribution
+entities:
+  DIVISION: { attrs: [Code, Tier], keys: [[Code]] }
+  TERM: { attrs: [Code, OpenedOn, ClosedOn], keys: [[Code]] }
+  AGENCY:
+    attrs:
+      - DepotId
+      - Address
+      - Region
+      - Dispatcher
+      - { name: Equipment, multivalued: true }
+      - { name: LoadingZone, multivalued: true, parts: [Code, Location, Volume] }
+    keys: [[DepotId]]
+  ZONE: { weak: true, attrs: [Number], partialKey: [Number] }
+  PILOT: { attrs: [BadgeId, FullName, JoinedOn, Clearance, Vehicle], keys: [[BadgeId]] }
+  ORDER: { attrs: [BatchId, SentOn, Deadline, Sequence], keys: [[BatchId]] }
+  REVIEWER: { attrs: [AuditId, FullName, Region], keys: [[AuditId]] }
+  VAULT: { attrs: [StorageId, Address, District, Volume], keys: [[StorageId]] }
+relationships:
+  ALLOCATED_TO:
+    ends:
+      - { entity: AGENCY, card: 1..N }
+      - { entity: DIVISION, card: 1..N }
+      - { entity: TERM, card: 1..N }
+  CONTAINS_ZONE:
+    identifies: ZONE
+    ends:
+      - { entity: AGENCY, card: 1..N }
+      - { entity: ZONE, card: 1..1 }
+  STAFFED_DURING:
+    ends:
+      - { entity: PILOT, card: 1..N }
+      - { entity: AGENCY, card: 1..N }
+      - { entity: TERM, card: 0..N }
+    attrs: [ValidFrom, ValidUntil]
+  IN_TERM:
+    ends:
+      - { entity: ORDER, card: 1..1 }
+      - { entity: TERM, card: 1..N }
+  PROCESSES:
+    ends:
+      - { entity: ORDER, card: 2..2 }
+      - { entity: AGENCY, card: 1..N }
+    attrs: [Priority]
+  INSPECTS:
+    ends:
+      - { entity: REVIEWER, card: 0..N }
+      - { entity: ORDER, card: 1..1 }
+  DEFAULT_VAULT:
+    ends:
+      - { entity: AGENCY, card: 1..1 }
+      - { entity: VAULT, card: 1..N }
+  PLACED_IN:
+    ends:
+      - { entity: ORDER, card: 1..1 }
+      - { entity: VAULT, card: 0..N }

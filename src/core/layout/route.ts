@@ -170,10 +170,15 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
   for (const start of starts.slice(0, MAX_PORTS)) for (const goal of goals.slice(0, MAX_PORTS)) {
     if (reserved.some((r) => segmentThrough(start.anchor, start.escape, boxShape(expand(r, 4))) || segmentThrough(goal.anchor, goal.escape, boxShape(expand(r, 4))))) continue;
     const path = orthogonal(start.escape, goal.escape, obstacles, prior);
-    if (path) return simplify([start.anchor, ...path, goal.anchor]);
+    if (path) {
+      const points = simplify([start.anchor, ...path, goal.anchor]);
+      // The grid checks escape points, but the appended endpoint segments also need clearance.
+      if (drawnPaths({ ...edge, points }).every((ps) => segments(ps).every(([p, q]) => foreign.every((n) => !segmentThrough(p, q, n))))) return points;
+    }
   }
   // Bounding boxes can close a corridor beside a diamond tip that its outline leaves open.
-  const outlineRoute = edge.kind === "end" && endPort ? semanticRoute(edge, nodes, prior, endPort, reserved, 4) : undefined;
+  const outlineRoute = edge.kind === "end" && endPort ? semanticRoute(edge, nodes, prior, endPort, reserved, 4)
+    ?? semanticRoute(edge, nodes, prior, endPort, reserved, 4, true) : undefined;
   if (outlineRoute) return outlineRoute;
   if (departure && endPort) {
     const middle = endPort.normal.y ? (a.y + b.y) / 2 : (a.x + b.x) / 2;

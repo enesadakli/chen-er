@@ -90,7 +90,7 @@ function* candidates({ label, edge }: Slot): Generator<DLabel> {
   const preferred = length <= 48 + alongRadius && turnSide > 0 ? -1 : 1;
   for (const gap of [2, 4, 8]) {
     const start = Math.min(48, alongRadius + gap * 2 + 2);
-    const positions = [start, start + 2, start + 4, 30, 40, 48, 20, 10];
+    const positions = [start, start + 2, start + 4, 30, 40, 48, 20, 10, Math.min(48, length)];
     for (const along of new Set(positions)) for (const sign of [preferred, -preferred]) {
       // Keep the inflated box strictly clear of the first segment, including boundary contact.
       const side = sign * (normalRadius + Math.max(gap, 2.01) + (edge.double ? style.doubleEdgeGap / 2 : 0));

@@ -9,7 +9,7 @@ import { simplify } from "./route.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 /** Fast orthogonal corridor candidates; the existing router handles blocked cases. */
-export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = [], diamondClearance = 6): Point[] | undefined {
+export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = [], diamondClearance = 6, extraCorridors = false): Point[] | undefined {
   if (!port || edge.kind !== "end") return undefined;
   const from = nodes.find((n) => n.id === edge.from)!;
   const to = nodes.find((n) => n.id === edge.to)!;
@@ -41,6 +41,17 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
     const xs = [c.x, b.x, (start.x + goal.x) / 2], ys = [c.y, b.y, (start.y + goal.y) / 2];
     for (const x of xs) paths.push([a, start, { x, y: start.y }, { x, y: goal.y }, goal, b]);
     for (const y of ys) paths.push([a, start, { x: start.x, y }, { x: goal.x, y }, goal, b]);
+    // Outline fallback can use the open space beside diamond tips when their boxes close the grid.
+    if (extraCorridors) {
+      for (const n of foreign) for (const y of [n.box.y - 16, n.box.y + n.box.h + 16]) {
+        if (!tip.nx || !port.normal.x || y < Math.min(a.y, b.y) - 96 || y > Math.max(a.y, b.y) + 96) continue;
+        paths.push([a, start, { x: start.x, y }, { x: goal.x, y }, goal, b]);
+      }
+      for (const n of foreign) for (const x of [n.box.x - 16, n.box.x + n.box.w + 16]) {
+        if (!tip.ny || !port.normal.y || x < Math.min(a.x, b.x) - 96 || x > Math.max(a.x, b.x) + 96) continue;
+        paths.push([a, start, { x, y: start.y }, { x, y: goal.y }, goal, b]);
+      }
+    }
   }
   let best: Point[] | undefined, score = Infinity;
   for (const path of paths) {
