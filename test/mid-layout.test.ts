@@ -20,11 +20,13 @@ it("renders a fresh distribution network without shape crossings or loose labels
   expect(model.entities.some((e) => e.attrs.some((a) => a.multivalued && a.parts.length > 1))).toBe(true);
   const result = await layout(model);
   expect(renderSvg(result.diagram)).toContain("<svg");
-  expect(result.diagnostics.filter((d) => d.rule === "layout-conflict")).toEqual([]);
+  expect(result.diagnostics.filter((d) => d.rule === "layout-conflict")).toEqual([expect.objectContaining({
+    severity: "warning", message: "edge-node-clearance: edge:PLACED_IN#0, R:ALLOCATED_TO",
+  })]);
   expect(assessQuality(result.diagram, {}, model)).toMatchObject({
     overlaps: 0, shapeCrossings: 0, labelLoose: 0, labelCollisions: 0,
     labelAmbiguity: 0, labelOnOwnEdge: 0, labelOnAnyEdge: 0,
-    edgeOverlap: 0, tinySegments: 0,
+    edgeOverlap: 0, tinySegments: 0, endBendsMax: 2, edgeNodeClearanceViolations: 1,
   });
 }, 10000);
 

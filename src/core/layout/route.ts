@@ -223,18 +223,33 @@ function shiftedCorridor(points: Point[], index: number, offset: number): Point[
   return simplify([...points.slice(0, index), shift(a), shift(b), ...points.slice(index + 2)]);
 }
 
+/** Slide the final corridor and its entity port together, keeping the existing bends. */
+function shiftedArrival(points: Point[], offset: number, target: DNode): Point[] | undefined {
+  if (points.length < 3 || target.kind !== "entity") return undefined;
+  const a = points.at(-2)!, b = points.at(-1)!;
+  const horizontal = Math.abs(a.y - b.y) < 1e-6;
+  const shift = (p: Point): Point => horizontal ? { x: p.x, y: p.y + offset } : { x: p.x + offset, y: p.y };
+  const end = shift(b);
+  if (distance(anchor(target, end), end) > 1e-6) return undefined;
+  return simplify([...points.slice(0, -2), shift(a), end]);
+}
+
 /** Soft clearance repair after placement: retain the original route if all candidates regress quality. */
 export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics: TextMetrics, pins: Pins = {}): QualityReport {
   let quality = assessQuality(diagram, pins, model);
   if (!quality.edgeNodeClearanceViolations) return quality;
-  const ceiling = quality;
-  const hard: (keyof QualityReport)[] = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "diagonalEnds", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations", "edgeCrossings", "zRoutes", "routeDetourMax"];
+  const hard: (keyof QualityReport)[] = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "diagonalEnds", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations", "edgeCrossings", "zRoutes", "endBendsMax", "endBendsMean", "routeDetourMax", "attributeSpokeMax", "emptyAreaRatio"];
   for (const edge of diagram.edges) {
     if (edgeNodeClear(edge, diagram.nodes, diagram.edges)) continue;
     const original = edge.points;
     const prior = diagram.edges.filter((e) => e !== edge);
     const candidates: Point[][] = [];
     const offsets = [-4, 4, -8, 8, -16, 16, -32, 32, -48, 48];
+    const target = diagram.nodes.find((n) => n.id === edge.to)!;
+    for (const offset of offsets) {
+      const points = shiftedArrival(original, offset, target);
+      if (points) candidates.push(points);
+    }
     for (let i = 0; i < original.length - 1; i++) for (const offset of offsets) candidates.push(shiftedCorridor(original, i, offset));
     const singles = [...candidates];
     if (!singles.some((points) => !tinyRouteSegments({ ...edge, points }) && edgeNodeClear({ ...edge, points }, diagram.nodes, prior))) {
@@ -251,8 +266,8 @@ export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics
       edge.points = points;
       const nextDiagram = { ...diagram, labels: placeLabels(model, diagram.nodes, diagram.edges, metrics) };
       const next = assessQuality(nextDiagram, pins, model);
-      if (next.edgeNodeClearanceViolations >= chosenQuality.edgeNodeClearanceViolations || hard.some((key) => (next[key] as number) > (ceiling[key] as number) + 1e-6)
-        || next.issues.filter((i) => i.kind === "out-of-canvas").length > ceiling.issues.filter((i) => i.kind === "out-of-canvas").length) continue;
+      if (next.edgeNodeClearanceViolations >= chosenQuality.edgeNodeClearanceViolations || hard.some((key) => (next[key] as number) > (quality[key] as number) + 1e-6)
+        || next.issues.filter((i) => i.kind === "out-of-canvas").length > quality.issues.filter((i) => i.kind === "out-of-canvas").length) continue;
       chosen = points; chosenLabels = nextDiagram.labels; chosenQuality = next;
     }
     edge.points = chosen;

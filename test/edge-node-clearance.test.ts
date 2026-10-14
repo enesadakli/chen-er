@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { DEdge, Diagram, DNode, Point } from "../src/core/geometry.js";
+import { regressionBaseline, type RegressionMetric } from "../bench/run.js";
 import { layout } from "../src/core/layout/index.js";
 import { layoutConflictDiagnostics } from "../src/core/layout/pipeline.js";
 import { repairEdgeNodeClearance } from "../src/core/layout/route.js";
 import { MIN_EDGE_NODE_CLEARANCE } from "../src/core/layout/semantic-clearance.js";
-import { parseModel } from "../src/core/normalize.js";
+import { normalize, parseModel } from "../src/core/normalize.js";
 import { assessQuality } from "../src/core/quality.js";
 import { interMetrics } from "../src/core/text/metrics.js";
 
@@ -50,25 +51,46 @@ describe("foreign node edge clearance", () => {
     expect(assessQuality(diagram([node("foreign")], [edge([{ x: 60, y: 120 }, { x: 220, y: 120 }])]))).toMatchObject({ shapeCrossings: 1, edgeNodeClearanceViolations: 1 });
   });
 
-  it("keeps a public parcel end edge outside foreign node clearance", async () => {
+  it("reports the parcel skim when clearing it would add bends", async () => {
     const model = parseModel(readFileSync("bench/fixtures/mid/parcel-distribution.er.yaml", "utf8")).model!;
     const result = await layout(model);
-    expect(assessQuality(result.diagram).edgeNodeClearanceViolations).toBe(0);
+    expect(assessQuality(result.diagram)).toMatchObject({ edgeNodeClearanceViolations: 1, endBendsMax: 2, tinySegments: 0 });
+    expect(result.diagnostics).toEqual([expect.objectContaining({
+      rule: "layout-conflict", severity: "warning", message: "edge-node-clearance: edge:PLACED_IN#0, R:ALLOCATED_TO",
+    })]);
   });
 
-  it("repairs the public parcel model without moving nodes or regressing existing quality", async () => {
+  it("retains the parcel route instead of regressing bends or benchmark metrics", async () => {
     const model = parseModel(readFileSync("bench/fixtures/mid/parcel-distribution.er.yaml", "utf8")).model!;
     const { diagram: d } = await layout(model);
     const positions = d.nodes.map((n) => ({ ...n.box }));
-    const passing = d.edges.find((e) => e.id === "edge:PLACED_IN#0")!;
-    const start = passing.points[0]!, arrival = passing.points.at(-2)!, end = passing.points.at(-1)!;
-    passing.points = [start, { x: arrival.x, y: start.y }, arrival, end];
+    const routes = d.edges.map((e) => e.points);
     const before = assessQuality(d);
     expect(before.edgeNodeClearanceViolations).toBe(1);
     repairEdgeNodeClearance(d, model, interMetrics);
     const after = assessQuality(d);
-    expect(after.edgeNodeClearanceViolations).toBe(0);
+    expect(after.edgeNodeClearanceViolations).toBe(1);
     expect(d.nodes.map((n) => n.box)).toEqual(positions);
-    for (const key of ["shapeCrossings", "edgeCrossings", "zRoutes", "routeDetourMax", "labelLoose"] as const) expect(after[key]).toBeLessThanOrEqual(before[key]);
+    expect(d.edges.map((e) => e.points)).toEqual(routes);
+    for (const key of Object.keys(regressionBaseline["parcel-distribution"]!) as RegressionMetric[]) expect(after[key]).toBeLessThanOrEqual(before[key]);
+    for (const key of ["shapeCrossings", "endBendsMean", "tinySegments", "labelLoose"] as const) expect(after[key]).toBeLessThanOrEqual(before[key]);
+  });
+
+  it.each(["middle", "arrival"])("clears a movable %s corridor while preserving bend count and benchmark metrics", (corridor) => {
+    const model = normalize({ version: 1, entities: { Target: {}, Observer: {} }, relationships: {
+      LINK: { ends: [{ entity: "Target", card: "0..N" }, { entity: "Observer", card: "0..N" }] },
+    } });
+    const source = { ...node("R:LINK", "relationship"), box: { x: 0, y: 100, w: 80, h: 40 } };
+    const target = { ...node("E:Target"), box: { x: 300, y: 240, w: 80, h: 40 } };
+    const foreign = { ...node("E:Observer"), box: corridor === "middle" ? { x: 208, y: 150, w: 80, h: 40 } : { x: 220, y: 268, w: 70, h: 40 } };
+    const passing = { ...edge([{ x: 80, y: 120 }, { x: 200, y: 120 }, { x: 200, y: 260 }, { x: 300, y: 260 }]), from: source.id, to: target.id, end: "LINK#0" };
+    const d = diagram([source, target, foreign], [passing]);
+    const positions = d.nodes.map((n) => ({ ...n.box }));
+    const before = assessQuality(d);
+    expect(before.edgeNodeClearanceViolations).toBe(1);
+    const after = repairEdgeNodeClearance(d, model, interMetrics);
+    expect(after).toMatchObject({ edgeNodeClearanceViolations: 0, endBendsMax: 2, endBendsMean: 2, tinySegments: 0 });
+    expect(d.nodes.map((n) => n.box)).toEqual(positions);
+    for (const key of Object.keys(regressionBaseline["parcel-distribution"]!) as RegressionMetric[]) expect(after[key]).toBeLessThanOrEqual(before[key]);
   });
 });
