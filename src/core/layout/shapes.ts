@@ -121,3 +121,20 @@ export function drawnPaths(edge: DEdge): Point[][] {
     return { x: p.x - (b.y - a.y) / len * gap, y: p.y + (b.x - a.x) / len * gap };
   }));
 }
+
+/** Euclidean distance from a segment to the drawn outline; intersections have zero gap. */
+export function segmentShapeGap(a: Point, b: Point, node: Pick<DNode, "kind" | "box">): number {
+  if (pointInside(a, node) || pointInside(b, node) || segmentThrough(a, b, node)) return 0;
+  let gap = Infinity;
+  for (const [c, d] of sides(polygon(node))) {
+    if (segmentIntersection(a, b, c, d)) return 0;
+    gap = Math.min(gap, pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d), pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b));
+  }
+  return gap;
+}
+
+/** Cheap lower bound used before measuring an outline. */
+export function segmentBoxGap(a: Point, b: Point, box: Box): number {
+  return Math.hypot(Math.max(0, box.x - Math.max(a.x, b.x), Math.min(a.x, b.x) - box.x - box.w),
+    Math.max(0, box.y - Math.max(a.y, b.y), Math.min(a.y, b.y) - box.y - box.h));
+}

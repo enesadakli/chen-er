@@ -1,6 +1,12 @@
-import { anchor, center, type Box, type DEdge, type DNode, type Point } from "../geometry.js";
+import type { NModel } from "../normalize.js";
+import type { TextMetrics } from "../text/metrics.js";
+import { assessQuality, type QualityReport } from "../quality.js";
+import { placeLabels } from "./labels.js";
+import { anchor, center, type Box, type DEdge, type DNode, type Diagram, type Pins, type Point } from "../geometry.js";
+import { edgeNodeClear, MIN_EDGE_NODE_CLEARANCE } from "./semantic-clearance.js";
+import { style } from "../style.js";
 import { semanticRoute } from "./semantic-route.js";
-import { dominantVertex } from "./semantic-edges.js";
+import { dominantVertex, MIN_ROUTE_SEGMENT, reverses, tinyRouteSegments } from "./semantic-edges.js";
 import { recursiveDeparture, type EndPort } from "./anchors.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
@@ -136,9 +142,16 @@ function ports(node: DNode, toward: Point, obstacles: DNode[], angleOffset: numb
   return out;
 }
 
-interface RouteOptions { endPort?: EndPort; forceBend?: boolean; reservedAnchors?: Point[] }
+interface RouteOptions { endPort?: EndPort; forceBend?: boolean; reservedAnchors?: Point[]; nodeClearance?: boolean }
 
 export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 0, reserved: Box[] = [], options: RouteOptions = {}): Point[] {
+  const original = routeWithClearance(edge, nodes, prior, offset, reserved, options, false);
+  if (!options.nodeClearance || edgeNodeClear({ ...edge, points: original }, nodes, prior)) return original;
+  const clear = routeWithClearance(edge, nodes, prior, offset, reserved, options, true);
+  return edgeNodeClear({ ...edge, points: clear }, nodes, prior) ? clear : original;
+}
+
+function routeWithClearance(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 0, reserved: Box[] = [], options: RouteOptions, respectNodeClearance: boolean): Point[] {
   const { endPort, forceBend = false, reservedAnchors = [] } = options;
   const from = nodes.find((n) => n.id === edge.from)!, to = nodes.find((n) => n.id === edge.to)!;
   const departure = endPort && recursiveDeparture(from, to, endPort);
@@ -146,11 +159,12 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
   const vertex = edge.kind === "end" ? dominantVertex(from, to) : undefined;
   const a = departure?.anchor ?? vertex?.point ?? anchor(from, b);
   const foreign = nodes.filter((n) => n.id !== from.id && n.id !== to.id);
-  const direct = drawnPaths({ ...edge, points: [a, b] });
+  const candidate = { ...edge, points: [a, b] };
+  const direct = drawnPaths(candidate);
   // Recursive ends need separate ports even when their centerlines are clear.
   const freeAnchor = (p: Point) => reservedAnchors.every((other) => distance(p, other) >= 14);
-  if ((edge.kind !== "end" || a.x === b.x || a.y === b.y) && (!departure || a.x === b.x || a.y === b.y) && !forceBend && freeAnchor(a) && (!offset || endPort) && (!endPort || (a.x - b.x) * endPort.normal.x + (a.y - b.y) * endPort.normal.y > 0) && foreign.every((n) => direct.every((ps) => segments(ps).every(([p, q]) => !segmentThrough(p, q, n)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
-  const obstacles = [...nodes.map((n) => expand(n.box, 10)), ...reserved.map((r) => expand(r, 5))];
+  if ((edge.kind !== "end" || a.x === b.x || a.y === b.y) && (!departure || a.x === b.x || a.y === b.y) && !forceBend && freeAnchor(a) && (!offset || endPort) && (!endPort || (a.x - b.x) * endPort.normal.x + (a.y - b.y) * endPort.normal.y > 0) && (!respectNodeClearance || edgeNodeClear(candidate, foreign, prior)) && foreign.every((n) => direct.every((ps) => segments(ps).every(([p, q]) => !segmentThrough(p, q, n)))) && reserved.every((r) => !segmentThrough(a, b, boxShape(expand(r, 4))))) return [a, b];
+  const obstacles = [...nodes.map((n) => expand(n.box, respectNodeClearance && n.id !== edge.from && n.id !== edge.to ? MIN_EDGE_NODE_CLEARANCE + (edge.double ? style.doubleEdgeGap / 2 : 0) : 10)), ...reserved.map((r) => expand(r, 5))];
   const c = center(from.box);
   const axisStarts = [
     { anchor: { x: c.x + from.box.w / 2, y: c.y }, normal: { x: 1, y: 0 } },
@@ -173,12 +187,12 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
     if (path) {
       const points = simplify([start.anchor, ...path, goal.anchor]);
       // The grid checks escape points, but the appended endpoint segments also need clearance.
-      if (drawnPaths({ ...edge, points }).every((ps) => segments(ps).every(([p, q]) => foreign.every((n) => !segmentThrough(p, q, n))))) return points;
+      if ((!respectNodeClearance || edgeNodeClear({ ...edge, points }, foreign, prior)) && drawnPaths({ ...edge, points }).every((ps) => segments(ps).every(([p, q]) => foreign.every((n) => !segmentThrough(p, q, n))))) return points;
     }
   }
   // Bounding boxes can close a corridor beside a diamond tip that its outline leaves open.
-  const outlineRoute = edge.kind === "end" && endPort ? semanticRoute(edge, nodes, prior, endPort, reserved, 4)
-    ?? semanticRoute(edge, nodes, prior, endPort, reserved, 4, true) : undefined;
+  const outlineRoute = edge.kind === "end" && endPort ? semanticRoute(edge, nodes, prior, endPort, reserved, 4, false, respectNodeClearance)
+    ?? semanticRoute(edge, nodes, prior, endPort, reserved, 4, true, respectNodeClearance) : undefined;
   if (outlineRoute) return outlineRoute;
   if (departure && endPort) {
     const middle = endPort.normal.y ? (a.y + b.y) / 2 : (a.x + b.x) / 2;
@@ -189,4 +203,61 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
     return simplify([start.anchor, start.escape, { x: goal.escape.x, y: start.escape.y }, goal.escape, goal.anchor]);
   }
   return [a, b];
+}
+
+/** Move a corridor without changing either endpoint anchor. */
+function shiftedCorridor(points: Point[], index: number, offset: number): Point[] {
+  const a = points[index]!, b = points[index + 1]!;
+  const horizontal = Math.abs(a.y - b.y) < 1e-6;
+  const shift = (p: Point): Point => horizontal ? { x: p.x, y: p.y + offset } : { x: p.x + offset, y: p.y };
+  const along = (p: Point, amount: number): Point => horizontal ? { x: p.x + Math.sign(b.x - a.x) * amount, y: p.y } : { x: p.x, y: p.y + Math.sign(b.y - a.y) * amount };
+  if (points.length < 3) return points;
+  if (index === 0) {
+    const departure = along(a, MIN_ROUTE_SEGMENT);
+    return simplify([a, departure, shift(departure), shift(b), ...points.slice(2)]);
+  }
+  if (index === points.length - 2) {
+    const arrival = along(b, -MIN_ROUTE_SEGMENT);
+    return simplify([...points.slice(0, index), shift(a), shift(arrival), arrival, b]);
+  }
+  return simplify([...points.slice(0, index), shift(a), shift(b), ...points.slice(index + 2)]);
+}
+
+/** Soft clearance repair after placement: retain the original route if all candidates regress quality. */
+export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics: TextMetrics, pins: Pins = {}): QualityReport {
+  let quality = assessQuality(diagram, pins, model);
+  if (!quality.edgeNodeClearanceViolations) return quality;
+  const ceiling = quality;
+  const hard: (keyof QualityReport)[] = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "diagonalEnds", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations", "edgeCrossings", "zRoutes", "routeDetourMax"];
+  for (const edge of diagram.edges) {
+    if (edgeNodeClear(edge, diagram.nodes, diagram.edges)) continue;
+    const original = edge.points;
+    const prior = diagram.edges.filter((e) => e !== edge);
+    const candidates: Point[][] = [];
+    const offsets = [-4, 4, -8, 8, -16, 16, -32, 32, -48, 48];
+    for (let i = 0; i < original.length - 1; i++) for (const offset of offsets) candidates.push(shiftedCorridor(original, i, offset));
+    const singles = [...candidates];
+    if (!singles.some((points) => !tinyRouteSegments({ ...edge, points }) && edgeNodeClear({ ...edge, points }, diagram.nodes, prior))) {
+      for (const first of singles) for (let i = 0; i < first.length - 1; i++) for (const offset of [-16, 16, -8, 8]) {
+        const points = shiftedCorridor(first, i, offset);
+        if (!tinyRouteSegments({ ...edge, points }) && edgeNodeClear({ ...edge, points }, diagram.nodes, prior)) candidates.push(points);
+      }
+    }
+    let chosen = original, chosenLabels = diagram.labels, chosenQuality = quality;
+    const originalLabels = diagram.labels;
+    for (const points of candidates) {
+      const candidate = { ...edge, points };
+      if (tinyRouteSegments(candidate) || reverses(points) || drawnPaths(candidate).some((path) => segments(path).some(([a, b]) => diagram.nodes.some((n) => segmentThrough(a, b, n)))) || !edgeNodeClear(candidate, diagram.nodes, prior)) continue;
+      edge.points = points;
+      const nextDiagram = { ...diagram, labels: placeLabels(model, diagram.nodes, diagram.edges, metrics) };
+      const next = assessQuality(nextDiagram, pins, model);
+      if (next.edgeNodeClearanceViolations >= chosenQuality.edgeNodeClearanceViolations || hard.some((key) => (next[key] as number) > (ceiling[key] as number) + 1e-6)
+        || next.issues.filter((i) => i.kind === "out-of-canvas").length > ceiling.issues.filter((i) => i.kind === "out-of-canvas").length) continue;
+      chosen = points; chosenLabels = nextDiagram.labels; chosenQuality = next;
+    }
+    edge.points = chosen;
+    diagram.labels = chosen === original ? originalLabels : chosenLabels;
+    quality = chosenQuality;
+  }
+  return quality;
 }

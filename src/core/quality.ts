@@ -1,14 +1,14 @@
 import { isRelativePin, pinPoint } from "./pins.js";
 import { edgeQuality, type EdgeQuality } from "./layout/semantic-edges.js";
 import type { NModel } from "./normalize.js";
-import { clearanceQuality, type ClearanceQuality } from "./layout/semantic-clearance.js";
+import { clearanceQuality, edgeNodeContext, edgeNodeGap, MIN_EDGE_NODE_CLEARANCE, type ClearanceQuality } from "./layout/semantic-clearance.js";
 import { semanticQuality, type SemanticQuality } from "./layout/semantic-quality.js";
 import { labelAmbiguityReasons, labelGeometry, labelIntersectsLines, labelLooseReasons, labelOnOwnEdge, linesBox } from "./layout/label-geometry.js";
 import { center, intersects, type Diagram, type Pins, type Point } from "./geometry.js";
 import { boxShape, distance, drawnPaths, pointInside, segmentIntersection, segments, segmentThrough, shapesNear, shapesOverlap } from "./layout/shapes.js";
 
 export interface QualityIssue {
-  kind: "overlap" | "shape-crossing" | "label-collision" | "label-ambiguity" | "label-loose" | "label-on-own-edge" | "label-on-any-edge" | "edge-crossing" | "pin-drift" | "out-of-canvas";
+  kind: "overlap" | "shape-crossing" | "edge-node-clearance" | "label-collision" | "label-ambiguity" | "label-loose" | "label-on-own-edge" | "label-on-any-edge" | "edge-crossing" | "pin-drift" | "out-of-canvas";
   ids: string[];
   message: string;
 }
@@ -17,6 +17,10 @@ export interface QualityReport extends SemanticQuality, EdgeQuality, ClearanceQu
   implemented: boolean;
   overlaps: number;
   shapeCrossings: number;
+  /** Foreign node/end-edge pairs below 14px; hard target zero. */
+  edgeNodeClearanceViolations: number;
+  /** Minimum qualifying parallel/crossing gap in px; Infinity without a pair. */
+  edgeNodeClearance: number;
   labelCollisions: number;
   labelAmbiguity: number;
   /** Labels that fail entity-end proximity, ownership or spacing requirements; hard target zero. */
@@ -61,6 +65,14 @@ export function assessQuality(diagram: Diagram, pins: Pins = {}, model?: NModel)
   const lineBounds = new Map([...lines].map(([id, ls]) => [id, linesBox(ls)]));
   for (const e of edges) for (const n of nodes) {
     if (n.id !== e.from && n.id !== e.to && lines.get(e.id)!.some(([a, b]) => segmentThrough(a, b, n))) add("shape-crossing", [e.id, n.id]);
+  }
+  let edgeNodeClearance = Infinity;
+  const nodeClearanceContext = edgeNodeContext(edges);
+  for (const e of edges) if (e.kind === "end") for (const n of nodes) {
+    if (n.id === e.from || n.id === e.to) continue;
+    const gap = edgeNodeGap(e, n, edges, nodeClearanceContext);
+    edgeNodeClearance = Math.min(edgeNodeClearance, gap);
+    if (gap < MIN_EDGE_NODE_CLEARANCE - 1e-6) add("edge-node-clearance", [e.id, n.id]);
   }
   for (let i = 0; i < labels.length; i++) {
     const l = labels[i]!, shape = boxShape(l.box);
@@ -111,7 +123,7 @@ export function assessQuality(diagram: Diagram, pins: Pins = {}, model?: NModel)
   const edgeLength = lengths.reduce((sum, length) => sum + length, 0);
   const meanEdgeLength = lengths.length ? edgeLength / lengths.length : 0;
   const area = diagram.width * diagram.height;
-  return { ...edgeQuality(diagram), ...clearanceQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), labelOnOwnEdge: count("label-on-own-edge"), labelOnAnyEdge: count("label-on-any-edge"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
+  return { ...edgeQuality(diagram), ...clearanceQuality(diagram), ...semanticQuality(diagram, median, model), implemented: true, overlaps: count("overlap"), shapeCrossings: count("shape-crossing"), edgeNodeClearance, edgeNodeClearanceViolations: count("edge-node-clearance"), labelCollisions: count("label-collision"), labelAmbiguity: count("label-ambiguity"), labelLoose: count("label-loose"), labelOnOwnEdge: count("label-on-own-edge"), labelOnAnyEdge: count("label-on-any-edge"), edgeCrossings: count("edge-crossing"), pinDrift: count("pin-drift"),
     aspect: diagram.height > 0 ? diagram.width / diagram.height : 0, edgeLength, meanEdgeLength,
     meanEdgeRatio: median > 0 ? meanEdgeLength / median : 0,
     longestEdgeRatio: median > 0 ? Math.max(0, ...lengths) / median : 0,

@@ -15,7 +15,7 @@ import { semanticAttributes, semanticRoute } from "./semantic-route.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
 import { endRouteMetrics, isZRoute, orthogonalPath } from "./semantic-edges.js";
 import { repairAttributeSpokes, straightSpoke } from "./semantic-spokes.js";
-import { routeEdge } from "./route.js";
+import { repairEdgeNodeClearance, routeEdge } from "./route.js";
 import { distance } from "./shapes.js";
 import { chooseSpacing, searchBudget } from "./semantic-spacing.js";
 
@@ -44,7 +44,7 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
       await placeClusters(clusters, model, options, name, pinnedAttributes.map((n) => n.box));
       result = buildDiagram(clusters, pinnedAttributes, model, metrics, name, false, pins);
     }
-    const quality = assessQuality(result.diagram, pins, model);
+    const quality = repairEdgeNodeClearance(result.diagram, model, metrics, pins);
     result.diagnostics.push(...layoutConflictDiagnostics(quality, pins));
     return result;
   };

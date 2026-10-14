@@ -5,11 +5,12 @@ import { recursiveDeparture, type EndPort } from "./anchors.js";
 import { attributeNode } from "./attributes.js";
 import type { Cluster } from "./clusters.js";
 import { dominantVertex, MIN_ROUTE_SEGMENT, reverses, visibleEdgePaths, visibleSegments } from "./semantic-edges.js";
+import { edgeNodeClear } from "./semantic-clearance.js";
 import { simplify } from "./route.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
 /** Fast orthogonal corridor candidates; the existing router handles blocked cases. */
-export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = [], diamondClearance = 6, extraCorridors = false): Point[] | undefined {
+export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port: EndPort | undefined, reserved: Box[] = [], diamondClearance = 6, extraCorridors = false, respectNodeClearance = false): Point[] | undefined {
   if (!port || edge.kind !== "end") return undefined;
   const from = nodes.find((n) => n.id === edge.from)!;
   const to = nodes.find((n) => n.id === edge.to)!;
@@ -54,6 +55,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
     }
   }
   let best: Point[] | undefined, score = Infinity;
+  let clearBest: Point[] | undefined, clearScore = Infinity;
   for (const path of paths) {
     const ps = simplify(path), copies = visibleEdgePaths({ ...edge, points: ps }), lines = copies.flatMap(segments);
     const first = ps[0]!, second = ps[1], last = ps.at(-1)!, before = ps.at(-2);
@@ -63,7 +65,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
     if (reverses(ps) || [ps, ...copies].some((ps) => segments(ps).some(([a, b]) => distance(a, b) < MIN_ROUTE_SEGMENT - 1e-6))) continue;
     // Crossings only add cost, so a path already longer than the best one cannot win.
     const base = segments(ps).reduce((s, [a, b]) => s + distance(a, b), 0) + ps.length * 8 + Math.max(0, ps.length - 4) * 1000;
-    if (base >= score) continue;
+    if (base >= (respectNodeClearance ? clearScore : score)) continue;
     // Shapes and segments outside the candidate's bounds (plus the largest clearance) cannot touch it.
     const xs = lines.flatMap(([a, b]) => [a.x, b.x]), ys = lines.flatMap(([a, b]) => [a.y, b.y]);
     const bounds = { x: Math.min(...xs) - 8, y: Math.min(...ys) - 8, w: Math.max(...xs) - Math.min(...xs) + 16, h: Math.max(...ys) - Math.min(...ys) + 16 };
@@ -81,8 +83,9 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
     }
     const value = segments(ps).reduce((s, [a, b]) => s + distance(a, b), 0) + crossings * 160 + ps.length * 8 + Math.max(0, ps.length - 4) * 1000;
     if (value < score) { score = value; best = ps; }
+    if (respectNodeClearance && value < clearScore && edgeNodeClear({ ...edge, points: ps }, foreign, prior)) { clearScore = value; clearBest = ps; }
   }
-  return best;
+  return respectNodeClearance ? clearBest : best;
 }
 
 /** Reserve clear outward root attributes, leaving crowded and composite cases to the fan placer. */
