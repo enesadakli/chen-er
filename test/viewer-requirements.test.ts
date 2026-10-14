@@ -11,11 +11,11 @@ const lines = (...texts: string[]): Line[] => texts.map((text, i) => ({ id: `r${
 const key = (k: string, start: number, patch: Partial<KeyInput> = {}): KeyInput => ({ key: k, start, end: start, singleRow: true, ...patch });
 const texts = (result: { lines: Line[] } | undefined) => result?.lines.map((l) => l.text);
 
-describe("requirement visibility above the apply bar", () => {
+describe("requirement visibility between the tab header and apply bar", () => {
   const view = { top: 100, bottom: 300 };
   it("does not scroll a fully visible row, including the exact boundaries", () => {
     expect(revealDelta({ top: 140, bottom: 180 }, view)).toBe(0);
-    expect(revealDelta({ top: 100, bottom: 292 }, view)).toBe(0);
+    expect(revealDelta({ top: 108, bottom: 292 }, view)).toBe(0);
   });
   it("scrolls down only enough to put the bottom eight pixels above the bar", () => {
     const row = { top: 270, bottom: 320 };
@@ -23,8 +23,16 @@ describe("requirement visibility above the apply bar", () => {
     expect(delta).toBe(28);
     expect(row.bottom - delta).toBe(view.bottom - 8);
   });
-  it("scrolls up only enough to bring the top into view", () => {
-    expect(revealDelta({ top: 80, bottom: 120 }, view)).toBe(-20);
+  it("scrolls up only enough to put the top eight pixels below the visible top", () => {
+    expect(revealDelta({ top: 80, bottom: 120 }, view)).toBe(-28);
+  });
+  it("reveals a row covered by the header with eight pixels of clearance", () => {
+    const headerView = { top: 140, bottom: 300 };
+    const row = { top: 120, bottom: 160 };
+    const delta = revealDelta(row, headerView);
+    expect(delta).toBe(-28);
+    expect(row.top - delta).toBe(headerView.top + 8);
+    expect(revealDelta({ top: 148, bottom: 292 }, headerView)).toBe(0);
   });
   it("aligns oversized rows at the bottom, even when that requires scrolling up", () => {
     expect(revealDelta({ top: 80, bottom: 350 }, view)).toBe(58);
@@ -34,9 +42,15 @@ describe("requirement visibility above the apply bar", () => {
   it("treats the bottom margin as part of the space needed to fit a row", () => {
     expect(revealDelta({ top: 95, bottom: 290 }, view)).toBe(-2);
   });
+  it("treats the top margin as part of the space needed to fit a row", () => {
+    expect(revealDelta({ top: 104, bottom: 292 }, view)).toBe(0);
+    expect(revealDelta({ top: 104, bottom: 280 }, view)).toBe(-4);
+  });
   it("accepts a custom margin", () => {
     expect(revealDelta({ top: 270, bottom: 300 }, view, 12)).toBe(12);
     expect(revealDelta({ top: 100, bottom: 300 }, view, 0)).toBe(0);
+    expect(revealDelta({ top: 100, bottom: 280 }, view, 8, 0)).toBe(0);
+    expect(revealDelta({ top: 100, bottom: 280 }, view, 8, 12)).toBe(-12);
   });
 });
 

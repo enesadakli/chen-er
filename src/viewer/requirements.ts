@@ -283,8 +283,10 @@ export class RequirementsPanel {
     const rect = notes.getBoundingClientRect();
     const top = rect.top + notes.clientTop;
     const bottom = top + notes.clientHeight;
+    const heading = notes.querySelector<HTMLElement>(".notes-heading");
+    const visibleTop = heading?.getClientRects().length ? Math.max(top, heading.getBoundingClientRect().bottom) : top;
     const bar = notes.querySelector<HTMLElement>(".req-apply")?.getBoundingClientRect();
-    const delta = revealDelta(input.getBoundingClientRect(), { top, bottom: bar?.height ? Math.min(bottom, bar.top) : bottom });
+    const delta = revealDelta(input.getBoundingClientRect(), { top: visibleTop, bottom: bar?.height ? Math.min(bottom, bar.top) : bottom });
     if (delta) notes.scrollTop += delta;
   }
 
