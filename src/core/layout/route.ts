@@ -6,7 +6,7 @@ import { anchor, center, type Box, type DEdge, type DNode, type Diagram, type Pi
 import { edgeNodeClear, MIN_EDGE_NODE_CLEARANCE } from "./semantic-clearance.js";
 import { style } from "../style.js";
 import { semanticRoute } from "./semantic-route.js";
-import { dominantVertex, MIN_ROUTE_SEGMENT, reverses, tinyRouteSegments } from "./semantic-edges.js";
+import { dominantVertex, endRouteMetrics, MIN_ROUTE_SEGMENT, reverses, tinyRouteSegments } from "./semantic-edges.js";
 import { recursiveDeparture, type EndPort } from "./anchors.js";
 import { boxShape, distance, drawnPaths, segmentIntersection, segments, segmentThrough } from "./shapes.js";
 
@@ -238,10 +238,12 @@ function shiftedArrival(points: Point[], offset: number, target: DNode): Point[]
 export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics: TextMetrics, pins: Pins = {}): QualityReport {
   let quality = assessQuality(diagram, pins, model);
   if (!quality.edgeNodeClearanceViolations) return quality;
-  const hard: (keyof QualityReport)[] = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "diagonalEnds", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations", "edgeCrossings", "zRoutes", "endBendsMax", "endBendsMean", "routeDetourMax", "attributeSpokeMax", "emptyAreaRatio"];
+  const hard: (keyof QualityReport)[] = ["overlaps", "shapeCrossings", "labelCollisions", "labelAmbiguity", "labelLoose", "labelOnOwnEdge", "labelOnAnyEdge", "pinDrift", "diagonalEnds", "attributeEdgeBends", "edgeOverlap", "tinySegments", "endPortCrowding", "diamondVertexViolations", "doubleEdgeArtifacts", "spokeEdgeViolations", "spokeLabelViolations", "edgeCrossings", "zRoutes", "routeDetourMax", "attributeSpokeMax", "emptyAreaRatio"];
   for (const edge of diagram.edges) {
     if (edgeNodeClear(edge, diagram.nodes, diagram.edges)) continue;
     const original = edge.points;
+    const bends = (points: Point[]) => endRouteMetrics({ ...diagram, edges: [{ ...edge, points }] })[0]!.endBends;
+    const bendLimit = Math.min(4, bends(original) + 2);
     const prior = diagram.edges.filter((e) => e !== edge);
     const candidates: Point[][] = [];
     const offsets = [-4, 4, -8, 8, -16, 16, -32, 32, -48, 48];
@@ -260,7 +262,9 @@ export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics
     }
     let chosen = original, chosenLabels = diagram.labels, chosenQuality = quality;
     const originalLabels = diagram.labels;
-    for (const points of candidates) {
+    const ranked = candidates.map((points) => ({ points, bends: bends(points) }))
+      .filter((candidate) => candidate.bends <= bendLimit).sort((a, b) => a.bends - b.bends);
+    for (const { points } of ranked) {
       const candidate = { ...edge, points };
       if (tinyRouteSegments(candidate) || reverses(points) || drawnPaths(candidate).some((path) => segments(path).some(([a, b]) => diagram.nodes.some((n) => segmentThrough(a, b, n)))) || !edgeNodeClear(candidate, diagram.nodes, prior)) continue;
       edge.points = points;
@@ -269,6 +273,7 @@ export function repairEdgeNodeClearance(diagram: Diagram, model: NModel, metrics
       if (next.edgeNodeClearanceViolations >= chosenQuality.edgeNodeClearanceViolations || hard.some((key) => (next[key] as number) > (quality[key] as number) + 1e-6)
         || next.issues.filter((i) => i.kind === "out-of-canvas").length > quality.issues.filter((i) => i.kind === "out-of-canvas").length) continue;
       chosen = points; chosenLabels = nextDiagram.labels; chosenQuality = next;
+      break;
     }
     edge.points = chosen;
     diagram.labels = chosen === original ? originalLabels : chosenLabels;
