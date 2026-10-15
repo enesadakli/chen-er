@@ -18,7 +18,7 @@ With a source checkout, replace `chen` with `npx tsx src/cli/index.ts`.
 For relational design, run `chen map model.er.yaml --format md` after checking
 the model; use `--format sql --default-type TEXT --out tables.sql` for SQL or
 `--format json` for table metadata. Each table explains its producing course
-step (1–7, specialization option 8A) and later FK additions. Categories (step 9) are not mapped. Read notes for
+step (1–7, specialization option 8A, category step 9) and later FK additions. Read notes for
 unenforced constraints, name collisions and the n-ary participation caveat in
 `docs/mapping.md`. SQL types are placeholders. Fix errors before mapping.
 
@@ -29,7 +29,7 @@ both an SVG and a sibling PNG.
 
 MCP `map_er` accepts the same exactly-one-of `model`/`path` source and returns
 JSON relations, keys, FKs, explanations, notes, diagnostics and `md`, without
-writing files. Specializations support mapping option 8A and Elmasri & Navathe drawing.
+writing files. Specializations and categories support mapping (8A, step 9) and Elmasri & Navathe drawing.
 
 ## Model cheat sheet
 
@@ -96,8 +96,9 @@ check domain meaning, keys and participation yourself. Version 1 draws
 `specializations`: d/o circles, double superclass lines for total completeness,
 subset marks, and direct lines without circles for single subclasses. Optional
 `attribute` labels the superclass line; subtype objects `{entity, predicate}`
-label subclass lines. Subclasses inherit keys. Only `categories` remain reserved
-and unsupported for drawing/mapping.
+label subclass lines. Subclasses inherit keys; a subclass may sit in several
+specializations. `categories` (union types: `supertypes`, `subtype`, `completeness`)
+draw a `u` circle under the superclasses; the category needs no key.
 
 Human-owned pins use stable node ids. Entity/relationship pins are absolute centres in pixels; attribute pins are `{dx, dy}` offsets from the immediate parent centre (composite parts use the parent attribute oval):
 

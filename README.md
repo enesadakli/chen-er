@@ -163,13 +163,13 @@ chen map model.er.yaml --format sql --default-type TEXT --out tables.sql
 chen map model.er.yaml --format json
 ```
 
-Mapping implements steps 1–7 and specialization option 8A. Every table lists the
+Mapping implements steps 1–7, specialization option 8A and union types (step 9). Every table lists the
 step that produced it, later FK additions and the source element ids. Composite
 attributes become simple columns, multivalued attributes get tables, derived
 attributes become notes, and recursive FKs use roles. SQL includes PK, FK,
 UNIQUE and NOT NULL constraints in dependency order; column types are placeholders.
 Constraints requiring assertions/triggers and deterministic naming decisions
-remain visible in notes. Lint errors block mapping. Union types (categories, step 9) are not mapped yet. See [mapping rules and conventions](docs/mapping.md),
+remain visible in notes. Lint errors block mapping. See [mapping rules and conventions](docs/mapping.md),
 especially the distinction between n-ary multiplicity and this model's own-end
 participation cards. Full fixture outputs: [campus Markdown](docs/mapping/campus.md)
 and [campus SQL](docs/mapping/campus.sql).
@@ -214,11 +214,12 @@ soft positions, relational mapping and course method reports. The default
 `stress` and `simple` are also available. Automatic layouts still need visual
 review, particularly on large models with many edge crossings.
 
-EER `specializations` are drawn in Elmasri & Navathe notation and support relational
-mapping with option 8A. Union types (`categories`) are reserved and report `unsupported-eer`. See the
+EER `specializations` and union types (`categories`) are drawn in Elmasri & Navathe notation
+and support relational mapping with option 8A and step 9. Specialization lattices (shared
+subclasses) are supported. See the
 [change log](https://github.com/enesadakli/chen-er/blob/main/CHANGELOG.md).
 
-Next work includes clearer layouts for large models and union types.
+Next work includes clearer layouts for large models.
 These are planned areas, not supported features or release dates.
 
 ## License

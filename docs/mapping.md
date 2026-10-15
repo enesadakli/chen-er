@@ -23,12 +23,11 @@ JSON payload and accepts exactly one of `model` (YAML text) or `path`.
 The CLI prints the mapping to stdout, or writes `--out` and prints that path.
 It refuses to overwrite the input model. Errors produce exit code 1 for an
 invalid model, 2 for usage/I/O failures; invalid models never write an output.
-Warnings and course findings appear on stderr. Mapping runs the existing lint
-rules, replacing the categories-only `unsupported-eer` diagnostic with a mapping
-error: union types (categories, step 9) are not mapped yet. Parsing,
-unknown references and every other lint error still block mapping. Missing keys
+Warnings and course findings appear on stderr. Mapping runs the lint rules first:
+parsing, unknown references and every other lint error block mapping. Missing keys
 or keys involving derived/multivalued components are additional mapping errors;
-the mapper never invents surrogate ids.
+the mapper never invents surrogate ids, except the step 9 surrogate key of a
+category whose superclasses have different keys.
 
 ## Rules implemented
 
@@ -42,6 +41,7 @@ the mapper never invents surrogate ids.
 | 6 | A multivalued attribute gets a table with owner PK as NOT NULL FK and stored simple value components; all of these form the PK. Composite values and relationship-owned values are supported. A relationship mapped by FK uses the destination entity's PK as its identity. |
 | 7 | An n-ary relationship gets all participant PKs as NOT NULL FKs. As requested by the course mapping rule, the PK combines FKs of many ends and excludes max 1 ends. Finite maxima greater than 1 count as many. See the semantic caveat below. |
 | 8 | Option 8A keeps superclass and subclass tables. Each subclass inherits its superclass PK as both PK and NOT NULL FK; its own declared candidate keys become UNIQUE. Subclasses may omit `keys`. Specialization chains and multiple inheritance work. |
+| 9 | A category (union type) gets a table with its own attributes. If every superclass has the same PK columns, that key is the category PK and, for a total category, each superclass PK also references the category. Otherwise a surrogate `<Category>_id` is the PK and each superclass table gets it as a UNIQUE FK, NOT NULL only for a total category. Declared category keys become UNIQUE. |
 
 Option 8A handles total/partial and disjoint/overlapping specializations.
 Notes describe alternatives: 8B stores only subclass tables (requires total
@@ -50,7 +50,12 @@ one table with a discriminator for disjoint subclasses; 8D stores one table with
 membership flags for overlapping subclasses. These alternatives are explanatory,
 not selectable output modes. Specializations are drawn in Elmasri & Navathe notation. Defining attributes
 appear in the 8A notes; predicates and membership constraints require application
-logic, assertions or triggers. Union types (`categories`, step 9) are not mapped.
+logic, assertions or triggers.
+
+Step 9 notes record the membership rule tables cannot enforce: each category row
+belongs to exactly one superclass. A weak category, a category that is also a
+specialization subclass, and a second category for the same entity are mapping
+errors because each would give the entity two identity sources.
 
 For multiple inheritance, a common ancestor's PK is reused and references every
 superclass. Independent superclass identities remain separate: the lexically
