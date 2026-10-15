@@ -2,6 +2,7 @@ import { center, intersects, type Box, type DEdge, type Diagram, type DNode, typ
 import { style } from "../style.js";
 import { distance, segmentIntersection, segments } from "./shapes.js";
 import { linesBox } from "./label-geometry.js";
+import { isSpecializationId } from "./eer.js";
 
 export const MIN_ROUTE_SEGMENT = 16;
 export const MIN_END_SEPARATION = 16;
@@ -52,6 +53,7 @@ export function edgesOverlap(a: DEdge, b: DEdge): boolean {
 }
 
 export function dominantVertex(diamond: DNode, entity: DNode): { point: Point; normal: Point } | undefined {
+  if (isSpecializationId(diamond.id)) return undefined;
   const c = center(diamond.box), target = center(entity.box), dx = target.x - c.x, dy = target.y - c.y;
   if (Math.abs(dx) > Math.abs(dy) * 1.5) return { point: { x: c.x + Math.sign(dx) * diamond.box.w / 2, y: c.y }, normal: { x: Math.sign(dx), y: 0 } };
   if (Math.abs(dy) > Math.abs(dx) * 1.5) return { point: { x: c.x, y: c.y + Math.sign(dy) * diamond.box.h / 2 }, normal: { x: 0, y: Math.sign(dy) } };
@@ -155,7 +157,7 @@ export function edgeQuality(diagram: Diagram): EdgeQuality {
     if (orthogonalPath(e.points)) {
       const diamond = byId.get(e.from), entity = byId.get(e.to);
       const recursive = diagram.edges.filter((other) => other.kind === "end" && other.from === e.from).every((other) => other.to === e.to);
-      if (diamond?.kind === "relationship" && entity && !recursive) {
+      if (diamond?.kind === "relationship" && !isSpecializationId(diamond.id) && entity && !recursive) {
         const vertex = dominantVertex(diamond, entity), first = e.points[0]!, second = e.points[1]!;
         if (vertex && (distance(first, vertex.point) > EPS || (second.x - first.x) * vertex.normal.x + (second.y - first.y) * vertex.normal.y <= EPS)) diamondVertexViolations++;
       }
