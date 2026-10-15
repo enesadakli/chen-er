@@ -17,8 +17,8 @@ export const searchBudget = (count: number, model: NModel): number =>
   Math.max(1, Math.ceil(count * Math.min(1, (12 / Math.max(1, model.entities.length)) ** 2)));
 
 /** A bounded grid at or below the default cell size; the default always comes first. */
-function spacingCandidates(base: number): Spacing[] {
-  const columns = [...new Set([base, 520, 480].filter((s) => s <= base))];
+function spacingCandidates(base: number, specialization: boolean): Spacing[] {
+  const columns = [...new Set([base, 520, 480, ...(specialization ? [380, 340, 300, 280] : [])].filter((s) => s <= base))];
   const rows = [...new Set([base, 520, 430, 380, 340].filter((s) => s <= base))];
   return columns.flatMap((c) => rows.map((r) => ({ columns: c, rows: r })));
 }
@@ -54,7 +54,7 @@ export function chooseSpacing(clusters: Cluster[], model: NModel, placement: Sem
   build: (cs: Cluster[]) => LayoutResult): { spacing: Spacing; initial?: LayoutResult } {
   const fallback = { spacing: { columns: base, rows: base } };
   if (Object.keys(pins).length || model.entities.length <= 4) return fallback;
-  const candidates = spacingCandidates(base);
+  const candidates = spacingCandidates(base, model.specializations.length > 0);
   const ranked = candidates.slice(0, searchBudget(candidates.length, model)).map((candidate) => {
     placeSemantically(clusters, model, placement, candidate.columns, reserved, candidate.rows);
     return { candidate, score: skeletonSpacingScore(build(withoutAttributes(clusters)), model) };

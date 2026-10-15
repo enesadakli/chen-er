@@ -158,14 +158,23 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): 
     if (!port || port.recursive) continue;
     const entity = nodes.find((n) => n.id === edge.to)!;
     const c = center(entity.box), b = entity.box;
+    const subclass = isSpecializationId(edge.from) && edge.end !== `${edge.from}#super`;
+    const origin = center(nodes.find((n) => n.id === edge.from)!.box);
     const blocked = (candidate: EndPort) => {
-      const escape = { x: candidate.anchor.x + candidate.normal.x * 96, y: candidate.anchor.y + candidate.normal.y * 96 };
+      // A subclass's top corridor can hit a diamond beyond the short local escape.
+      const reach = subclass ? Math.max(96, (origin.x - candidate.anchor.x) * candidate.normal.x + (origin.y - candidate.anchor.y) * candidate.normal.y) : 96;
+      const escape = { x: candidate.anchor.x + candidate.normal.x * reach, y: candidate.anchor.y + candidate.normal.y * reach };
       return nodes.some((n) => (n.kind === "relationship" && n.id !== edge.from || n.kind === "attribute" && pins[n.id] && isRelativePin(pins[n.id]!)) && segmentThrough(candidate.anchor, escape,
         boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 })));
     };
     if (!blocked(port)) continue;
     const currentSide = sides.find((s) => normal(s).x === port.normal.x && normal(s).y === port.normal.y)!;
-    const alternatives = [currentSide, ...sides.filter((s) => s !== currentSide)].flatMap((side) => {
+    const remaining = sides.filter((s) => s !== currentSide);
+    if (subclass) remaining.sort((a, b) => {
+      const toward = (s: Side) => (origin.x - c.x) * normal(s).x + (origin.y - c.y) * normal(s).y;
+      return toward(b) - toward(a);
+    });
+    const alternatives = [currentSide, ...remaining].flatMap((side) => {
       const n = normal(side), span = horizontal(side) ? b.w : b.h;
       const wanted = horizontal(side) ? port.anchor.x - c.x : port.anchor.y - c.y;
       return [0, -16, 16, -32, 32, -48, 48, -64, 64].map((delta): EndPort => {

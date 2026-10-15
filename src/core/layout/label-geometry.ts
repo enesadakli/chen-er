@@ -37,6 +37,21 @@ export function labelOnOwnEdge(box: Box, edge: DEdge, geometry?: LabelGeometry):
   return labelIntersectsLines(box, geometry?.lines.get(edge.id) ?? drawnPaths(edge).flatMap(segments));
 }
 
+/** Compare both sides at the same position along a specialization's entity-end segment. */
+export function specializationLabelFacesEdge(box: Box, edge: DEdge, edges: readonly DEdge[], geometry?: LabelGeometry): boolean {
+  if (!edge.from.startsWith("S:")) return false;
+  const end = edge.points.at(-1), previous = edge.points.at(-2);
+  if (!end || !previous) return false;
+  const length = distance(end, previous);
+  if (!length) return false;
+  const c = center(box), ux = (previous.x - end.x) / length, uy = (previous.y - end.y) / length;
+  const normal = -(c.x - end.x) * uy + (c.y - end.y) * ux;
+  const opposite = { ...box, x: box.x + 2 * normal * uy, y: box.y - 2 * normal * ux };
+  const others = edges.filter((other) => other.id !== edge.id).flatMap((other) => geometry?.lines.get(other.id) ?? drawnPaths(other).flatMap(segments));
+  const clearance = (candidate: Box) => Math.min(...others.map(([a, b]) => boxSegmentDistance(candidate, a, b)));
+  return clearance(opposite) > clearance(box) + 1e-7;
+}
+
 export function labelAmbiguityReasons(box: Box, edge: DEdge, edges: DEdge[], geometry?: LabelGeometry): string[] {
   const end = edge.points.at(-1), previous = edge.points.at(-2);
   if (!end || !previous) return ["missing entity-end segment"];
@@ -48,6 +63,7 @@ export function labelAmbiguityReasons(box: Box, edge: DEdge, edges: DEdge[], geo
   if (own > 14 + 1e-7) reasons.push("more than 14px from entity-end segment");
   if (edges.some((other) => other.kind === "end" && other.id !== edge.id && (!geometry?.bounds.has(other.id) || boxDistance(box, geometry.bounds.get(other.id)!) < own + 1e-6) && (geometry?.lines.get(other.id) ?? drawnPaths(other).flatMap(segments)).some(([a, b]) => boxSegmentDistance(box, a, b) < own - 1e-7))) reasons.push("closer to another end edge");
   if (Math.abs(along) > 60 + 1e-7) reasons.push("more than 60px along the edge from entity end");
+  if (specializationLabelFacesEdge(box, edge, edges, geometry)) reasons.push("opposite side of specialization edge has more clearance");
   return reasons;
 }
 
@@ -99,6 +115,7 @@ export function labelLooseReasons(label: DLabel, edge: DEdge, geometry: LabelGeo
   if (along < -1e-7 || along > Math.min(48, length) + 1e-7) reasons.push("outside first 48px of entity-end segment");
   if (Math.abs(normal) < radius - 1e-7) reasons.push("straddles entity-end segment");
   if (own > 8 + 1e-7) reasons.push("more than 8px from entity-end segment");
+  if (label.kind === "specialization" && specializationLabelFacesEdge(label.box, edge, [...geometry.edges.values()], geometry)) reasons.push("opposite side of specialization edge has more clearance");
   if (stopAtFirst && reasons.length) return reasons;
   const required = 2 * own - 1e-7;
   for (const [id, lines] of geometry.lines) if (id !== edge.id && boxDistance(label.box, geometry.bounds.get(id)!) < required + 1e-6 && lines.some(([a, b]) => boxSegmentDistance(label.box, a, b) < required)) {

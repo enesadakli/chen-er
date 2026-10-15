@@ -205,8 +205,11 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     if (spec && ends.length > 1) {
       const supertype = center(byId.get(`E:${spec.supertype}`)!.node.box);
       const subtypes = spec.subtypes.map((name) => center(byId.get(`E:${name}`)!.node.box));
-      midpoint.x = (supertype.x + subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length) / 2;
-      midpoint.y = (supertype.y + subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length) / 2;
+      // Keep each circle over its own subclass group, including parallel specializations.
+      midpoint.x = subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length;
+      const subclassY = subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length;
+      // Leave the middle of the rank gap free for ordinary relationship diamonds.
+      midpoint.y = supertype.y + (subclassY - supertype.y) * 0.4;
     }
     const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
     const norm = Math.hypot(dx, dy) || 1;
