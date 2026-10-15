@@ -66,11 +66,37 @@ export const Relationship = z
   })
   .strict();
 
+export const Subtype = z.union([
+  Identifier,
+  z
+    .object({
+      entity: Identifier,
+      predicate: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Defining value or condition drawn next to this subclass line, e.g. \"'Secretary'\" or \"Job_type = 'Engineer'\"."),
+    })
+    .strict(),
+]);
+
 export const Specialization = z
   .object({
+    id: Identifier.optional().describe("Stable id for pins; defaults to <supertype>.<n>, n counting this supertype's specializations from 0."),
     supertype: Identifier,
-    subtypes: z.array(Identifier).min(1),
-    disjointness: z.enum(["disjoint", "overlapping"]),
+    subtypes: z.array(Subtype).min(1).describe("One subclass is drawn as a direct line with a subset mark and no circle."),
+    disjointness: z.enum(["disjoint", "overlapping"]).describe("Circle letter: d or o."),
+    completeness: z.enum(["total", "partial"]).describe("Total: double line between the superclass and the circle."),
+    attribute: Identifier.optional().describe("Defining attribute of an attribute-defined specialization (a top-level attribute of the supertype)."),
+  })
+  .strict();
+
+/** Reserved for union types (categories, circle with u). Not drawn or mapped yet. */
+export const Category = z
+  .object({
+    id: Identifier.optional(),
+    supertypes: z.array(Identifier).min(2),
+    subtype: Identifier,
     completeness: z.enum(["total", "partial"]),
   })
   .strict();
@@ -85,7 +111,11 @@ export const Model = z
     specializations: z
       .array(Specialization)
       .optional()
-      .describe("Reserved for EER. Version 1 does not draw these and reports a diagnostic if present."),
+      .describe("EER specialization/generalization, drawn in Elmasri & Navathe notation."),
+    categories: z
+      .array(Category)
+      .optional()
+      .describe("Reserved for EER union types (categories). Not drawn yet; reports a diagnostic if present."),
   })
   .strict();
 
@@ -93,6 +123,8 @@ export type ModelInput = z.infer<typeof Model>;
 export type EntityInput = z.infer<typeof Entity>;
 export type RelationshipInput = z.infer<typeof Relationship>;
 export type AttributeInput = z.infer<typeof Attribute>;
+export type SpecializationInput = z.infer<typeof Specialization>;
+export type CategoryInput = z.infer<typeof Category>;
 
 /** Pins file next to a model: `model.er.layout.json`. Absolute centres or attribute offsets from the immediate parent, in diagram px. */
 export const LayoutFile = z

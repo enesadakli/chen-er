@@ -134,7 +134,7 @@ describe("method report core", () => {
   });
 
   it("includes specializations and mapping failure diagnostics", () => {
-    const doc = buildReport({ model: { ...model, title: "Course", specializations: [{ supertype: "PERSON", subtypes: ["RECORD"], disjointness: "disjoint", completeness: "partial" }] }, fileName: "course.er.yaml", mapping: { diagnostics: [{ rule: "mapping", severity: "error", message: "Cannot map" }] } });
+    const doc = buildReport({ model: { ...model, title: "Course", specializations: [{ id: "S:PERSON.0", name: "PERSON.0", supertype: "PERSON", subtypes: ["RECORD"], disjointness: "disjoint", completeness: "partial", predicates: {}, path: "specializations.0" }] }, fileName: "course.er.yaml", mapping: { diagnostics: [{ rule: "mapping", severity: "error", message: "Cannot map" }] } });
     expect(doc.title).toBe("Course");
     const md = reportMarkdown(doc);
     expect(md).toContain("Specialization:");

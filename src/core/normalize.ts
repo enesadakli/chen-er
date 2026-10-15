@@ -11,6 +11,7 @@ import { Model, type AttributeInput, type ModelInput } from "./schema.js";
  *   relationship  "R:<Relationship>"
  *   attribute     "A:<Owner>.<attr>[.<part>...]"   (owner = entity or relationship name)
  *   end           "<Relationship>#<end id or index>"
+ *   specialization "S:<id or supertype.n>"; its ends "S:<name>#super" and "S:<name>#<Subtype>"
  */
 export type Max = number | "N";
 
@@ -69,12 +70,31 @@ export interface NRelationship {
   path: string;
 }
 
+export interface NSpecialization {
+  /** Node id of the circle: "S:<id>". */
+  id: string;
+  /** Explicit id or "<supertype>.<n>". */
+  name: string;
+  supertype: string;
+  /** Subclass entity names in model order. */
+  subtypes: string[];
+  disjointness: "disjoint" | "overlapping";
+  completeness: "total" | "partial";
+  /** Defining attribute of an attribute-defined specialization. */
+  attribute?: string;
+  /** Subclass name → defining value or condition. */
+  predicates: Record<string, string>;
+  path: string;
+}
+
 export interface NModel {
   title?: string;
   entities: NEntity[];
   relationships: NRelationship[];
   notes: string[];
-  specializations: NonNullable<ModelInput["specializations"]>;
+  specializations: NSpecialization[];
+  /** Reserved EER union types; not drawn yet. */
+  categories: NonNullable<ModelInput["categories"]>;
   /** Maps a dotted path to a 1-based source position. */
   locate(path: string): { line: number; column: number } | undefined;
 }
@@ -86,6 +106,7 @@ export interface ParseResult {
 
 export const entityNodeId = (name: string) => `E:${name}`;
 export const relationshipNodeId = (name: string) => `R:${name}`;
+export const specializationNodeId = (name: string) => `S:${name}`;
 
 export function parseCard(card: string): { min: number; max: Max } {
   const [lo = "0", hi = "N"] = card.split("..").map((s) => s.trim());
@@ -199,9 +220,36 @@ export function normalize(input: ModelInput, locate: NModel["locate"] = () => un
     entities,
     relationships,
     notes: input.notes ?? [],
-    specializations: input.specializations ?? [],
+    specializations: normSpecializations(input.specializations ?? []),
+    categories: input.categories ?? [],
     locate,
   };
+}
+
+function normSpecializations(input: NonNullable<ModelInput["specializations"]>): NSpecialization[] {
+  const seen = new Map<string, number>();
+  return input.map((spec, index) => {
+    const n = seen.get(spec.supertype) ?? 0;
+    seen.set(spec.supertype, n + 1);
+    const name = spec.id ?? `${spec.supertype}.${n}`;
+    const predicates: Record<string, string> = {};
+    const subtypes = spec.subtypes.map((sub) => {
+      if (typeof sub === "string") return sub;
+      if (sub.predicate) predicates[sub.entity] = sub.predicate;
+      return sub.entity;
+    });
+    return {
+      id: specializationNodeId(name),
+      name,
+      supertype: spec.supertype,
+      subtypes,
+      disjointness: spec.disjointness,
+      completeness: spec.completeness,
+      attribute: spec.attribute,
+      predicates,
+      path: `specializations.${index}`,
+    };
+  });
 }
 
 function normAttr(

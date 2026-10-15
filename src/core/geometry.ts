@@ -27,10 +27,10 @@ export interface Box {
   h: number;
 }
 
-export type NodeKind = "entity" | "relationship" | "attribute";
+export type NodeKind = "entity" | "relationship" | "attribute" | "specialization";
 
 export interface DNode {
-  /** Node id from normalize.ts ("E:...", "R:...", "A:..."). */
+  /** Node id from normalize.ts ("E:...", "R:...", "A:...", "S:..."). */
   id: string;
   kind: NodeKind;
   label: string;
@@ -46,6 +46,11 @@ export interface DNode {
   };
   /** True when the position came from a pin. */
   pinned?: boolean;
+  /**
+   * Specialization circle (kind "specialization"): the letter drawn inside, "d" or "o".
+   * Absent symbol = single-subclass specialization: nothing is drawn, the two ends meet at the centre.
+   */
+  specialization?: { symbol?: "d" | "o" };
 }
 
 export type EdgeKind = "end" | "attribute" | "part";
@@ -60,11 +65,17 @@ export interface DEdge {
   points: Point[];
   /** Total participation of a weak entity in its identifying relationship: drawn as two parallel lines. */
   double: boolean;
-  /** For "end" edges: the end id from normalize.ts ("REL#0"). */
+  /** For "end" edges: the end id from normalize.ts ("REL#0", "S:EMPLOYEE.0#SECRETARY"). */
   end?: string;
+  /**
+   * Subset mark (⊂) on a specialization → subclass end. `at` is the centre of the mark on the line,
+   * `toward` the unit direction along the line toward the superclass; the mark opens that way.
+   */
+  subset?: { at: Point; toward: Point };
 }
 
-export type LabelKind = "cardinality" | "role";
+/** "specialization": defining attribute (superclass line) or predicate (subclass line). */
+export type LabelKind = "cardinality" | "role" | "specialization";
 
 export interface DLabel {
   id: string;
@@ -117,7 +128,7 @@ export const intersects = (a: Box, b: Box, gap = 0): boolean =>
 
 /**
  * Point where the ray from the shape's center toward `toward` leaves the shape outline.
- * Rectangles for entities, diamonds for relationships, ellipses for attributes.
+ * Rectangles for entities, diamonds for relationships, ellipses for attributes and specialization circles.
  */
 export function anchor(node: Pick<DNode, "kind" | "box">, toward: Point): Point {
   const c = center(node.box);
