@@ -25,6 +25,10 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   "ternary": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.1615798922800717, attributeSpokeMax: 1.0654701843573313, emptyAreaRatio: 0.9313489034397789 },
   "turkish-labels": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.8434353146897209 },
   "library": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106, emptyAreaRatio: 0.9271289508500763 },
+  // Measured after subclass-group centering, compact spacing and specialization label clearance.
+  "vehicles-eer": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0996068152031455, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.916731675037542 },
+  "eer-employee": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0789473684210527, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9467771077394788 },
+  "eer-hospital": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0523917995444192, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9179247991958909 },
   // Measured on the default engine; campus is the public stand-in for the private university model.
   // Compact ranks and spacing (0.3): canvas 1700x2162 -> 1669x1588, end-edge length 9821 -> 5148 px,
   // longEdgeMax 6.80 -> 3.40, crossings 1 -> 0. Accepted trade-off within the general limits (1.6, 2.5):

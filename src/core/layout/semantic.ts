@@ -1,5 +1,6 @@
 import { anchor, boxAround, center, intersects, type Box, type DNode, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
+import { specializationOf } from "./eer.js";
 import type { Cluster } from "./clusters.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
 import { distance, segmentIntersection, segmentThrough } from "./shapes.js";
@@ -200,6 +201,16 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     const ends = [...new Set(r.ends.map((e) => `E:${e.entity}`))].map((id) => byId.get(id)).filter((c): c is Cluster => !!c).map((c) => center(c.node.box));
     if (!ends.length) continue;
     const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: isolatedTernary ? Math.min(...ends.map((p) => p.y)) : ends.reduce((s, p) => s + p.y, 0) / ends.length };
+    const spec = specializationOf(r);
+    if (spec && ends.length > 1) {
+      const supertype = center(byId.get(`E:${spec.supertype}`)!.node.box);
+      const subtypes = spec.subtypes.map((name) => center(byId.get(`E:${name}`)!.node.box));
+      // Keep each circle over its own subclass group, including parallel specializations.
+      midpoint.x = subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length;
+      const subclassY = subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length;
+      // Leave the middle of the rank gap free for ordinary relationship diamonds.
+      midpoint.y = supertype.y + (subclassY - supertype.y) * 0.4;
+    }
     const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
     const norm = Math.hypot(dx, dy) || 1;
     // Parallel relationships use a small perpendicular lane around their shared midpoint.

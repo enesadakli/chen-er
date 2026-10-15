@@ -9,6 +9,7 @@ import { alignDiamondPorts, fanEndAnchors, placeRecursive } from "./anchors.js";
 import { attributeNode, placeAttributes, placeRadialAttributes } from "./attributes.js";
 import { measureClusters, placeClusters, type Cluster } from "./clusters.js";
 import { compactRows, layoutScore } from "./compact.js";
+import { specializationOf } from "./eer.js";
 import { finalize } from "./finalize.js";
 import { placeLabels } from "./labels.js";
 import { clearPinnedSpokes, placeSemanticRecursive, placeSemantically, semanticPlacements } from "./semantic.js";
@@ -32,7 +33,7 @@ export function makeEngine(name: "simple" | "layered" | "stress"): LayoutEngine 
     let result: LayoutResult;
     const semanticBuild = (positions: Cluster[]) => buildDiagram(positions, pinnedAttributes, model, metrics, name, true, pins);
     // Entity cells depend only on topology; attribute clearance never selects a new skeleton.
-    if (name !== "simple") {
+    if (name !== "simple" || model.relationships.some((r) => specializationOf(r))) {
       const placement = semanticPlacements(model)[0]!;
       const base = model.relationships.some((r) => r.ends.length > 1 && r.ends.every((e) => e.entity === r.ends[0]!.entity)) && model.entities.length > 1 ? 600 : 430;
       const reserved = pinnedAttributes.map((n) => n.box);
@@ -240,7 +241,7 @@ function buildDiagram(clusters: Cluster[], pinnedAttributes: DNode[], model: NMo
   if (semantic) { clearPinnedSpokes(model, nodes); syncRoots(); }
   const edges: DEdge[] = [];
   for (const r of model.relationships) for (const end of r.ends) if (byId.has(`E:${end.entity}`)) edges.push({
-    id: `edge:${end.id}`, kind: "end", from: r.id, to: `E:${end.entity}`, points: [], double: r.identifies === end.entity, end: end.id,
+    id: `edge:${end.id}`, kind: "end", from: r.id, to: `E:${end.entity}`, points: [], double: specializationOf(r) ? end.index === 0 && specializationOf(r)!.completeness === "total" : r.identifies === end.entity, end: end.id,
   });
   let endPorts = fanEndAnchors(nodes, edges, pins);
   if (semantic) {

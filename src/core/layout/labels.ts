@@ -1,4 +1,5 @@
 import { boxAround, intersects, type Box, type DEdge, type DLabel, type DNode } from "../geometry.js";
+import { specializationOf } from "./eer.js";
 import type { NModel } from "../normalize.js";
 import { cardText, labelSize, style } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
@@ -16,14 +17,18 @@ export function placeLabels(model: NModel, nodes: DNode[], edges: DEdge[], metri
   const geometry = labelGeometry(nodes, edges, paths);
   const lines = new Map(edges.map((edge) => [edge.id, paths.get(edge.id)!.flatMap(segments)]));
   const bounds = new Map([...lines].map(([id, ls]) => [id, linesBox(ls)]));
-  const slots: Slot[] = model.relationships.flatMap((r) => r.ends).flatMap((end) => {
+  const slots: Slot[] = model.relationships.flatMap((r) => r.ends.flatMap((end) => {
     const edge = edges.find((e) => e.end === end.id);
     if (!edge) return [];
-    const texts: { text: string; kind: DLabel["kind"] }[] = [{ text: cardText(end.min, end.max), kind: "cardinality" }];
-    if (end.role) texts.push({ text: end.role, kind: "role" });
+    const spec = specializationOf(r);
+    const text = spec && (end.index === 0 ? spec.attribute : spec.predicates[end.entity]);
+    const texts: { text: string; kind: DLabel["kind"] }[] = spec
+      ? text ? [{ text, kind: "specialization" }] : []
+      : [{ text: cardText(end.min, end.max), kind: "cardinality" }];
+    if (!spec && end.role) texts.push({ text: end.role, kind: "role" });
     return texts.map(({ text, kind }) => ({ edge, label: { id: `label:${edge.id}:${kind}`, kind, text, edge: edge.id,
       box: { x: 0, y: 0, ...labelSize(text, metrics) } } }));
-  });
+  }));
   const collides = (label: DLabel, edge: DEdge, ownershipClear = false) => {
     const box = label.box, shape = boxShape(box);
     const expanded = { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 };

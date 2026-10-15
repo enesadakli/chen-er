@@ -89,8 +89,8 @@ const cases: RuleCase[] = [
   },
   {
     id: "unsupported-eer",
-    failing: { specializations: [{ supertype: "A", subtypes: ["B"], disjointness: "disjoint", completeness: "total" }] },
-    passing: { specializations: [] },
+    failing: { categories: [{ supertypes: ["A", "B"], subtype: "C", completeness: "total" }] },
+    passing: { categories: [] },
   },
   {
     id: "weak-without-partial-key",
@@ -135,8 +135,8 @@ const cases: RuleCase[] = [
 
 describe("lint rules", () => {
   it("registers every rule once, with severity and description but no exposed check function", () => {
-    expect(RULES.map((rule) => rule.id).sort()).toEqual(cases.map((entry) => entry.id).sort());
-    expect(new Set(RULES.map((rule) => rule.id)).size).toBe(19);
+    expect(RULES.map((rule) => rule.id).sort()).toEqual([...cases.map((entry) => entry.id), "specialization-self", "specialization-cycle", "duplicate-subtype", "duplicate-specialization-id", "unknown-defining-attribute", "attribute-defined-overlap"].sort());
+    expect(new Set(RULES.map((rule) => rule.id)).size).toBe(25);
     for (const rule of RULES) {
       expect(Object.keys(rule).sort()).toEqual(["description", "id", "severity"]);
       expect(rule.description.length).toBeGreaterThan(10);

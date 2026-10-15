@@ -44,9 +44,19 @@ export function renderSvg(d: Diagram): string {
 
 function edgeSvg(e: DEdge): string {
   const group = `<g data-id="${esc(e.id)}" class="er-edge">`;
-  if (!e.double) return `${group}<polyline points="${pts(e.points)}"/></g>`;
+  const subset = e.subset ? subsetSvg(e.subset) : "";
+  if (!e.double) return `${group}<polyline points="${pts(e.points)}"/>${subset}</g>`;
   const g = style.doubleEdgeGap / 2;
-  return `${group}<polyline points="${pts(offset(e.points, g))}"/><polyline points="${pts(offset(e.points, -g))}"/></g>`;
+  return `${group}<polyline points="${pts(offset(e.points, g))}"/><polyline points="${pts(offset(e.points, -g))}"/>${subset}</g>`;
+}
+
+function subsetSvg({ at: c, toward: u }: NonNullable<DEdge["subset"]>): string {
+  const r = style.specialization.subsetRadius, a = style.specialization.subsetArm;
+  const n = { x: -u.y, y: u.x };
+  const p = { x: c.x + r * n.x, y: c.y + r * n.y };
+  const q = { x: c.x - r * n.x, y: c.y - r * n.y };
+  // With n perpendicular to u, sweep 1 traverses the half-circle through c - r*u.
+  return `<path d="M ${f(p.x + a * u.x)} ${f(p.y + a * u.y)} L ${f(p.x)} ${f(p.y)} A ${r} ${r} 0 0 1 ${f(q.x)} ${f(q.y)} L ${f(q.x + a * u.x)} ${f(q.y + a * u.y)}" fill="none"/>`;
 }
 
 function nodeSvg(n: DNode): string {
@@ -62,6 +72,12 @@ function nodeSvg(n: DNode): string {
     parts.push(`<polygon points="${pts(diamond(b, 0))}" fill="${c.relationshipFill}" ${stroke}/>`);
     if (n.double) parts.push(`<polygon points="${pts(diamond(b, style.relationship.doubleInset))}" fill="none" ${stroke}/>`);
     parts.push(text(n.label, center(b), style.relationship.fontSize, 700));
+  } else if (n.kind === "specialization") {
+    if (n.specialization?.symbol) {
+      const p = center(b);
+      parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(b.w / 2)}" fill="${c.attributeFill}" ${stroke}/>`);
+      parts.push(text(n.specialization.symbol, p, style.specialization.fontSize, 700));
+    }
   } else {
     const p = center(b);
     const dash = n.attr?.derived ? ' stroke-dasharray="5 4"' : "";

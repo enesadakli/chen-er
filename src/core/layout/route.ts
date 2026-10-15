@@ -154,7 +154,7 @@ export function routeEdge(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 
 function routeWithClearance(edge: DEdge, nodes: DNode[], prior: DEdge[], offset = 0, reserved: Box[] = [], options: RouteOptions, respectNodeClearance: boolean): Point[] {
   const { endPort, forceBend = false, reservedAnchors = [] } = options;
   const from = nodes.find((n) => n.id === edge.from)!, to = nodes.find((n) => n.id === edge.to)!;
-  const departure = endPort && recursiveDeparture(from, to, endPort);
+  const departure = endPort && (endPort.departure ?? recursiveDeparture(from, to, endPort));
   const b = endPort?.anchor ?? anchor(to, center(from.box));
   const vertex = edge.kind === "end" ? dominantVertex(from, to) : undefined;
   const a = departure?.anchor ?? vertex?.point ?? anchor(from, b);

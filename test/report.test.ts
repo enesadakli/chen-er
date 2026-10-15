@@ -134,11 +134,13 @@ describe("method report core", () => {
   });
 
   it("includes specializations and mapping failure diagnostics", () => {
-    const doc = buildReport({ model: { ...model, title: "Course", specializations: [{ supertype: "PERSON", subtypes: ["RECORD"], disjointness: "disjoint", completeness: "partial" }] }, fileName: "course.er.yaml", mapping: { diagnostics: [{ rule: "mapping", severity: "error", message: "Cannot map" }] } });
+    const doc = buildReport({ model: { ...model, title: "Course", specializations: [{ id: "S:PERSON.0", name: "PERSON.0", supertype: "PERSON", subtypes: ["RECORD"], disjointness: "disjoint", completeness: "partial", attribute: "Kind", predicates: { RECORD: "<cargo>" }, path: "specializations.0" }] }, fileName: "course.er.yaml", mapping: { diagnostics: [{ rule: "mapping", severity: "error", message: "Cannot map" }] } });
     expect(doc.title).toBe("Course");
     const md = reportMarkdown(doc);
     expect(md).toContain("Specialization:");
     expect(md).toContain("disjoint, partial");
+    expect(md).toContain("defining attribute: Kind; predicates: RECORD: &lt;cargo&gt;");
+    expect(reportHtml(doc, { svg: "<svg></svg>" })).toContain("defining attribute: Kind; predicates: RECORD: &lt;cargo&gt;");
     expect(md).toContain("| error | mapping | Cannot map |");
     const clean = buildReport({ model: normalize({ version: 1, entities: {} }), fileName: "empty.yaml" });
     expect(reportMarkdown(clean)).toContain("No findings.");

@@ -5,6 +5,20 @@ All notable changes to chen-er are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- EER specialization lint for self-links, cycles, duplicate subtypes and ids, invalid defining
+  attributes and single-valued attribute overlap. Subclasses inherit superclass keys.
+- Specialization defining attributes and predicates in method reports, defining attributes in
+  option 8A mapping notes, and a public fleet vehicle example.
+- Documentation and JSON Schema for Elmasri & Navathe specialization drawing: d/o circles,
+  total completeness, subset marks, single subclasses, defining attributes and predicates.
+
+### Changed
+
+- `unsupported-eer` applies only to reserved union types (`categories`); mapping rejects
+  categories explicitly as unsupported step 9 instead of silently ignoring them.
+
 ## [0.4.0] - 2026-10-10
 
 The npm package is now `chen-erd` (`npm install -g chen-erd` provides the `chen` command; the

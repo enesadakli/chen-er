@@ -1,7 +1,8 @@
 import ELK, { type ELK as ElkInstance } from "elkjs/lib/elk.bundled.js";
 import { boxAround, center, intersects, type Box, type DNode, type LayoutOptions, type Point } from "../geometry.js";
+import { specializationOf } from "./eer.js";
 import { flattenAttrs, type NAttribute, type NModel } from "../normalize.js";
-import { attributeSize, entitySize, relationshipSize, style } from "../style.js";
+import { attributeSize, entitySize, relationshipSize, specializationSize, style } from "../style.js";
 import type { TextMetrics } from "../text/metrics.js";
 
 // elkjs exposes a CommonJS constructor while NodeNext sees a module namespace.
@@ -12,7 +13,7 @@ const attrDepth = (attrs: NAttribute[]): number => attrs.length ? 1 + Math.max(.
 export function measureClusters(model: NModel, metrics: TextMetrics, pins: Record<string, Point>): Cluster[] {
   return [
     ...model.entities.map((e) => ({ spec: e, kind: "entity" as const, size: entitySize(e.label, metrics), double: e.weak })),
-    ...model.relationships.map((r) => ({ spec: r, kind: "relationship" as const, size: relationshipSize(r.label, metrics), double: !!r.identifies })),
+    ...model.relationships.map((r) => ({ spec: r, kind: "relationship" as const, size: specializationOf(r) ? specializationSize() : relationshipSize(r.label, metrics), double: !!r.identifies })),
   ].map(({ spec, kind, size, double }) => ({
     node: { id: spec.id, kind, label: spec.label, box: boxAround(pins[spec.id] ?? { x: 0, y: 0 }, size.w, size.h), double, pinned: !!pins[spec.id] },
     attrs: spec.attrs,

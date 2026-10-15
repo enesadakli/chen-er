@@ -10,6 +10,7 @@ export const style = {
   entity: { fontSize: 16, weight: "bold" as FontWeight, padX: 22, height: 46, minWidth: 110, doubleInset: 5 },
   relationship: { fontSize: 14, weight: "bold" as FontWeight, padX: 26, height: 64, minWidth: 110, widthFactor: 1.5, doubleInset: 7 },
   attribute: { fontSize: 14, weight: "regular" as FontWeight, padX: 18, height: 34, minWidth: 64, doubleInset: 4 },
+  specialization: { diameter: 30, fontSize: 15, weight: "bold" as FontWeight, subsetRadius: 7, subsetArm: 5 },
   label: { fontSize: 13, weight: "regular" as FontWeight, padX: 3, height: 18 },
   title: { fontSize: 20, weight: "bold" as FontWeight, band: 48 },
   note: { fontSize: 13, weight: "regular" as FontWeight, lineHeight: 20 },
@@ -45,6 +46,11 @@ export function relationshipSize(label: string, m: TextMetrics): ShapeSize {
 export function attributeSize(label: string, m: TextMetrics): ShapeSize {
   const s = style.attribute;
   return { w: Math.max(s.minWidth, Math.ceil(m.width(label, s.fontSize, s.weight) * 1.15 + 2 * s.padX)), h: s.height };
+}
+
+export function specializationSize(): ShapeSize {
+  const d = style.specialization.diameter;
+  return { w: d, h: d };
 }
 
 export function labelSize(text: string, m: TextMetrics): ShapeSize {

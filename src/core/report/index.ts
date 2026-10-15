@@ -76,7 +76,7 @@ export function buildReport(input: ReportInput): ReportDoc {
       modelName(r), String(r.ends.length), r.ends.map((e) => `${entities.get(e.entity) ?? e.entity}${e.role ? ` [${e.role}]` : ""} (${e.min},${e.max})`).join(", "),
       r.attrs.map(attribute).join(", "), r.identifies ? `Yes (${name(`E:${r.identifies}`)})` : "No",
     ])),
-    ...model.specializations.map((s) => text(`Specialization: ${name(`E:${s.supertype}`)} → ${s.subtypes.map((n) => name(`E:${n}`)).join(", ")} (${s.disjointness}, ${s.completeness}).`)),
+    ...model.specializations.map((s) => text(`Specialization: ${name(`E:${s.supertype}`)} → ${s.subtypes.map((n) => name(`E:${n}`)).join(", ")} (${s.disjointness}, ${s.completeness})${s.attribute ? `; defining attribute: ${s.attribute}` : ""}${Object.keys(s.predicates).length ? `; predicates: ${s.subtypes.filter((n) => s.predicates[n]).map((n) => `${name(`E:${n}`)}: ${s.predicates[n]}`).join(", ")}` : ""}.`)),
   ];
   sections.push({ heading: "Model", blocks });
   if (requirements) {

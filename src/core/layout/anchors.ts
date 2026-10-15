@@ -1,10 +1,16 @@
 import { isRelativePin } from "../pins.js";
+import { isSpecializationId } from "./eer.js";
 import { boxAround, center, intersects, type DEdge, type DNode, type Pins, type Point } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { boxShape, distance, segmentThrough } from "./shapes.js";
 import { MIN_ROUTE_SEGMENT } from "./semantic-edges.js";
 
-export interface EndPort { anchor: Point; normal: Point; recursive?: { index: number; count: number } }
+export interface EndPort {
+  anchor: Point;
+  normal: Point;
+  recursive?: { index: number; count: number };
+  departure?: { anchor: Point; normal: Point };
+}
 type Side = "top" | "right" | "bottom" | "left";
 const sides: Side[] = ["top", "right", "bottom", "left"];
 const normal = (side: Side): Point => ({ x: side === "right" ? 1 : side === "left" ? -1 : 0, y: side === "bottom" ? 1 : side === "top" ? -1 : 0 });
@@ -47,7 +53,7 @@ export function recursiveDeparture(from: DNode, to: DNode, port: EndPort): EndPo
 
 /** Align a binary diamond with its crowded horizontal entity end before routing. */
 export function alignDiamondPorts(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>): void {
-  for (const diamond of nodes.filter((n) => n.kind === "relationship" && !n.pinned)) {
+  for (const diamond of nodes.filter((n) => n.kind === "relationship" && !isSpecializationId(n.id) && !n.pinned)) {
     const ends = edges.filter((e) => e.kind === "end" && e.from === diamond.id);
     if (ends.length !== 2 || ends[0]!.to === ends[1]!.to) continue;
     const owners = ends.map((e) => nodes.find((n) => n.id === e.to)!);
@@ -152,14 +158,23 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): 
     if (!port || port.recursive) continue;
     const entity = nodes.find((n) => n.id === edge.to)!;
     const c = center(entity.box), b = entity.box;
+    const subclass = isSpecializationId(edge.from) && edge.end !== `${edge.from}#super`;
+    const origin = center(nodes.find((n) => n.id === edge.from)!.box);
     const blocked = (candidate: EndPort) => {
-      const escape = { x: candidate.anchor.x + candidate.normal.x * 96, y: candidate.anchor.y + candidate.normal.y * 96 };
+      // A subclass's top corridor can hit a diamond beyond the short local escape.
+      const reach = subclass ? Math.max(96, (origin.x - candidate.anchor.x) * candidate.normal.x + (origin.y - candidate.anchor.y) * candidate.normal.y) : 96;
+      const escape = { x: candidate.anchor.x + candidate.normal.x * reach, y: candidate.anchor.y + candidate.normal.y * reach };
       return nodes.some((n) => (n.kind === "relationship" && n.id !== edge.from || n.kind === "attribute" && pins[n.id] && isRelativePin(pins[n.id]!)) && segmentThrough(candidate.anchor, escape,
         boxShape({ x: n.box.x - 6, y: n.box.y - 6, w: n.box.w + 12, h: n.box.h + 12 })));
     };
     if (!blocked(port)) continue;
     const currentSide = sides.find((s) => normal(s).x === port.normal.x && normal(s).y === port.normal.y)!;
-    const alternatives = [currentSide, ...sides.filter((s) => s !== currentSide)].flatMap((side) => {
+    const remaining = sides.filter((s) => s !== currentSide);
+    if (subclass) remaining.sort((a, b) => {
+      const toward = (s: Side) => (origin.x - c.x) * normal(s).x + (origin.y - c.y) * normal(s).y;
+      return toward(b) - toward(a);
+    });
+    const alternatives = [currentSide, ...remaining].flatMap((side) => {
       const n = normal(side), span = horizontal(side) ? b.w : b.h;
       const wanted = horizontal(side) ? port.anchor.x - c.x : port.anchor.y - c.y;
       return [0, -16, 16, -32, 32, -48, 48, -64, 64].map((delta): EndPort => {
@@ -170,6 +185,24 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): 
     const clear = alternatives.find((candidate) => !blocked(candidate) && [...result].every(([id, other]) =>
       id === edge.id || edges.find((e) => e.id === id)?.to !== edge.to || distance(candidate.anchor, other.anchor) >= 28 - 1e-6));
     if (clear) result.set(edge.id, clear);
+  }
+  for (const node of nodes.filter((n) => isSpecializationId(n.id))) {
+    const c = center(node.box);
+    const ends = edges.filter((e) => e.kind === "end" && e.from === node.id);
+    const subtypes = ends.filter((e) => e.end !== `${node.id}#super`).sort((a, b) =>
+      center(nodes.find((n) => n.id === a.to)!.box).x - center(nodes.find((n) => n.id === b.to)!.box).x || a.id.localeCompare(b.id));
+    for (const edge of ends) {
+      const port = result.get(edge.id);
+      if (!port) continue;
+      const index = subtypes.indexOf(edge);
+      const angle = index < 0 ? -Math.PI / 2 : subtypes.length === 1 ? Math.PI / 2 : Math.PI - index * Math.PI / (subtypes.length - 1);
+      const x = Math.abs(Math.cos(angle)) < 1e-9 ? 0 : Math.cos(angle);
+      const y = Math.abs(Math.sin(angle)) < 1e-9 ? 0 : Math.sin(angle);
+      port.departure = {
+        anchor: { x: c.x + x * node.box.w / 2, y: c.y + y * node.box.h / 2 },
+        normal: Math.abs(x) > Math.abs(y) ? { x: Math.sign(x), y: 0 } : { x: 0, y: Math.sign(y) },
+      };
+    }
   }
   return result;
 }

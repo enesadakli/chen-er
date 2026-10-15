@@ -17,7 +17,7 @@ export function semanticRoute(edge: DEdge, nodes: DNode[], prior: DEdge[], port:
   const vertex = dominantVertex(from, to);
   const c = center(from.box), b = port.anchor;
   const foreign = nodes.filter((n) => n.id !== edge.from && n.id !== edge.to);
-  const departure = recursiveDeparture(from, to, port);
+  const departure = port.departure ?? recursiveDeparture(from, to, port);
   const tips = departure ? [{ ...departure.anchor, nx: departure.normal.x, ny: departure.normal.y }] : [
     { x: c.x + from.box.w / 2, y: c.y, nx: 1, ny: 0 }, { x: c.x - from.box.w / 2, y: c.y, nx: -1, ny: 0 },
     { x: c.x, y: c.y + from.box.h / 2, nx: 0, ny: 1 }, { x: c.x, y: c.y - from.box.h / 2, nx: 0, ny: -1 },

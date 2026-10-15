@@ -33,11 +33,12 @@ function attributeNames(attributes: readonly NAttribute[], prefix = ""): string[
 
 /** Map normalized ER data without I/O. No partial mapping is returned for invalid input. */
 export function mapModel(model: NModel): MappingResponse {
-  // This diagnostic describes the renderer's capability, not an invalid EER model.
+  // Categories have a separate mapping capability diagnostic.
   const diagnostics = lint(model, { disable: ["unsupported-eer"] });
   const error = (path: string, message: string) => diagnostics.push({
     rule: "mapping", severity: "error", path, ...model.locate(path), message,
   });
+  if (model.categories.length) error("categories", "union types (categories, step 9) are not mapped yet");
   const parents = new Map<string, string[]>();
   model.specializations.forEach((spec, i) => {
     for (const child of spec.subtypes) {
@@ -312,7 +313,7 @@ export function mapModel(model: NModel): MappingResponse {
   model.specializations.forEach((spec, i) => {
     const membership = spec.disjointness === "disjoint" ? "disjoint membership needs an assertion or trigger" : "overlapping membership is allowed";
     const coverage = spec.completeness === "total" ? "total coverage needs an assertion or trigger" : "partial coverage permits superclass-only rows";
-    note(`specializations.${i} (E:${spec.supertype}): option 8A keeps superclass + subclass tables; ${membership}; ${coverage}. Alternatives: 8B subclass-only tables for total specialization, 8C one table with a type discriminator for disjoint subclasses, 8D one table with membership flags for overlapping subclasses.`);
+    note(`specializations.${i} (E:${spec.supertype}): option 8A keeps superclass + subclass tables; ${membership}; ${coverage}.${spec.attribute ? ` Defining attribute: ${spec.attribute}.` : ""} Alternatives: 8B subclass-only tables for total specialization, 8C one table with a type discriminator for disjoint subclasses, 8D one table with membership flags for overlapping subclasses.`);
   });
   result.relations = dependencyOrder(result.relations);
   return hasErrors(diagnostics) ? { diagnostics } : { mapping: result, diagnostics };

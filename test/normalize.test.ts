@@ -69,3 +69,24 @@ entities:
     expect(parseCard("1..3")).toEqual({ min: 1, max: 3 });
   });
 });
+
+describe("specialization normalization", () => {
+  it("preserves both subtype forms, predicates, explicit ids and per-supertype default counters", () => {
+    const { model, diagnostics } = parseModel(`version: 1
+entities: {A: {}, B: {}, C: {}}
+specializations:
+  - {supertype: A, subtypes: [B, {entity: C, predicate: "'cargo'"}], disjointness: disjoint, completeness: total, attribute: Kind}
+  - {id: chosen, supertype: A, subtypes: [{entity: B}], disjointness: overlapping, completeness: partial}
+  - {supertype: B, subtypes: [C], disjointness: disjoint, completeness: partial}
+  - {supertype: A, subtypes: [C], disjointness: disjoint, completeness: partial}
+`);
+    expect(diagnostics).toEqual([]);
+    expect(model!.specializations.map((s) => [s.id, s.name, s.path])).toEqual([
+      ["S:A.0", "A.0", "specializations.0"], ["S:chosen", "chosen", "specializations.1"],
+      ["S:B.0", "B.0", "specializations.2"], ["S:A.2", "A.2", "specializations.3"],
+    ]);
+    expect(model!.specializations[0]).toMatchObject({ subtypes: ["B", "C"], attribute: "Kind", predicates: { C: "'cargo'" } });
+    expect(model!.specializations[1]!.predicates).toEqual({});
+    expect(model!.categories).toEqual([]);
+  });
+});

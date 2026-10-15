@@ -83,8 +83,8 @@ summary .chevron { width: 18px; height: 18px; }
 .overlay { overflow: visible; pointer-events: none; }
 .overlay .mark { pointer-events: auto; cursor: pointer; }
 .overlay .mark:hover, .overlay .mark:focus-visible { stroke-width: 2; }
-.er-entity, .er-relationship, .er-attribute { cursor: grab; }
-.er-entity:active, .er-relationship:active, .er-attribute:active { cursor: grabbing; }
+.er-entity, .er-relationship, .er-attribute, .er-specialization { cursor: grab; }
+.er-entity:active, .er-relationship:active, .er-attribute:active, .er-specialization:active { cursor: grabbing; }
 #placeholder { position: absolute; top: 24px; left: 24px; max-width: 45ch; }
 .zoom-controls { position: absolute; bottom: 12px; left: 12px; display: flex; align-items: center; gap: 2px; background: var(--sheet); color: var(--ink); padding: 4px; border: 1px solid var(--graphite); border-radius: var(--radius); box-shadow: var(--ui-shadow); }
 #actual { min-width: 48px; text-align: center; }
@@ -263,3 +263,4 @@ summary .chevron { width: 18px; height: 18px; }
 
 .figure g[data-id]:focus:not(:focus-visible) { outline: none; }
 .figure g[data-id]:focus-visible { outline: 2px solid var(--graphite); outline-offset: 6px; }
+.figure g.er-specialization:focus-visible { outline: none; }

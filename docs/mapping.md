@@ -24,7 +24,8 @@ The CLI prints the mapping to stdout, or writes `--out` and prints that path.
 It refuses to overwrite the input model. Errors produce exit code 1 for an
 invalid model, 2 for usage/I/O failures; invalid models never write an output.
 Warnings and course findings appear on stderr. Mapping runs the existing lint
-rules, except `unsupported-eer`, which describes a drawing limitation. Parsing,
+rules, replacing the categories-only `unsupported-eer` diagnostic with a mapping
+error: union types (categories, step 9) are not mapped yet. Parsing,
 unknown references and every other lint error still block mapping. Missing keys
 or keys involving derived/multivalued components are additional mapping errors;
 the mapper never invents surrogate ids.
@@ -47,7 +48,9 @@ Notes describe alternatives: 8B stores only subclass tables (requires total
 coverage, with redundant superclass data for overlapping membership); 8C stores
 one table with a discriminator for disjoint subclasses; 8D stores one table with
 membership flags for overlapping subclasses. These alternatives are explanatory,
-not selectable output modes. Drawing specializations remains unsupported.
+not selectable output modes. Specializations are drawn in Elmasri & Navathe notation. Defining attributes
+appear in the 8A notes; predicates and membership constraints require application
+logic, assertions or triggers. Union types (`categories`, step 9) are not mapped.
 
 For multiple inheritance, a common ancestor's PK is reused and references every
 superclass. Independent superclass identities remain separate: the lexically
