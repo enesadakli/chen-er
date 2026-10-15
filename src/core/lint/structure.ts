@@ -99,10 +99,10 @@ const recursiveMissingRole: Rule = {
 
 const unsupportedEer: Rule = {
   id: "unsupported-eer", severity: "error",
-  description: "Version 1 cannot draw non-empty specializations.",
-  check: (model) => model.specializations.length ? [finding(model, unsupportedEer, "specializations",
-    `Version 1 cannot draw specializations of ${model.specializations.map((spec) => spec.supertype).join(", ")}.`,
-    "Remove specializations from this version 1 model and represent the required facts with entities and relationships.")] : [],
+  description: "Union types (categories) cannot be drawn yet.",
+  check: (model) => model.categories.length ? [finding(model, unsupportedEer, "categories",
+    "Union types (categories) are not drawn yet.",
+    "Remove categories until union type drawing is supported.")] : [],
 };
 
 export const structureRules: Rule[] = [unknownEntity, unknownKey, duplicateAttribute, invalidCardinality,

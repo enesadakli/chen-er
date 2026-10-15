@@ -53,9 +53,56 @@ relationships:
 
 A weak entity draws a double rectangle; its identifying relationship draws a double diamond. The identified end draws double lines. A binary identifying relationship requires the weak end to be `"1..1"`. A partial key distinguishes the entity within its owner and draws a dashed underline. Missing partial keys are course findings; missing identifying relationships are errors. Identification cycles are errors.
 
-## Notes and unsupported EER
+## Specialization and generalization
 
-Use `title` for the heading and top-level `notes` for text printed below the diagram. Entity/relationship `note` fields are accepted model metadata; they are not printed as diagram notes. Non-empty `specializations` currently produce an `unsupported-eer` error.
+`specializations` is an optional list. Each entry has required `supertype` (entity name),
+`subtypes` (one or more subclass references), `disjointness` (`disjoint` or `overlapping`)
+and `completeness` (`total` or `partial`). Optional `id` supplies a stable identifier;
+optional `attribute` names a top-level defining attribute of the supertype.
+
+```yaml
+specializations:
+  - id: vehicle_kind
+    supertype: VEHICLE
+    subtypes:
+      - {entity: CAR, predicate: "'Car'"}
+      - {entity: TRUCK, predicate: "'Truck'"}
+    disjointness: disjoint
+    completeness: total
+    attribute: Vehicle_type
+  - supertype: VEHICLE
+    subtypes: [ELECTRIC_VEHICLE]
+    disjointness: disjoint
+    completeness: partial
+```
+
+A subtype is either an entity-name string or an object with required `entity` and optional
+non-empty `predicate` text. The defining attribute is drawn on the superclass line;
+predicates (values or conditions) appear on the corresponding subclass lines. A single-valued
+defining attribute implies disjoint subclasses; use `disjoint`, or make that attribute
+multivalued when overlap is intended.
+
+Elmasri & Navathe notation uses a circle containing `d` for disjoint subclasses or `o` for
+overlapping subclasses, a double superclass-to-circle line for total completeness and a
+single line for partial completeness. Subclass lines carry subset marks toward the superclass.
+A single subclass uses a direct line with a subset mark and no circle; total completeness
+still uses a double line. Subclasses inherit superclass keys and need not redeclare them.
+Self-specialization, cycles, duplicate subtypes and duplicate normalized ids are errors.
+
+Circle pin ids are `S:<id>` with explicit ids, otherwise `S:<supertype>.<n>`, where `n` starts
+at 0 and counts entries for that supertype (including entries with explicit ids). These pins
+use absolute centres. See [the fleet vehicle example](../examples/vehicles-eer.er.yaml).
+
+## Reserved categories
+
+`categories` reserves union types (circle with `u`). Each entry has `supertypes` (at least two
+entity names), `subtype`, `completeness` (`total` or `partial`) and optional `id`. Non-empty
+categories produce `unsupported-eer`: union types are not drawn yet. Mapping also rejects
+them explicitly because step 9 is not implemented.
+
+## Notes
+
+Use `title` for the heading and top-level `notes` for text printed below the diagram. Entity/relationship `note` fields are accepted model metadata; they are not printed as diagram notes.
 
 ## Layout files
 

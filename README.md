@@ -169,8 +169,7 @@ attributes become simple columns, multivalued attributes get tables, derived
 attributes become notes, and recursive FKs use roles. SQL includes PK, FK,
 UNIQUE and NOT NULL constraints in dependency order; column types are placeholders.
 Constraints requiring assertions/triggers and deterministic naming decisions
-remain visible in notes. Lint errors block mapping; specialization's drawing-only
-`unsupported-eer` rule is excluded for mapping. See [mapping rules and conventions](docs/mapping.md),
+remain visible in notes. Lint errors block mapping. Union types (categories, step 9) are not mapped yet. See [mapping rules and conventions](docs/mapping.md),
 especially the distinction between n-ary multiplicity and this model's own-end
 participation cards. Full fixture outputs: [campus Markdown](docs/mapping/campus.md)
 and [campus SQL](docs/mapping/campus.sql).
@@ -215,11 +214,11 @@ soft positions, relational mapping and course method reports. The default
 `stress` and `simple` are also available. Automatic layouts still need visual
 review, particularly on large models with many edge crossings.
 
-EER `specializations` support relational mapping, but lint/rendering still report
-`unsupported-eer` because specialization diagrams are not drawn. See the
+EER `specializations` are drawn in Elmasri & Navathe notation and support relational
+mapping with option 8A. Union types (`categories`) are reserved and report `unsupported-eer`. See the
 [change log](https://github.com/enesadakli/chen-er/blob/main/CHANGELOG.md).
 
-Next work includes clearer layouts for large models and EER rendering.
+Next work includes clearer layouts for large models and union types.
 These are planned areas, not supported features or release dates.
 
 ## License

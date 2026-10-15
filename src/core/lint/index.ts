@@ -1,5 +1,6 @@
 import type { Diagnostic, Severity } from "../diagnostics.js";
 import type { NModel } from "../normalize.js";
+import { eerRules } from "./eer.js";
 import { courseRules } from "./course.js";
 import { heuristicRules } from "./heuristics.js";
 import { infoRules } from "./info.js";
@@ -24,7 +25,7 @@ export interface LintOptions {
   disableSeverities?: Severity[];
 }
 
-const rules = [...structureRules, ...weakRules, ...courseRules, ...heuristicRules, ...infoRules];
+const rules = [...structureRules, ...eerRules, ...weakRules, ...courseRules, ...heuristicRules, ...infoRules];
 
 export const RULES: RuleInfo[] = rules.map(({ id, severity, description }) => ({ id, severity, description }));
 

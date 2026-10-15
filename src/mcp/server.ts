@@ -39,7 +39,7 @@ export function createServer(io: ToolIO = fileIO): McpServer {
     annotations: { readOnlyHint: false, destructiveHint: true },
   }, (input) => safely(() => renderEr(input, io)));
   server.registerTool("map_er", {
-    description: "Map Chen ER YAML to relational tables using steps 1–7 and specialization option 8A. Supply exactly one of model or path. Returns relations, columns, PKs, UNIQUEs, FKs, source ids, step explanations, limitations, diagnostics and Markdown. Refuses invalid models; does not write files.",
+    description: "Map Chen ER YAML to relational tables using steps 1–7 and specialization option 8A. Union types (categories, step 9) are not mapped yet. Supply exactly one of model or path. Returns relations, columns, PKs, UNIQUEs, FKs, source ids, step explanations, limitations, diagnostics and Markdown. Refuses invalid models; does not write files.",
     inputSchema: mapInput,
     annotations: { readOnlyHint: true },
   }, (input) => safely(() => mapEr(input, io)));

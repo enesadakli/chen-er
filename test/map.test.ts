@@ -273,7 +273,7 @@ describe("ER-to-relational mapping", () => {
       const result = mapModel(normalize({ version: 1, entities: { SHOP: entity("ShopId"), ITEM: entity("ItemId"), COURIER: entity("CourierId") },
         specializations: pairs.map(([supertype, subtype]) => ({ supertype: supertype!, subtypes: [subtype!], disjointness: "disjoint", completeness: "partial" })) }));
       expect(result.mapping).toBeUndefined();
-      expect(result.diagnostics.some((d) => d.severity === "error")).toBe(true);
+      expect(result.diagnostics.some((d) => d.rule === "specialization-cycle" && d.severity === "error")).toBe(true);
     }
   });
 
@@ -329,5 +329,33 @@ describe("ER-to-relational mapping", () => {
     expect(result.mapping).toBeDefined();
     await expect(mappingMarkdown(result.mapping!)).toMatchFileSnapshot(`../docs/mapping/${name}.md`);
     await expect(mappingSql(result.mapping!)).toMatchFileSnapshot(`../docs/mapping/${name}.sql`);
+  });
+});
+
+describe("EER mapping diagnostics and notes", () => {
+  it("rejects categories explicitly instead of silently ignoring step 9", () => {
+    const response = mapModel(normalize({ version: 1, entities: { A: entity("Id"), B: entity("Id"), C: entity("Id") },
+      categories: [{ supertypes: ["A", "B"], subtype: "C", completeness: "partial" }] }));
+    expect(response.mapping).toBeUndefined();
+    expect(response.diagnostics).toContainEqual(expect.objectContaining({ rule: "mapping", severity: "error", path: "categories", message: "union types (categories, step 9) are not mapped yet" }));
+    expect(response.diagnostics.some((d) => d.rule === "unsupported-eer")).toBe(false);
+  });
+
+  it("includes the defining attribute in option 8A notes", () => {
+    const result = mapping({ entities: { A: entity("Id"), B: {} }, specializations: [
+      { supertype: "A", subtypes: [{ entity: "B", predicate: "'cargo'" }], attribute: "Description", disjointness: "disjoint", completeness: "total" },
+    ] });
+    expect(result.notes.some((n) => n.includes("option 8A") && n.includes("Defining attribute: Description"))).toBe(true);
+  });
+
+  it.each([
+    { subtypes: ["A"], rule: "specialization-self" },
+    { subtypes: ["B", "B"], rule: "duplicate-subtype" },
+  ])("blocks $rule before producing tables", ({ subtypes, rule }) => {
+    const response = mapModel(normalize({ version: 1, entities: { A: entity("Id"), B: {} }, specializations: [
+      { supertype: "A", subtypes, disjointness: "disjoint", completeness: "partial" },
+    ] }));
+    expect(response.mapping).toBeUndefined();
+    expect(response.diagnostics.some((d) => d.rule === rule && d.severity === "error")).toBe(true);
   });
 });

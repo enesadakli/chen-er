@@ -1,0 +1,33 @@
+version: 1
+title: Fleet vehicles and depot assignments
+entities:
+  VEHICLE:
+    attrs: [Vin, Vehicle_type]
+    keys: [[Vin]]
+  CAR:
+    attrs: [Seat_count]
+  TRUCK:
+    attrs: [Payload_limit]
+  ELECTRIC_VEHICLE:
+    attrs: [Battery_capacity]
+  DEPOT:
+    attrs: [Depot_code, Name]
+    keys: [[Depot_code]]
+relationships:
+  PARKED_AT:
+    ends:
+      - {entity: TRUCK, card: "1..1"}
+      - {entity: DEPOT, card: "0..N"}
+specializations:
+  - id: vehicle_kind
+    supertype: VEHICLE
+    subtypes:
+      - {entity: CAR, predicate: "'Car'"}
+      - {entity: TRUCK, predicate: "'Truck'"}
+    disjointness: disjoint
+    completeness: total
+    attribute: Vehicle_type
+  - supertype: VEHICLE
+    subtypes: [ELECTRIC_VEHICLE]
+    disjointness: disjoint
+    completeness: partial
