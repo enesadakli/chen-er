@@ -4,7 +4,7 @@ import { stringify } from "yaml";
 import { mapText } from "../src/app/map.js";
 import { normalize } from "../src/core/normalize.js";
 import { mapModel, mappingMarkdown, mappingSql, type MappingResult } from "../src/core/map/index.js";
-import type { ModelInput } from "../src/core/schema.js";
+import type { CategoryInput, ModelInput } from "../src/core/schema.js";
 
 const entity = (name: string) => ({ attrs: [name, "Description"], keys: [[name]] });
 function mapping(input: Omit<ModelInput, "version">): MappingResult {
@@ -333,12 +333,56 @@ describe("ER-to-relational mapping", () => {
 });
 
 describe("EER mapping diagnostics and notes", () => {
-  it("rejects categories explicitly instead of silently ignoring step 9", () => {
-    const response = mapModel(normalize({ version: 1, entities: { A: entity("Id"), B: entity("Id"), C: entity("Id") },
-      categories: [{ supertypes: ["A", "B"], subtype: "C", completeness: "partial" }] }));
+  it("step 9 gives a category with different superclass keys a surrogate key referenced by each superclass", () => {
+    const result = mapping({ entities: { PERSON: entity("Ssn"), CLUB: entity("Code"), PAYER: { attrs: ["Email"] }, BILL: entity("No") },
+      relationships: { PAYS: { ends: [{ entity: "PAYER", card: "0..N" }, { entity: "BILL", card: "1..1" }] } },
+      categories: [{ supertypes: ["PERSON", "CLUB"], subtype: "PAYER", completeness: "partial" }] });
+    const payer = result.relations.find((r) => r.name === "PAYER")!;
+    expect(payer).toMatchObject({ step: 9, elementIds: ["E:PAYER", "U:PAYER.0", "E:PERSON", "E:CLUB"], primaryKey: ["PAYER_id"] });
+    expect(payer.columns.map((c) => [c.name, c.notNull])).toEqual([["PAYER_id", true], ["Email", false]]);
+    for (const name of ["PERSON", "CLUB"]) {
+      const superclass = result.relations.find((r) => r.name === name)!;
+      expect(superclass.columns.find((c) => c.name === "PAYER_id")).toMatchObject({ notNull: false, sourceIds: ["U:PAYER.0", `E:${name}`] });
+      expect(superclass.foreignKeys).toContainEqual({ columns: ["PAYER_id"], references: { relation: "PAYER", columns: ["PAYER_id"] }, sourceIds: ["U:PAYER.0", `E:${name}`] });
+      expect(superclass.uniqueKeys).toContainEqual(["PAYER_id"]);
+      expect(superclass.steps.map((step) => step.step)).toEqual([1, 9]);
+    }
+    expect(result.relations.findIndex((r) => r.name === "PAYER")).toBeLessThan(result.relations.findIndex((r) => r.name === "PERSON"));
+    expect(result.relations.find((r) => r.name === "BILL")!.foreignKeys[0]!.references).toEqual({ relation: "PAYER", columns: ["PAYER_id"] });
+    expect(result.notes.some((n) => n.startsWith("categories.0 (E:PAYER): step 9") && n.includes("surrogate key PAYER.PAYER_id") && n.includes("exactly one superclass table"))).toBe(true);
+  });
+
+  it("step 9 makes the surrogate FK NOT NULL for a total category", () => {
+    const result = mapping({ entities: { A: entity("Id"), B: entity("Code"), C: {} }, categories: [{ supertypes: ["A", "B"], subtype: "C", completeness: "total" }] });
+    for (const name of ["A", "B"]) expect(result.relations.find((r) => r.name === name)!.columns.find((c) => c.name === "C_id")!.notNull).toBe(true);
+    expect(result.notes.some((n) => n.includes("Total: every superclass row belongs to the category."))).toBe(true);
+  });
+
+  it("step 9 reuses a key shared by every superclass and references the category only when it is total", () => {
+    const input = (completeness: "total" | "partial") => ({ entities: { SEDAN: entity("Vin"), VAN: entity("Vin"), LEASED: { attrs: ["Until"], keys: [["Until"]] } },
+      categories: [{ supertypes: ["SEDAN", "VAN"], subtype: "LEASED", completeness }] });
+    const total = mapping(input("total"));
+    const leased = total.relations.find((r) => r.name === "LEASED")!;
+    expect(leased).toMatchObject({ step: 9, primaryKey: ["Vin"], uniqueKeys: [["Until"]] });
+    expect(leased.columns.map((c) => c.name)).toEqual(["Vin", "Until"]);
+    expect(total.relations.find((r) => r.name === "SEDAN")!.foreignKeys).toEqual([{ columns: ["Vin"], references: { relation: "LEASED", columns: ["Vin"] }, sourceIds: ["U:LEASED.0", "E:SEDAN"] }]);
+    const partial = mapping(input("partial"));
+    expect(partial.relations.find((r) => r.name === "VAN")!.foreignKeys).toEqual([]);
+    expect(partial.relations.find((r) => r.name === "VAN")!.steps.at(-1)!.reason).toContain("partial category cannot reference them by FK");
+  });
+
+  it.each([
+    { name: "weak category", input: { entities: { A: entity("Id"), B: entity("Id"), C: { weak: true, attrs: ["No"], partialKey: ["No"] } },
+      relationships: { OWNS: { identifies: "C", ends: [{ entity: "A", card: "0..N" }, { entity: "C", card: "1..1" }] } } }, message: "a weak category" },
+    { name: "category subclass", input: { entities: { A: entity("Id"), B: entity("Id"), C: {} },
+      specializations: [{ supertype: "A", subtypes: ["C"], disjointness: "disjoint" as const, completeness: "partial" as const }] }, message: "also a specialization subclass" },
+    { name: "second category", input: { entities: { A: entity("Id"), B: entity("Id"), C: {} },
+      extra: [{ supertypes: ["B", "A"], subtype: "C", completeness: "partial" as const }] }, message: "one category per entity" },
+  ])("step 9 rejects a $name", ({ input, message }) => {
+    const { extra = [], ...rest } = input as typeof input & { extra?: CategoryInput[] };
+    const response = mapModel(normalize({ version: 1, ...rest, categories: [{ supertypes: ["A", "B"], subtype: "C", completeness: "partial" }, ...extra] }));
     expect(response.mapping).toBeUndefined();
-    expect(response.diagnostics).toContainEqual(expect.objectContaining({ rule: "mapping", severity: "error", path: "categories", message: "union types (categories, step 9) are not mapped yet" }));
-    expect(response.diagnostics.some((d) => d.rule === "unsupported-eer")).toBe(false);
+    expect(response.diagnostics.some((d) => d.rule === "mapping" && d.message.includes(message))).toBe(true);
   });
 
   it("includes the defining attribute in option 8A notes", () => {

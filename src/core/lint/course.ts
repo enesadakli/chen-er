@@ -11,9 +11,9 @@ const weakWithoutPartialKey: Rule = {
 
 const entityWithoutKey: Rule = {
   id: "entity-without-key", severity: "course",
-  description: "Non-weak entities should declare a candidate key unless inherited from a superclass.",
+  description: "Non-weak entities should declare a candidate key unless inherited from a superclass or given by a category.",
   check: (model) => model.entities.filter((entity) => !entity.weak && !entity.keys.length &&
-    !model.specializations.some((s) => s.subtypes.includes(entity.name)))
+    !model.specializations.some((s) => s.subtypes.includes(entity.name)) && !model.categories.some((c) => c.subtype === entity.name))
     .map((entity) => finding(model, entityWithoutKey, `${entity.path}.keys`,
       `Entity ${entity.name} has no candidate key.`,
       `Add keys to ${entity.name} using top-level attributes that uniquely identify each instance.`)),

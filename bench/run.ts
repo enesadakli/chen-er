@@ -27,6 +27,11 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   "library": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 0, routeDetourMax: 1, attributeSpokeMax: 1.0775077508069106, emptyAreaRatio: 0.9271289508500763 },
   // Measured after subclass-group centering, compact spacing and specialization label clearance.
   "vehicles-eer": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0996068152031455, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.916731675037542 },
+  // Specialization lattice: AMPHIBIAN is a shared subclass of LAND_VEHICLE and WATER_VEHICLE. Two-subclass
+  // groups centre their circle between columns, so each superclass reaches its circle with a Z route.
+  "watercraft-lattice": { zRoutes: 4, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0495867768595042, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9194972349525514 },
+  // Category (union type): BOOKER under a u circle between MEMBER, CLUB and SPONSOR.
+  "room-booking-category": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0152931180968565, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9360052078149939 },
   "eer-employee": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0789473684210527, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9467771077394788 },
   "eer-hospital": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0523917995444192, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9179247991958909 },
   // Measured on the default engine; campus is the public stand-in for the private university model.
@@ -74,10 +79,13 @@ export async function stabilityOf(model: NModel, diagram: Diagram, engine: Engin
       id: `A:${e.name}.Extra`, name: "Extra", label: "Extra", owner: e.name, ownerKind: "entity", parts: [], multivalued: false, derived: false, key: false, partial: false, path: "bench.extra",
     }] }) };
     const next = (await layout(modified, { engine, pins })).diagram;
-    displacement.push(...diagram.nodes.filter((n) => n.kind === "entity").map((n) => {
+    const shifts = diagram.nodes.filter((n) => n.kind === "entity").map((n) => {
       const c = center(n.box), other = center(next.nodes.find((m) => m.id === n.id)!.box);
-      return Math.hypot(c.x - other.x, c.y - other.y);
-    }));
+      return { x: other.x - c.x, y: other.y - c.y };
+    });
+    // A shift shared by every entity only moves the canvas origin; measure movement relative to it.
+    const common = shifts.length && shifts.every((s) => Math.hypot(s.x - shifts[0]!.x, s.y - shifts[0]!.y) < 0.01) ? shifts[0]! : { x: 0, y: 0 };
+    displacement.push(...shifts.map((s) => Math.hypot(s.x - common.x, s.y - common.y)));
   }
   displacement.sort((a, b) => a - b);
   const median = displacement.length ? (displacement[Math.floor(displacement.length / 2)]! + displacement[Math.floor((displacement.length - 1) / 2)]!) / 2 : 0;

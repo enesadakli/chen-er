@@ -1,6 +1,6 @@
 import { hasErrors } from "../diagnostics.js";
 import { lint } from "../lint/index.js";
-import { flattenAttrs, type NAttribute, type NEnd, type NModel, type NRelationship } from "../normalize.js";
+import { flattenAttrs, type NAttribute, type NCategory, type NEnd, type NModel, type NRelationship } from "../normalize.js";
 import type { MappingExplanation, MappingRelation, MappingResponse, MappingResult, MappingStep } from "./types.js";
 import { dependencyOrder } from "./format.js";
 export type * from "./types.js";
@@ -33,12 +33,10 @@ function attributeNames(attributes: readonly NAttribute[], prefix = ""): string[
 
 /** Map normalized ER data without I/O. No partial mapping is returned for invalid input. */
 export function mapModel(model: NModel): MappingResponse {
-  // Categories have a separate mapping capability diagnostic.
-  const diagnostics = lint(model, { disable: ["unsupported-eer"] });
+  const diagnostics = lint(model);
   const error = (path: string, message: string) => diagnostics.push({
     rule: "mapping", severity: "error", path, ...model.locate(path), message,
   });
-  if (model.categories.length) error("categories", "union types (categories, step 9) are not mapped yet");
   const parents = new Map<string, string[]>();
   model.specializations.forEach((spec, i) => {
     for (const child of spec.subtypes) {
@@ -47,9 +45,17 @@ export function mapModel(model: NModel): MappingResponse {
       if (model.entities.find((e) => e.name === child)?.weak) error(`specializations.${i}`, `E:${child}: a weak subclass has two identity sources; resolve its identity before mapping.`);
     }
   });
+  const categories = new Map<string, NCategory>();
+  model.categories.forEach((category) => {
+    const e = model.entities.find((item) => item.name === category.subtype);
+    if (categories.has(category.subtype)) error(category.path, `${e?.id ?? category.subtype}: one category per entity; merge the superclass lists into one union type.`);
+    else if (e?.weak) error(category.path, `${e.id}: a weak category has two identity sources; resolve its identity before mapping.`);
+    else if (parents.has(category.subtype)) error(category.path, `E:${category.subtype}: a category that is also a specialization subclass has two identity sources; keep one of them.`);
+    categories.set(category.subtype, category);
+  });
   for (const e of model.entities) {
     const keys = e.weak ? [e.partialKey, ...e.keys] : e.keys;
-    if (!(e.weak ? e.partialKey.length : e.keys.length || parents.has(e.name))) {
+    if (!(e.weak ? e.partialKey.length : e.keys.length || parents.has(e.name) || categories.has(e.name))) {
       error(e.path, `${e.id}: declare ${e.weak ? "a partial key" : "a candidate key"}; mapping never invents an identifier.`);
     }
     for (const key of keys) for (const name of key) {
@@ -203,13 +209,26 @@ export function mapModel(model: NModel): MappingResponse {
     const parentTables = parentNames.map(buildEntity);
     const inherited = parentTables[0];
     const ownerTables = owners.map((end) => buildEntity(end.entity));
-    const explanation = inherited
+    const category = categories.get(name);
+    const unionTables = category?.supertypes.map(buildEntity) ?? [];
+    // Superclasses with the same key columns share that key; otherwise the category gets a surrogate key.
+    const sharedKey = unionTables.length > 0 && unionTables.every((t) => t.primaryKey.join("\0").toLowerCase() === unionTables[0]!.primaryKey.join("\0").toLowerCase());
+    const unionIds = category ? [e.id, category.id, ...category.supertypes.map((p) => `E:${p}`)] : [];
+    const explanation = category
+      ? explain(9, unionIds, `${e.id} is a category (union type) of ${category.supertypes.map((p) => `E:${p}`).join(", ")}; ${sharedKey
+        ? "its superclasses share one key, so that key is its PK"
+        : "its superclasses have different keys, so a surrogate key is its PK and each superclass references it"}.`)
+      : inherited
       ? explain(8, [e.id, ...parentNames.map((p) => `E:${p}`)], `${e.id} is a subclass of ${parentNames.map((p) => `E:${p}`).join(", ")}; option 8A inherits the superclass PK as its PK and FK.`)
       : identifying
         ? explain(2, [e.id, identifying.id], `${e.id} is weak, identified by ${identifying.id}; PK = owner PK(s) + partial key.`)
         : explain(1, [e.id], `${e.id} is regular; first candidate key is the PK, remaining candidate keys are UNIQUE.`);
     const out = table(e.name, explanation);
     entityTables.set(name, out);
+    // The category key comes first so its columns lead the table, before the category's own attributes.
+    const unionKey = !category ? [] : sharedKey
+      ? unionTables[0]!.primaryKey.map((pk) => column(out, pk, [e.id, category.id, ...unionTables.map((t) => t.columns.find((c) => c.name === pk)?.sourceIds ?? []).flat()], true, reservedAttributes.get(e.id)))
+      : [column(out, `${e.name}_id`, [e.id, category.id], true, reservedAttributes.get(e.id))];
     const own = attrs(out, e.attrs);
     const expand = (names: string[]) => names.flatMap((n) => own.get(n) ?? []);
     if (inherited) {
@@ -240,9 +259,28 @@ export function mapModel(model: NModel): MappingResponse {
       participation(identifying, new Set(identifying.ends.filter((end) => end.entity === name).map((end) => end.id)));
       if (owners.length === 1 && owners[0]!.max === 1) key(out, ownerKeys);
       if (owners.length > 1) note(`${identifying.id}: joint owner identity uses all owner PKs; n-ary participation bounds beyond FK existence need assertions or triggers.`);
+    } else if (category) {
+      key(out, unionKey, true);
+      unionTables.forEach((target, i) => {
+        const parent = `E:${category.supertypes[i]}`, total = category.completeness === "total";
+        const step = explain(9, unionIds, `${parent} is a superclass of category ${e.id}; ${sharedKey
+          ? total ? "its PK also references the category table" : "the shared key matches category rows, but a partial category cannot reference them by FK"
+          : `${out.name}.${unionKey[0]} is copied as a UNIQUE${total ? " NOT NULL" : ", nullable"} FK`}.`);
+        target.steps.push(step);
+        if (sharedKey) {
+          if (total) target.foreignKeys.push({ columns: [...target.primaryKey], references: { relation: out.name, columns: [...unionKey] }, sourceIds: [category.id, parent] });
+          return;
+        }
+        // A partial category leaves superclass rows outside it: UNIQUE must not imply NOT NULL here.
+        target.uniqueKeys.push(copyPk(target, out, "", [category.id, parent], total));
+      });
+      const membership = sharedKey
+        ? `each ${out.name} key must exist in exactly one superclass table${category.completeness === "partial" ? " (no FK ties superclass rows to it)" : ""}`
+        : `each ${unionKey[0]} value must appear in exactly one superclass table`;
+      note(`${category.path} (${e.id}): step 9 maps the union type ${category.supertypes.join(" ∪ ")} with ${sharedKey ? "their shared key" : `surrogate key ${out.name}.${unionKey[0]}`}; ${membership}, which needs an assertion or trigger.${category.completeness === "total" ? " Total: every superclass row belongs to the category." : ""}`);
     } else key(out, expand(e.keys[0]!), true);
     if (!inherited) identityRoots.set(name, e.id);
-    for (const candidate of (inherited || e.weak ? e.keys : e.keys.slice(1))) key(out, expand(candidate));
+    for (const candidate of (inherited || e.weak || category ? e.keys : e.keys.slice(1))) key(out, expand(candidate));
     if (e.note) note(`${e.id}: ${e.note}`);
     building.delete(name);
     return out;

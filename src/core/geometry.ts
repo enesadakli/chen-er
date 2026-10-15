@@ -30,7 +30,7 @@ export interface Box {
 export type NodeKind = "entity" | "relationship" | "attribute" | "specialization";
 
 export interface DNode {
-  /** Node id from normalize.ts ("E:...", "R:...", "A:...", "S:..."). */
+  /** Node id from normalize.ts ("E:...", "R:...", "A:...", "S:...", "U:..."). */
   id: string;
   kind: NodeKind;
   label: string;
@@ -47,10 +47,11 @@ export interface DNode {
   /** True when the position came from a pin. */
   pinned?: boolean;
   /**
-   * Specialization circle (kind "specialization"): the letter drawn inside, "d" or "o".
+   * EER circle (kind "specialization"): the letter drawn inside, "d" or "o" for a specialization,
+   * "u" for a category (union type).
    * Absent symbol = single-subclass specialization: nothing is drawn, the two ends meet at the centre.
    */
-  specialization?: { symbol?: "d" | "o" };
+  specialization?: { symbol?: "d" | "o" | "u" };
 }
 
 export type EdgeKind = "end" | "attribute" | "part";
@@ -63,13 +64,17 @@ export interface DEdge {
   to: string;
   /** Polyline from the boundary of `from` to the boundary of `to`. */
   points: Point[];
-  /** Total participation of a weak entity in its identifying relationship: drawn as two parallel lines. */
+  /**
+   * Drawn as two parallel lines: total participation of a weak entity in its identifying relationship,
+   * a total specialization's superclass line or a total category's category line.
+   */
   double: boolean;
-  /** For "end" edges: the end id from normalize.ts ("REL#0", "S:EMPLOYEE.0#SECRETARY"). */
+  /** For "end" edges: the end id from normalize.ts ("REL#0", "S:EMPLOYEE.0#SECRETARY", "U:OWNER.0#sub"). */
   end?: string;
   /**
-   * Subset mark (⊂) on a specialization → subclass end. `at` is the centre of the mark on the line,
-   * `toward` the unit direction along the line toward the superclass; the mark opens that way.
+   * Subset mark (⊂) on a specialization → subclass end or a category circle → category end. `at` is the
+   * centre of the mark on the line, `toward` the unit direction along the line toward the superclass side
+   * (the circle for a category); the mark opens that way.
    */
   subset?: { at: Point; toward: Point };
 }

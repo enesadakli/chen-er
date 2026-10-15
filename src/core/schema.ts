@@ -91,13 +91,13 @@ export const Specialization = z
   })
   .strict();
 
-/** Reserved for union types (categories, circle with u). Not drawn or mapped yet. */
+/** Union type (category): one subclass of several superclasses, drawn with a circle holding u. */
 export const Category = z
   .object({
-    id: Identifier.optional(),
-    supertypes: z.array(Identifier).min(2),
-    subtype: Identifier,
-    completeness: z.enum(["total", "partial"]),
+    id: Identifier.optional().describe("Stable id for pins; defaults to <subtype>.<n>, n counting this subtype's categories from 0."),
+    supertypes: z.array(Identifier).min(2).describe("Defining superclasses; a category member belongs to one of them."),
+    subtype: Identifier.describe("The category entity."),
+    completeness: z.enum(["total", "partial"]).describe("Total: double line between the circle and the category; every superclass member is in the category."),
   })
   .strict();
 
@@ -115,7 +115,7 @@ export const Model = z
     categories: z
       .array(Category)
       .optional()
-      .describe("Reserved for EER union types (categories). Not drawn yet; reports a diagnostic if present."),
+      .describe("EER union types (categories), drawn in Elmasri & Navathe notation."),
   })
   .strict();
 

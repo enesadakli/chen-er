@@ -224,12 +224,13 @@
       }
     },
     "categories": {
-      "description": "Reserved for EER union types (categories). Not drawn yet; reports a diagnostic if present.",
+      "description": "EER union types (categories), drawn in Elmasri & Navathe notation.",
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "id": {
+            "description": "Stable id for pins; defaults to <subtype>.<n>, n counting this subtype's categories from 0.",
             "type": "string",
             "minLength": 1,
             "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
@@ -241,19 +242,22 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
-            }
+            },
+            "description": "Defining superclasses; a category member belongs to one of them."
           },
           "subtype": {
             "type": "string",
             "minLength": 1,
-            "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$"
+            "pattern": "^[\\p{L}_][\\p{L}\\p{N}_-]*$",
+            "description": "The category entity."
           },
           "completeness": {
             "type": "string",
             "enum": [
               "total",
               "partial"
-            ]
+            ],
+            "description": "Total: double line between the circle and the category; every superclass member is in the category."
           }
         },
         "required": [

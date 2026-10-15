@@ -1,0 +1,40 @@
+version: 1
+title: Rental fleet with amphibious vehicles
+entities:
+  VEHICLE:
+    attrs: [Fleet_no, Model]
+    keys: [[Fleet_no]]
+  LAND_VEHICLE:
+    attrs: [Wheel_count]
+  WATER_VEHICLE:
+    attrs: [Hull_class]
+  CAR:
+    attrs: [Seats]
+  BOAT:
+    attrs: [Draft]
+  AMPHIBIAN:
+    attrs: [Max_wave_height]
+  MARINA:
+    attrs: [Marina_code]
+    keys: [[Marina_code]]
+relationships:
+  MOORED_AT:
+    ends:
+      - {entity: WATER_VEHICLE, card: "0..1"}
+      - {entity: MARINA, card: "0..N"}
+specializations:
+  - id: terrain
+    supertype: VEHICLE
+    subtypes: [LAND_VEHICLE, WATER_VEHICLE]
+    disjointness: overlapping
+    completeness: total
+  - id: land_kind
+    supertype: LAND_VEHICLE
+    subtypes: [CAR, AMPHIBIAN]
+    disjointness: disjoint
+    completeness: partial
+  - id: water_kind
+    supertype: WATER_VEHICLE
+    subtypes: [BOAT, AMPHIBIAN]
+    disjointness: disjoint
+    completeness: partial

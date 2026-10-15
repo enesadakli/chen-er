@@ -93,12 +93,33 @@ Circle pin ids are `S:<id>` with explicit ids, otherwise `S:<supertype>.<n>`, wh
 at 0 and counts entries for that supertype (including entries with explicit ids). These pins
 use absolute centres. See [the fleet vehicle example](../examples/vehicles-eer.er.yaml).
 
-## Reserved categories
+A subclass may appear in several specializations (a lattice, or multiple inheritance): it is
+drawn once, below every superclass, with one subset-marked line per specialization. See
+[the amphibious fleet example](../examples/watercraft-lattice.er.yaml).
 
-`categories` reserves union types (circle with `u`). Each entry has `supertypes` (at least two
-entity names), `subtype`, `completeness` (`total` or `partial`) and optional `id`. Non-empty
-categories produce `unsupported-eer`: union types are not drawn yet. Mapping also rejects
-them explicitly because step 9 is not implemented.
+## Categories (union types)
+
+`categories` lists union types. Each entry has `supertypes` (at least two entity names),
+`subtype` (the category entity), `completeness` (`total` or `partial`) and optional `id`:
+
+```yaml
+categories:
+  - supertypes: [MEMBER, CLUB, SPONSOR]
+    subtype: BOOKER
+    completeness: partial
+```
+
+Elmasri & Navathe notation draws a circle containing `u` between the superclasses and the
+category: the superclasses sit above the circle and the category below it. The circle-to-category
+line carries the subset mark; it is double for a total category (every superclass member is in
+the category) and single for a partial one. The category needs no key of its own: mapping gives it
+the superclasses' shared key or a surrogate key (step 9). A category listed among its own
+superclasses, repeated superclasses, duplicate normalized ids and cycles through category links
+are errors.
+
+Circle pin ids are `U:<id>` with explicit ids, otherwise `U:<subtype>.<n>`, where `n` starts at 0
+and counts entries for that subtype. Its ends are `U:<name>#sub` (the category) and
+`U:<name>#<Supertype>`. See [the room booking example](../examples/room-booking-category.er.yaml).
 
 ## Notes
 

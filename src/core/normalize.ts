@@ -12,6 +12,7 @@ import { Model, type AttributeInput, type ModelInput } from "./schema.js";
  *   attribute     "A:<Owner>.<attr>[.<part>...]"   (owner = entity or relationship name)
  *   end           "<Relationship>#<end id or index>"
  *   specialization "S:<id or supertype.n>"; its ends "S:<name>#super" and "S:<name>#<Subtype>"
+ *   category      "U:<id or subtype.n>"; its ends "U:<name>#sub" and "U:<name>#<Supertype>"
  */
 export type Max = number | "N";
 
@@ -87,14 +88,26 @@ export interface NSpecialization {
   path: string;
 }
 
+export interface NCategory {
+  /** Node id of the circle: "U:<id>". */
+  id: string;
+  /** Explicit id or "<subtype>.<n>". */
+  name: string;
+  /** Defining superclass entity names in model order. */
+  supertypes: string[];
+  /** The category entity. */
+  subtype: string;
+  completeness: "total" | "partial";
+  path: string;
+}
+
 export interface NModel {
   title?: string;
   entities: NEntity[];
   relationships: NRelationship[];
   notes: string[];
   specializations: NSpecialization[];
-  /** Reserved EER union types; not drawn yet. */
-  categories: NonNullable<ModelInput["categories"]>;
+  categories: NCategory[];
   /** Maps a dotted path to a 1-based source position. */
   locate(path: string): { line: number; column: number } | undefined;
 }
@@ -107,6 +120,7 @@ export interface ParseResult {
 export const entityNodeId = (name: string) => `E:${name}`;
 export const relationshipNodeId = (name: string) => `R:${name}`;
 export const specializationNodeId = (name: string) => `S:${name}`;
+export const categoryNodeId = (name: string) => `U:${name}`;
 
 export function parseCard(card: string): { min: number; max: Max } {
   const [lo = "0", hi = "N"] = card.split("..").map((s) => s.trim());
@@ -221,7 +235,7 @@ export function normalize(input: ModelInput, locate: NModel["locate"] = () => un
     relationships,
     notes: input.notes ?? [],
     specializations: normSpecializations(input.specializations ?? []),
-    categories: input.categories ?? [],
+    categories: normCategories(input.categories ?? []),
     locate,
   };
 }
@@ -248,6 +262,23 @@ function normSpecializations(input: NonNullable<ModelInput["specializations"]>):
       attribute: spec.attribute,
       predicates,
       path: `specializations.${index}`,
+    };
+  });
+}
+
+function normCategories(input: NonNullable<ModelInput["categories"]>): NCategory[] {
+  const seen = new Map<string, number>();
+  return input.map((category, index) => {
+    const n = seen.get(category.subtype) ?? 0;
+    seen.set(category.subtype, n + 1);
+    const name = category.id ?? `${category.subtype}.${n}`;
+    return {
+      id: categoryNodeId(name),
+      name,
+      supertypes: [...category.supertypes],
+      subtype: category.subtype,
+      completeness: category.completeness,
+      path: `categories.${index}`,
     };
   });
 }

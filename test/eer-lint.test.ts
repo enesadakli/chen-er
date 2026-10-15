@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { stringify } from "yaml";
 import { lint } from "../src/core/lint/index.js";
 import { normalize, parseModel } from "../src/core/normalize.js";
-import type { ModelInput, SpecializationInput } from "../src/core/schema.js";
+import type { CategoryInput, ModelInput, SpecializationInput } from "../src/core/schema.js";
 
 const spec = (overrides: Partial<SpecializationInput> = {}): SpecializationInput => ({
   supertype: "A", subtypes: ["B"], disjointness: "disjoint", completeness: "partial", ...overrides,
@@ -10,7 +10,9 @@ const spec = (overrides: Partial<SpecializationInput> = {}): SpecializationInput
 const input = (specializations: SpecializationInput[]): ModelInput => ({ version: 1, entities: {
   A: { attrs: ["Id", "Kind", { name: "Details", parts: ["Nested", "Other"] }], keys: [["Id"]] }, B: {}, C: {},
 }, specializations });
-const findings = (rule: string, specs: SpecializationInput[]) => lint(normalize(input(specs))).filter((d) => d.rule === rule);
+const findings = (rule: string, specs: SpecializationInput[], categories: CategoryInput[] = []) =>
+  lint(normalize({ ...input(specs), categories })).filter((d) => d.rule === rule);
+const category = (overrides: Partial<CategoryInput> = {}): CategoryInput => ({ supertypes: ["A", "B"], subtype: "C", completeness: "partial", ...overrides });
 
 describe("EER lint", () => {
   it.each([
@@ -63,5 +65,40 @@ describe("EER lint", () => {
     model.entities[0]!.keys = [];
     expect(lint(model).filter((d) => d.rule === "entity-without-key").map((d) => d.path)).toEqual(["entities.A.keys", "entities.C.keys"]);
     expect(lint(model).some((d) => d.rule === "unsupported-eer")).toBe(false);
+  });
+
+  it.each([
+    { rule: "category-self", bad: category({ supertypes: ["A", "C"] }), path: "supertypes.1" },
+    { rule: "duplicate-supertype", bad: category({ supertypes: ["A", "B", "A"] }), path: "supertypes.2" },
+    { rule: "unknown-entity", bad: category({ supertypes: ["A", "Missing"] }), path: "supertypes.1" },
+    { rule: "unknown-entity", bad: category({ subtype: "Missing" }), path: "subtype" },
+  ])("checks category rule $rule at $path", ({ rule, bad, path }) => {
+    const parsed = parseModel(stringify({ ...input([]), categories: [bad] }));
+    expect(parsed.diagnostics).toEqual([]);
+    const found = lint(parsed.model!).filter((d) => d.rule === rule);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ severity: "error", path: `categories.0.${path}`, ...parsed.model!.locate(`categories.0.${path}`) });
+    expect(found[0]!.line).toBeGreaterThan(1);
+    expect(findings(rule, [], [category()])).toEqual([]);
+  });
+
+  it("draws categories instead of reporting them and exempts the category from key findings", () => {
+    const all = lint(normalize({ ...input([]), categories: [category()] }));
+    expect(all.filter((d) => d.severity === "error")).toEqual([]);
+    expect(all.filter((d) => d.rule === "entity-without-key").map((d) => d.path)).toEqual(["entities.B.keys"]);
+  });
+
+  it("names categories by subtype and rejects repeated names", () => {
+    const model = normalize({ ...input([]), categories: [category(), category({ supertypes: ["A", "B"] }), category({ id: "C.0", subtype: "B", supertypes: ["A", "C"] })] });
+    expect(model.categories.map((c) => [c.id, c.name, c.path])).toEqual([
+      ["U:C.0", "C.0", "categories.0"], ["U:C.1", "C.1", "categories.1"], ["U:C.0", "C.0", "categories.2"],
+    ]);
+    expect(lint(model).filter((d) => d.rule === "duplicate-category-id")).toMatchObject([{ path: "categories.2.id", severity: "error" }]);
+  });
+
+  it("finds cycles through category links", () => {
+    const found = findings("specialization-cycle", [spec({ supertype: "C", subtypes: ["A"] })], [category()]);
+    expect(found.map((d) => [d.path, d.message])).toEqual([["categories.0.supertypes.0", "Specialization cycle: C → A → C."]]);
+    expect(findings("specialization-cycle", [spec({ supertype: "A", subtypes: ["B"] })], [category()])).toEqual([]);
   });
 });

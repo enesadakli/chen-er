@@ -1,0 +1,28 @@
+version: 1
+title: Campus room bookings by members, clubs and sponsors
+entities:
+  MEMBER:
+    attrs: [Member_no, Name]
+    keys: [[Member_no]]
+  CLUB:
+    attrs: [Club_code, Club_name]
+    keys: [[Club_code]]
+  SPONSOR:
+    attrs: [Tax_no, Company]
+    keys: [[Tax_no]]
+  BOOKER:
+    attrs: [Contact_email]
+  ROOM:
+    attrs: [Room_no, Capacity]
+    keys: [[Room_no]]
+relationships:
+  RESERVES:
+    ends:
+      - {entity: BOOKER, card: "0..N"}
+      - {entity: ROOM, card: "0..N"}
+    attrs: [Slot]
+categories:
+  - id: booker
+    supertypes: [MEMBER, CLUB, SPONSOR]
+    subtype: BOOKER
+    completeness: partial

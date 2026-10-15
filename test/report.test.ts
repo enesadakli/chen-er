@@ -142,6 +142,8 @@ describe("method report core", () => {
     expect(md).toContain("defining attribute: Kind; predicates: RECORD: &lt;cargo&gt;");
     expect(reportHtml(doc, { svg: "<svg></svg>" })).toContain("defining attribute: Kind; predicates: RECORD: &lt;cargo&gt;");
     expect(md).toContain("| error | mapping | Cannot map |");
+    const union = reportMarkdown(buildReport({ model: { ...model, categories: [{ id: "U:RECORD.0", name: "RECORD.0", supertypes: ["PERSON", "RECORD"], subtype: "RECORD", completeness: "total", path: "categories.0" }] }, fileName: "course.er.yaml" }));
+    expect(union).toMatch(/Category \(union type\): RECORD ⊆ Person .* ∪ RECORD \(total\)\./);
     const clean = buildReport({ model: normalize({ version: 1, entities: {} }), fileName: "empty.yaml" });
     expect(reportMarkdown(clean)).toContain("No findings.");
   });

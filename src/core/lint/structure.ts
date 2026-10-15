@@ -3,7 +3,7 @@ import { finding, type Rule } from "./rule.js";
 
 const unknownEntity: Rule = {
   id: "unknown-entity", severity: "error",
-  description: "Every relationship and specialization reference must name an existing entity.",
+  description: "Every relationship, specialization and category reference must name an existing entity.",
   check(model) {
     const names = new Set(model.entities.map((entity) => entity.name));
     const references = model.relationships.flatMap((rel) => [
@@ -14,6 +14,12 @@ const unknownEntity: Rule = {
       references.push({ name: spec.supertype, path: `specializations.${index}.supertype`, owner: "specialization" });
       spec.subtypes.forEach((name, sub) => references.push({
         name, path: `specializations.${index}.subtypes.${sub}`, owner: `specialization of ${spec.supertype}`,
+      }));
+    });
+    model.categories.forEach((category) => {
+      references.push({ name: category.subtype, path: `${category.path}.subtype`, owner: "category" });
+      category.supertypes.forEach((name, i) => references.push({
+        name, path: `${category.path}.supertypes.${i}`, owner: `category ${category.subtype}`,
       }));
     });
     return references.filter((ref) => !names.has(ref.name)).map((ref) => finding(model, unknownEntity, ref.path,
@@ -97,13 +103,5 @@ const recursiveMissingRole: Rule = {
   }),
 };
 
-const unsupportedEer: Rule = {
-  id: "unsupported-eer", severity: "error",
-  description: "Union types (categories) cannot be drawn yet.",
-  check: (model) => model.categories.length ? [finding(model, unsupportedEer, "categories",
-    "Union types (categories) are not drawn yet.",
-    "Remove categories until union type drawing is supported.")] : [],
-};
-
 export const structureRules: Rule[] = [unknownEntity, unknownKey, duplicateAttribute, invalidCardinality,
-  duplicateEndId, recursiveMissingRole, unsupportedEer];
+  duplicateEndId, recursiveMissingRole];

@@ -7,6 +7,15 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Added
 
+- EER union types (`categories`) drawn in Elmasri & Navathe notation: a `u` circle between the
+  superclasses and the category, a subset mark on the category line, a double line for a total
+  category. Circle pin ids are `U:<id>` or `U:<subtype>.<n>`.
+- Mapping step 9: a category gets the superclasses' shared key or a surrogate `<Category>_id`
+  key that each superclass references with a UNIQUE FK. Course reports list categories.
+- Category lint rules `category-self`, `duplicate-supertype` and `duplicate-category-id`;
+  `specialization-cycle` and `unknown-entity` also follow category links.
+- Public examples for a specialization lattice and a category.
+
 - EER specialization lint for self-links, cycles, duplicate subtypes and ids, invalid defining
   attributes and single-valued attribute overlap. Subclasses inherit superclass keys.
 - Specialization defining attributes and predicates in method reports, defining attributes in
@@ -16,8 +25,9 @@ All notable changes to chen-er are recorded here. The format follows
 
 ### Changed
 
-- `unsupported-eer` applies only to reserved union types (`categories`); mapping rejects
-  categories explicitly as unsupported step 9 instead of silently ignoring them.
+- `unsupported-eer` is removed: categories are drawn and mapped.
+- Layout scores a specialization circle where it is drawn, so a shared subclass in a lattice
+  stays near its superclasses. Bench stability ignores a shift shared by every entity.
 
 ## [0.4.0] - 2026-10-10
 
