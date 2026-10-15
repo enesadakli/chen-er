@@ -117,8 +117,10 @@ export function sinkRanks(ids: string[], ranks: Map<string, number>, pairs: { pa
 /** Static parts of the skeleton score are built once; the returned scorer adds terms in a fixed order. */
 function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Map<string, number>) => number {
   const relationships = model.relationships.map((r) => {
-    const ends = [...new Set(r.ends.map((e) => e.entity))];
-    return { id: r.id, ends: ends.map((name) => `E:${name}`), key: ends.join(";") };
+    const ends = [...new Set(r.ends.map((e) => e.entity))], spec = specializationOf(r);
+    // A specialization circle sits over its subclasses, not at the centroid of all ends (see placeSemantically).
+    const circle = spec ? { supertype: `E:${spec.supertype}`, subtypes: spec.subtypes.map((name) => `E:${name}`) } : undefined;
+    return { id: r.id, ends: ends.map((name) => `E:${name}`), key: ends.join(";"), circle };
   }).filter((r) => r.ends.length >= 2);
   const entities = model.entities.map((e) => ({ key: `E:${e.name}`, degree: model.relationships.filter((r) => r.ends.some((end) => `E:${end.entity}` === e.id)).length }));
   // Path pairs that may cross: different diamonds and different entities, in the original pair order.
@@ -142,7 +144,8 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
     let score = 0;
     for (const r of relationships) {
       const points = r.ends.map(point);
-      const p = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
+      const p = r.circle ? circlePoint(point(r.circle.supertype), r.circle.subtypes.map(point))
+        : { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
       diamonds.push({ id: r.id, p, key: r.key });
       r.ends.forEach((_, i) => {
         const q = points[i]!;
@@ -175,6 +178,12 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
   };
 }
 
+/** Specialization circle: centred over the subclasses, 40% of the way down from the superclass. */
+function circlePoint(supertype: Point, subtypes: Point[]): Point {
+  const x = subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length, y = subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length;
+  return { x, y: supertype.y + (y - supertype.y) * 0.4 };
+}
+
 export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = [], rowSpacing = spacing): void {
   const byId = new Map(clusters.map((c) => [c.node.id, c]));
   const isolatedTernary = model.entities.length === 3 && model.relationships.length === 1 && new Set(model.relationships[0]!.ends.map((e) => e.entity)).size === 3 && !hierarchyPairs(modelRelations(model)).length;
@@ -203,13 +212,9 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: isolatedTernary ? Math.min(...ends.map((p) => p.y)) : ends.reduce((s, p) => s + p.y, 0) / ends.length };
     const spec = specializationOf(r);
     if (spec && ends.length > 1) {
-      const supertype = center(byId.get(`E:${spec.supertype}`)!.node.box);
-      const subtypes = spec.subtypes.map((name) => center(byId.get(`E:${name}`)!.node.box));
-      // Keep each circle over its own subclass group, including parallel specializations.
-      midpoint.x = subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length;
-      const subclassY = subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length;
-      // Leave the middle of the rank gap free for ordinary relationship diamonds.
-      midpoint.y = supertype.y + (subclassY - supertype.y) * 0.4;
+      // Keep each circle over its own subclass group, including parallel specializations, and leave
+      // the middle of the rank gap free for ordinary relationship diamonds.
+      Object.assign(midpoint, circlePoint(center(byId.get(`E:${spec.supertype}`)!.node.box), spec.subtypes.map((name) => center(byId.get(`E:${name}`)!.node.box))));
     }
     const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
     const norm = Math.hypot(dx, dy) || 1;

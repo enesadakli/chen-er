@@ -100,6 +100,38 @@ describe("EER layout", () => {
     }
   });
 
+  it("places a shared subclass of a lattice under its nearest superclass without crossings", async () => {
+    const m = normalize({
+      version: 1,
+      entities: {
+        ACCOUNT: { attrs: ["Handle"], keys: [["Handle"]] }, LISTENER: {}, ARTIST: {}, FREE_LISTENER: {}, PREMIUM_LISTENER: {},
+        SOLO_ARTIST: {}, BAND: {}, CURATOR: { attrs: ["Playlist_count"] }, LABEL: { attrs: ["Label_id"], keys: [["Label_id"]] },
+      },
+      relationships: { SIGNED_TO: { ends: [{ entity: "ARTIST", card: "0..1" }, { entity: "LABEL", card: "0..N" }] } },
+      specializations: [
+        { id: "role", supertype: "ACCOUNT", subtypes: ["LISTENER", "ARTIST"], disjointness: "overlapping", completeness: "total" },
+        { id: "tier", supertype: "LISTENER", subtypes: ["FREE_LISTENER", "PREMIUM_LISTENER"], disjointness: "disjoint", completeness: "total" },
+        { id: "act", supertype: "ARTIST", subtypes: ["SOLO_ARTIST", "BAND", "CURATOR"], disjointness: "overlapping", completeness: "partial" },
+        { id: "curates", supertype: "PREMIUM_LISTENER", subtypes: ["CURATOR"], disjointness: "disjoint", completeness: "partial" },
+      ],
+    });
+    const first = await layout(m), { diagram } = first;
+    expect(await layout(m)).toEqual(first);
+    const at = (id: string) => center(diagram.nodes.find((n) => n.id === id)!.box);
+    // CURATOR sits below both superclasses, under the deeper one rather than at the far edge of its sibling row.
+    expect(at("E:CURATOR").y).toBeGreaterThan(at("E:PREMIUM_LISTENER").y);
+    expect(Math.abs(at("E:CURATOR").x - at("E:PREMIUM_LISTENER").x)).toBeLessThan(Math.abs(at("E:CURATOR").x - at("E:BAND").x));
+    for (const spec of ["S:act", "S:curates"]) {
+      const edge = diagram.edges.find((e) => e.end === `${spec}#CURATOR`)!;
+      expect(edge.subset).toBeDefined();
+      expect(edge.to).toBe("E:CURATOR");
+    }
+    const q = assessQuality(diagram, {}, m);
+    expect(q.edgeCrossings + q.overlaps + q.shapeCrossings + q.labelCollisions + q.edgeNodeClearanceViolations + q.hierarchyViolations).toBe(0);
+    expect(q.endBendsMax).toBeLessThanOrEqual(3);
+    expect(q.issues).toEqual([]);
+  });
+
   it("uses a side port when a subclass's upper corridor hits a distant relationship diamond", () => {
     const nodes: Diagram["nodes"] = [
       { id: "S:branch", kind: "relationship", label: "", box: { x: 385, y: 285, w: 30, h: 30 }, double: false },
