@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { center, type DEdge, type Diagram, type LayoutResult } from "../src/core/geometry.js";
 import { fanEndAnchors } from "../src/core/layout/anchors.js";
-import { finishSpecializations, isSpecializationId, specializationOf, withSpecializationProxies } from "../src/core/layout/eer.js";
+import { circleOf, finishSpecializations, isChildEnd, isSpecializationId, rootEndId, specializationOf, withSpecializationProxies } from "../src/core/layout/eer.js";
 import { layout } from "../src/core/layout/index.js";
 import { boxSegmentDistance, pointSegmentDistance } from "../src/core/layout/label-geometry.js";
 import { placeLabels } from "../src/core/layout/labels.js";
@@ -130,6 +130,57 @@ describe("EER layout", () => {
     expect(q.edgeCrossings + q.overlaps + q.shapeCrossings + q.labelCollisions + q.edgeNodeClearanceViolations + q.hierarchyViolations).toBe(0);
     expect(q.endBendsMax).toBeLessThanOrEqual(3);
     expect(q.issues).toEqual([]);
+  });
+
+  it("draws a total category under a u circle between its superclasses", async () => {
+    const m = normalize({
+      version: 1,
+      entities: {
+        ASSET: { attrs: ["Asset_tag"], keys: [["Asset_tag"]] }, BUILDING: { attrs: ["Address"] }, MACHINE: { attrs: ["Serial"] },
+        FLEET_CAR: { attrs: ["Plate"], keys: [["Plate"]] }, INSURED_ITEM: { attrs: ["Premium"] }, POLICY: { attrs: ["Policy_no"], keys: [["Policy_no"]] },
+      },
+      relationships: { COVERED_BY: { ends: [{ entity: "INSURED_ITEM", card: "1..1" }, { entity: "POLICY", card: "1..N" }] } },
+      specializations: [{ supertype: "ASSET", subtypes: ["BUILDING", "MACHINE"], disjointness: "disjoint", completeness: "partial" }],
+      categories: [{ supertypes: ["BUILDING", "MACHINE", "FLEET_CAR"], subtype: "INSURED_ITEM", completeness: "total" }],
+    });
+    const first = await layout(m), { diagram } = first;
+    expect(await layout(m)).toEqual(first);
+    const circle = diagram.nodes.find((n) => n.id === "U:INSURED_ITEM.0")!;
+    expect(circle).toMatchObject({ kind: "specialization", label: "", double: false, specialization: { symbol: "u" } });
+    const at = (id: string) => center(diagram.nodes.find((n) => n.id === id)!.box), c = center(circle.box);
+    for (const parent of ["BUILDING", "MACHINE", "FLEET_CAR"]) expect(at(`E:${parent}`).y).toBeLessThan(c.y);
+    expect(c.y).toBeLessThan(at("E:INSURED_ITEM").y);
+    expect(Math.abs(at("E:INSURED_ITEM").x - c.x)).toBeLessThan(1);
+    const ends = diagram.edges.filter((e) => e.from === circle.id);
+    expect(ends.map((e) => e.end).sort()).toEqual(["U:INSURED_ITEM.0#BUILDING", "U:INSURED_ITEM.0#FLEET_CAR", "U:INSURED_ITEM.0#MACHINE", "U:INSURED_ITEM.0#sub"]);
+    for (const e of ends) {
+      const own = e.end === "U:INSURED_ITEM.0#sub";
+      expect(e.double).toBe(own);
+      expect(!!e.subset).toBe(own);
+      expect(distance(e.points[0]!, c)).toBeCloseTo(circle.box.w / 2, 5);
+    }
+    const sub = ends.find((e) => e.end === "U:INSURED_ITEM.0#sub")!;
+    expect(sub.points.length).toBe(2);
+    // The mark opens toward the circle.
+    expect(sub.subset!.toward.y).toBeLessThan(0);
+    expect(diagram.labels.filter((l) => ends.some((e) => e.id === l.edge))).toEqual([]);
+    const q = assessQuality(diagram, {}, m);
+    expect(q.edgeCrossings + q.overlaps + q.shapeCrossings + q.labelCollisions + q.edgeNodeClearanceViolations + q.hierarchyViolations).toBe(0);
+    expect(q.issues).toEqual([]);
+  });
+
+  it("builds category proxies whose root end is the category", () => {
+    const m = normalize({ version: 1, entities: { A: {}, B: {}, C: {} }, categories: [{ id: "union", supertypes: ["A", "B"], subtype: "C", completeness: "partial" }] });
+    const r = withSpecializationProxies(m).relationships.find((r) => r.id === "U:union")!;
+    expect(specializationOf(r)).toBeUndefined();
+    expect(circleOf(r)).toEqual({ kind: "category", root: "C", fan: ["A", "B"], completeness: "partial" });
+    expect(r.ends.map((e) => e.id)).toEqual(["U:union#sub", "U:union#A", "U:union#B"]);
+    expect(rootEndId("U:union")).toBe("U:union#sub");
+    expect(rootEndId("S:x")).toBe("S:x#super");
+    expect(r.ends.map((e) => isChildEnd("U:union", e.id))).toEqual([true, false, false]);
+    expect(isChildEnd("S:x", "S:x#super")).toBe(false);
+    expect(isChildEnd("S:x", "S:x#B")).toBe(true);
+    expect(hierarchyPairs(modelRelations(m))).toEqual([{ parent: "E:A", child: "E:C" }, { parent: "E:B", child: "E:C" }]);
   });
 
   it("uses a side port when a subclass's upper corridor hits a distant relationship diamond", () => {

@@ -1,5 +1,5 @@
 import { isRelativePin } from "../pins.js";
-import { isSpecializationId } from "./eer.js";
+import { isCategoryId, isEerCircleId, rootEndId } from "./eer.js";
 import { boxAround, center, intersects, type DEdge, type DNode, type Pins, type Point } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { boxShape, distance, segmentThrough } from "./shapes.js";
@@ -53,7 +53,7 @@ export function recursiveDeparture(from: DNode, to: DNode, port: EndPort): EndPo
 
 /** Align a binary diamond with its crowded horizontal entity end before routing. */
 export function alignDiamondPorts(nodes: DNode[], edges: DEdge[], ports: Map<string, EndPort>): void {
-  for (const diamond of nodes.filter((n) => n.kind === "relationship" && !isSpecializationId(n.id) && !n.pinned)) {
+  for (const diamond of nodes.filter((n) => n.kind === "relationship" && !isEerCircleId(n.id) && !n.pinned)) {
     const ends = edges.filter((e) => e.kind === "end" && e.from === diamond.id);
     if (ends.length !== 2 || ends[0]!.to === ends[1]!.to) continue;
     const owners = ends.map((e) => nodes.find((n) => n.id === e.to)!);
@@ -158,7 +158,7 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): 
     if (!port || port.recursive) continue;
     const entity = nodes.find((n) => n.id === edge.to)!;
     const c = center(entity.box), b = entity.box;
-    const subclass = isSpecializationId(edge.from) && edge.end !== `${edge.from}#super`;
+    const subclass = isEerCircleId(edge.from) && edge.end !== rootEndId(edge.from);
     const origin = center(nodes.find((n) => n.id === edge.from)!.box);
     const blocked = (candidate: EndPort) => {
       // A subclass's top corridor can hit a diamond beyond the short local escape.
@@ -186,16 +186,18 @@ export function fanEndAnchors(nodes: DNode[], edges: DEdge[], pins: Pins = {}): 
       id === edge.id || edges.find((e) => e.id === id)?.to !== edge.to || distance(candidate.anchor, other.anchor) >= 28 - 1e-6));
     if (clear) result.set(edge.id, clear);
   }
-  for (const node of nodes.filter((n) => isSpecializationId(n.id))) {
+  for (const node of nodes.filter((n) => isEerCircleId(n.id))) {
     const c = center(node.box);
+    // A specialization fans its subclasses over the lower half; a category fans its superclasses over the upper half.
+    const flip = isCategoryId(node.id) ? -1 : 1;
     const ends = edges.filter((e) => e.kind === "end" && e.from === node.id);
-    const subtypes = ends.filter((e) => e.end !== `${node.id}#super`).sort((a, b) =>
+    const subtypes = ends.filter((e) => e.end !== rootEndId(node.id)).sort((a, b) =>
       center(nodes.find((n) => n.id === a.to)!.box).x - center(nodes.find((n) => n.id === b.to)!.box).x || a.id.localeCompare(b.id));
     for (const edge of ends) {
       const port = result.get(edge.id);
       if (!port) continue;
       const index = subtypes.indexOf(edge);
-      const angle = index < 0 ? -Math.PI / 2 : subtypes.length === 1 ? Math.PI / 2 : Math.PI - index * Math.PI / (subtypes.length - 1);
+      const angle = flip * (index < 0 ? -Math.PI / 2 : subtypes.length === 1 ? Math.PI / 2 : Math.PI - index * Math.PI / (subtypes.length - 1));
       const x = Math.abs(Math.cos(angle)) < 1e-9 ? 0 : Math.cos(angle);
       const y = Math.abs(Math.sin(angle)) < 1e-9 ? 0 : Math.sin(angle);
       port.departure = {

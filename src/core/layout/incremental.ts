@@ -1,6 +1,6 @@
 import { absolutePins, attributeParents } from "../pins.js";
 import { boxAround, center, intersects, type Box, type LayoutEngine, type LayoutOptions, type LayoutResult, type Pins, type Point } from "../geometry.js";
-import { specializationOf } from "./eer.js";
+import { circleOf } from "./eer.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
 import { attributeSize, entitySize, relationshipSize, specializationSize } from "../style.js";
 import { assessQuality } from "../quality.js";
@@ -212,7 +212,7 @@ function placeNewShapes(
 function shapeSizes(model: NModel, m: TextMetrics): Map<string, { w: number; h: number }> {
   const sizes = new Map<string, { w: number; h: number }>();
   for (const e of model.entities) sizes.set(e.id, entitySize(e.label, m));
-  for (const r of model.relationships) sizes.set(r.id, specializationOf(r) ? specializationSize() : relationshipSize(r.label, m));
+  for (const r of model.relationships) sizes.set(r.id, circleOf(r) ? specializationSize() : relationshipSize(r.label, m));
   const attrs = [...model.entities.flatMap((e) => flattenAttrs(e.attrs)), ...model.relationships.flatMap((r) => flattenAttrs(r.attrs))];
   for (const a of attrs) sizes.set(a.id, attributeSize(a.label, m));
   return sizes;

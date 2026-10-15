@@ -10,16 +10,20 @@ const self: Rule = {
 
 const cycle: Rule = {
   id: "specialization-cycle", severity: "error",
-  description: "The specialization graph must be acyclic.",
+  description: "The specialization and category graph must be acyclic.",
   check(model) {
     const edges = new Map<string, Set<string>>();
     const diagnostics: ReturnType<Rule["check"]> = [];
-    // Insert edges in source order: each simple cycle is found at its last edge.
-    for (const s of model.specializations) s.subtypes.forEach((child, j) => {
-      if (child === s.supertype || edges.get(s.supertype)?.has(child)) return;
+    // Superclass → subclass links in source order, specializations first: each simple cycle is found at its last link.
+    const links = [
+      ...model.specializations.flatMap((s) => s.subtypes.map((child, j) => ({ parent: s.supertype, child, path: `${s.path}.subtypes.${j}` }))),
+      ...model.categories.flatMap((c) => c.supertypes.map((parent, j) => ({ parent, child: c.subtype, path: `${c.path}.supertypes.${j}` }))),
+    ];
+    for (const { parent, child, path: at } of links) {
+      if (child === parent || edges.get(parent)?.has(child)) continue;
       const walk = (node: string, path: string[]) => {
-        if (node === s.supertype) {
-          diagnostics.push(finding(model, cycle, `${s.path}.subtypes.${j}`,
+        if (node === parent) {
+          diagnostics.push(finding(model, cycle, at,
             `Specialization cycle: ${[...path, child].join(" → ")}.`,
             "Remove a superclass/subclass link to break this cycle."));
           return;
@@ -27,9 +31,9 @@ const cycle: Rule = {
         for (const next of edges.get(node) ?? []) if (!path.includes(next)) walk(next, [...path, next]);
       };
       walk(child, [child]);
-      if (!edges.has(s.supertype)) edges.set(s.supertype, new Set());
-      edges.get(s.supertype)!.add(child);
-    });
+      if (!edges.has(parent)) edges.set(parent, new Set());
+      edges.get(parent)!.add(child);
+    }
     return diagnostics;
   },
 };
@@ -86,4 +90,41 @@ const attributeOverlap: Rule = {
   }),
 };
 
-export const eerRules: Rule[] = [self, cycle, duplicateSubtype, duplicateId, unknownAttribute, attributeOverlap];
+const categorySelf: Rule = {
+  id: "category-self", severity: "error",
+  description: "A category must differ from each of its superclasses.",
+  check: (model) => model.categories.flatMap((c) => c.supertypes.flatMap((parent, j) =>
+    parent === c.subtype ? [finding(model, categorySelf, `${c.path}.supertypes.${j}`,
+      `${c.subtype} cannot be a category of itself.`, "Remove the category from its own supertypes.")] : [])),
+};
+
+const duplicateSupertype: Rule = {
+  id: "duplicate-supertype", severity: "error",
+  description: "Superclasses must be unique within each category.",
+  check: (model) => model.categories.flatMap((c) => {
+    const seen = new Set<string>();
+    return c.supertypes.flatMap((parent, j) => {
+      const duplicate = seen.has(parent);
+      seen.add(parent);
+      return duplicate ? [finding(model, duplicateSupertype, `${c.path}.supertypes.${j}`,
+        `${c.name} repeats superclass ${parent}.`, "Remove the duplicate superclass.")] : [];
+    });
+  }),
+};
+
+const duplicateCategoryId: Rule = {
+  id: "duplicate-category-id", severity: "error",
+  description: "Normalized category names must be unique.",
+  check(model) {
+    const seen = new Set<string>();
+    return model.categories.flatMap((c) => {
+      const duplicate = seen.has(c.name);
+      seen.add(c.name);
+      return duplicate ? [finding(model, duplicateCategoryId, `${c.path}.id`,
+        `Category id ${c.name} is repeated.`, "Assign a unique explicit id to the category.")] : [];
+    });
+  },
+};
+
+export const eerRules: Rule[] = [self, cycle, duplicateSubtype, duplicateId, unknownAttribute, attributeOverlap,
+  categorySelf, duplicateSupertype, duplicateCategoryId];

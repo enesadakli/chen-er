@@ -1,4 +1,4 @@
-import { isSpecializationId, specializationOf, withSpecializationProxies } from "./eer.js";
+import { circleOf, isChildEnd, isEerCircleId, withSpecializationProxies } from "./eer.js";
 import type { Diagram } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 
@@ -7,7 +7,7 @@ export interface SemanticRelation { id: string; ends: SemanticEnd[] }
 export interface HierarchyPair { parent: string; child: string }
 
 export function modelRelations(model: NModel): SemanticRelation[] {
-  return withSpecializationProxies(model).relationships.map((r) => ({ id: r.id, ends: r.ends.map((e) => ({ entity: `E:${e.entity}`, max: e.max, weak: specializationOf(r) ? e.index > 0 : r.identifies === e.entity })) }));
+  return withSpecializationProxies(model).relationships.map((r) => ({ id: r.id, ends: r.ends.map((e) => ({ entity: `E:${e.entity}`, max: e.max, weak: circleOf(r) ? (circleOf(r)!.kind === "category") === (e.index === 0) : r.identifies === e.entity })) }));
 }
 
 /** Cardinality labels preserve the model semantics for diagram-only callers. */
@@ -17,8 +17,8 @@ export function semanticRelations(diagram: Diagram, model?: NModel): SemanticRel
     id: r.id,
     ends: diagram.edges.filter((e) => e.kind === "end" && e.from === r.id).map((e) => {
       const card = diagram.labels.find((l) => l.kind === "cardinality" && l.edge === e.id)?.text.match(/^\(\d+,\s*(\d+|N)\)$/);
-      return { entity: e.to, max: isSpecializationId(r.id) ? 1 : card?.[1] === "N" || !card ? "N" : Number(card[1]),
-        weak: isSpecializationId(r.id) ? e.end !== `${r.id}#super` : e.double };
+      return { entity: e.to, max: isEerCircleId(r.id) ? 1 : card?.[1] === "N" || !card ? "N" : Number(card[1]),
+        weak: isEerCircleId(r.id) ? isChildEnd(r.id, e.end) : e.double };
     }),
   }));
 }

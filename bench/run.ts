@@ -30,6 +30,8 @@ export const regressionBaseline: Record<string, Record<RegressionMetric, number>
   // Specialization lattice: AMPHIBIAN is a shared subclass of LAND_VEHICLE and WATER_VEHICLE. Two-subclass
   // groups centre their circle between columns, so each superclass reaches its circle with a Z route.
   "watercraft-lattice": { zRoutes: 4, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0495867768595042, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9194972349525514 },
+  // Category (union type): BOOKER under a u circle between MEMBER, CLUB and SPONSOR.
+  "room-booking-category": { zRoutes: 0, edgeCrossings: 0, endBendsMax: 1, routeDetourMax: 1.0152931180968565, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9360052078149939 },
   "eer-employee": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0789473684210527, attributeSpokeMax: 1.0735294117647058, emptyAreaRatio: 0.9467771077394788 },
   "eer-hospital": { zRoutes: 1, edgeCrossings: 0, endBendsMax: 2, routeDetourMax: 1.0523917995444192, attributeSpokeMax: 1.0588235294117647, emptyAreaRatio: 0.9179247991958909 },
   // Measured on the default engine; campus is the public stand-in for the private university model.

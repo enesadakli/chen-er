@@ -77,6 +77,7 @@ export function buildReport(input: ReportInput): ReportDoc {
       r.attrs.map(attribute).join(", "), r.identifies ? `Yes (${name(`E:${r.identifies}`)})` : "No",
     ])),
     ...model.specializations.map((s) => text(`Specialization: ${name(`E:${s.supertype}`)} → ${s.subtypes.map((n) => name(`E:${n}`)).join(", ")} (${s.disjointness}, ${s.completeness})${s.attribute ? `; defining attribute: ${s.attribute}` : ""}${Object.keys(s.predicates).length ? `; predicates: ${s.subtypes.filter((n) => s.predicates[n]).map((n) => `${name(`E:${n}`)}: ${s.predicates[n]}`).join(", ")}` : ""}.`)),
+    ...model.categories.map((c) => text(`Category (union type): ${name(`E:${c.subtype}`)} ⊆ ${c.supertypes.map((n) => name(`E:${n}`)).join(" ∪ ")} (${c.completeness}).`)),
   ];
   sections.push({ heading: "Model", blocks });
   if (requirements) {

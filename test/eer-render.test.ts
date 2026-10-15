@@ -14,7 +14,7 @@ function subsetEdge(toward: Point): DEdge {
 }
 
 describe("EER SVG geometry", () => {
-  it.each(["d", "o"] as const)("draws a centered %s circle in the supplied box", (symbol) => {
+  it.each(["d", "o", "u"] as const)("draws a centered %s circle in the supplied box", (symbol) => {
     const d = diagram();
     d.nodes.push({ id: "S:Person", kind: "specialization", label: "Ignored label", double: false,
       box: { x: 41, y: 67, w: 30, h: 30 }, specialization: { symbol } });

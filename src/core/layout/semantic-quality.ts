@@ -2,7 +2,7 @@ import { center, type Diagram } from "../geometry.js";
 import type { NModel } from "../normalize.js";
 import { distance, segments } from "./shapes.js";
 import { hierarchyDag, hierarchyPairs, semanticRelations } from "./semantic-graph.js";
-import { isSpecializationId } from "./eer.js";
+import { isEerCircleId } from "./eer.js";
 
 export interface SemanticQuality {
   hierarchyViolations: number;
@@ -54,7 +54,7 @@ export function semanticQuality(diagram: Diagram, medianWidth: number, model?: N
     const diamond = byId.get(r.id);
     // Circles belong above their subclass group, not at an n-ary relationship centroid.
     // Recursive relationships have no inter-entity span and are excluded.
-    if (diamond && !isSpecializationId(r.id) && count && span > 0) {
+    if (diamond && !isEerCircleId(r.id) && count && span > 0) {
       const centroid = { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
       offsets.push(distance(diamond, centroid) / (span / count));
     }

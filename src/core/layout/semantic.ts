@@ -1,6 +1,6 @@
 import { anchor, boxAround, center, intersects, type Box, type DNode, type Point } from "../geometry.js";
 import { flattenAttrs, type NModel } from "../normalize.js";
-import { specializationOf } from "./eer.js";
+import { circleOf } from "./eer.js";
 import type { Cluster } from "./clusters.js";
 import { hierarchyDag, hierarchyPairs, modelRelations } from "./semantic-graph.js";
 import { distance, segmentIntersection, segmentThrough } from "./shapes.js";
@@ -117,9 +117,10 @@ export function sinkRanks(ids: string[], ranks: Map<string, number>, pairs: { pa
 /** Static parts of the skeleton score are built once; the returned scorer adds terms in a fixed order. */
 function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Map<string, number>) => number {
   const relationships = model.relationships.map((r) => {
-    const ends = [...new Set(r.ends.map((e) => e.entity))], spec = specializationOf(r);
-    // A specialization circle sits over its subclasses, not at the centroid of all ends (see placeSemantically).
-    const circle = spec ? { supertype: `E:${spec.supertype}`, subtypes: spec.subtypes.map((name) => `E:${name}`) } : undefined;
+    const ends = [...new Set(r.ends.map((e) => e.entity))], eer = circleOf(r);
+    // An EER circle sits beside its fan, not at the centroid of all ends (see placeSemantically).
+    // A category hangs below its circle; a sideways category line costs more than a longer relationship.
+    const circle = eer ? { root: `E:${eer.root}`, fan: eer.fan.map((name) => `E:${name}`), rootWeight: eer.kind === "category" ? 3 : 1 } : undefined;
     return { id: r.id, ends: ends.map((name) => `E:${name}`), key: ends.join(";"), circle };
   }).filter((r) => r.ends.length >= 2);
   const entities = model.entities.map((e) => ({ key: `E:${e.name}`, degree: model.relationships.filter((r) => r.ends.some((end) => `E:${end.entity}` === e.id)).length }));
@@ -144,12 +145,12 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
     let score = 0;
     for (const r of relationships) {
       const points = r.ends.map(point);
-      const p = r.circle ? circlePoint(point(r.circle.supertype), r.circle.subtypes.map(point))
+      const p = r.circle ? circlePoint(point(r.circle.root), r.circle.fan.map(point))
         : { x: points.reduce((s, p) => s + p.x, 0) / points.length, y: points.reduce((s, p) => s + p.y, 0) / points.length };
       diamonds.push({ id: r.id, p, key: r.key });
       r.ends.forEach((_, i) => {
         const q = points[i]!;
-        score += distance(p, q) ** 2 * 5 + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
+        score += distance(p, q) ** 2 * 5 * (i === 0 ? r.circle?.rootWeight ?? 1 : 1) + (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01 ? 1.5 : 0);
         paths.push({ a: p, b: q });
       });
     }
@@ -178,10 +179,13 @@ function skeletonScorer(model: NModel): (columns: Map<string, number>, ranks: Ma
   };
 }
 
-/** Specialization circle: centred over the subclasses, 40% of the way down from the superclass. */
-function circlePoint(supertype: Point, subtypes: Point[]): Point {
-  const x = subtypes.reduce((sum, p) => sum + p.x, 0) / subtypes.length, y = subtypes.reduce((sum, p) => sum + p.y, 0) / subtypes.length;
-  return { x, y: supertype.y + (y - supertype.y) * 0.4 };
+/**
+ * EER circle: centred on its fan (subclasses of a specialization, superclasses of a category), 40% of
+ * the way from the root entity toward the fan.
+ */
+function circlePoint(root: Point, fan: Point[]): Point {
+  const x = fan.reduce((sum, p) => sum + p.x, 0) / fan.length, y = fan.reduce((sum, p) => sum + p.y, 0) / fan.length;
+  return { x, y: root.y + (y - root.y) * 0.4 };
 }
 
 export function placeSemantically(clusters: Cluster[], model: NModel, placement: SemanticPlacement, spacing = 430, reserved: Box[] = [], rowSpacing = spacing): void {
@@ -210,11 +214,11 @@ export function placeSemantically(clusters: Cluster[], model: NModel, placement:
     const ends = [...new Set(r.ends.map((e) => `E:${e.entity}`))].map((id) => byId.get(id)).filter((c): c is Cluster => !!c).map((c) => center(c.node.box));
     if (!ends.length) continue;
     const midpoint = { x: ends.reduce((s, p) => s + p.x, 0) / ends.length, y: isolatedTernary ? Math.min(...ends.map((p) => p.y)) : ends.reduce((s, p) => s + p.y, 0) / ends.length };
-    const spec = specializationOf(r);
-    if (spec && ends.length > 1) {
+    const eer = circleOf(r);
+    if (eer && ends.length > 1) {
       // Keep each circle over its own subclass group, including parallel specializations, and leave
       // the middle of the rank gap free for ordinary relationship diamonds.
-      Object.assign(midpoint, circlePoint(center(byId.get(`E:${spec.supertype}`)!.node.box), spec.subtypes.map((name) => center(byId.get(`E:${name}`)!.node.box))));
+      Object.assign(midpoint, circlePoint(center(byId.get(`E:${eer.root}`)!.node.box), eer.fan.map((name) => center(byId.get(`E:${name}`)!.node.box))));
     }
     const dx = ends.length > 1 ? ends[1]!.x - ends[0]!.x : 1, dy = ends.length > 1 ? ends[1]!.y - ends[0]!.y : 0;
     const norm = Math.hypot(dx, dy) || 1;
