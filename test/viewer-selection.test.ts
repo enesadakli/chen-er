@@ -22,3 +22,25 @@ for (const kind of ["binary", "recursive", "ternary"]) describe(`${kind} selecti
     }
   });
 });
+
+describe("specialization selection neighborhood", () => {
+  it("collects superclass, subclasses and predicate labels without needing a model owner", () => {
+    const diagram: import("../src/core/geometry.js").Diagram = {
+      width: 300, height: 300, notes: [], meta: { engine: "test" },
+      nodes: [
+        { id: "S:Person.0", kind: "specialization", label: "Person.0", double: false, box: { x: 90, y: 90, w: 30, h: 30 } },
+        ...["Person", "Student", "Teacher"].map((name, i) => ({ id: `E:${name}`, kind: "entity" as const, label: name, double: false, box: { x: i * 80, y: i ? 200 : 0, w: 70, h: 40 } })),
+      ],
+      edges: ["super", "Student", "Teacher"].map((end) => ({ id: `edge:S:Person.0#${end}`, kind: "end" as const, from: "S:Person.0", to: `E:${end === "super" ? "Person" : end}`, double: end === "super", points: [] })),
+      labels: [{ id: "predicate", kind: "specialization", text: "Job", edge: "edge:S:Person.0#Teacher", box: { x: 120, y: 150, w: 30, h: 18 } }],
+    };
+    for (const id of ["S:Person.0", "E:Student"]) {
+      const selection = selectionNeighborhood(diagram, id);
+      expect(selection.nodeIds.sort()).toEqual(diagram.nodes.map((n) => n.id).sort());
+      expect(selection.edgeIds).toHaveLength(3);
+      expect(selection.labelIds).toEqual(["predicate"]);
+      expect(selection.box).toBeDefined();
+    }
+    expect(() => selectionNeighborhood(diagram, "edge:S:Person.0#Teacher")).not.toThrow();
+  });
+});

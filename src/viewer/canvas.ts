@@ -137,6 +137,10 @@ export class NotebookCanvas {
       this.overlay.setAttribute("height", next.getAttribute("height")!);
       for (const node of state.diagram.nodes) {
         const group = this.group(node.id);
+        if (group && node.kind === "specialization" && !node.specialization?.symbol) {
+          const p = center(node.box);
+          group.append(svg("circle", { cx: p.x, cy: p.y, r: node.box.w / 2, fill: "transparent", "pointer-events": "all" }));
+        }
         group?.setAttribute("tabindex", "0");
         group?.setAttribute("role", "button");
         group?.setAttribute("aria-label", `${node.kind} ${node.label}${state.pins[node.id] ? ', pinned' : ''}. ${node.kind !== "attribute" ? "Enter opens actions; " : ""}arrow keys move; Delete unpins.`);
@@ -180,8 +184,8 @@ export class NotebookCanvas {
     const diagram = this.good?.diagram;
     if (!diagram || !this.has(id)) return false;
     this.selected = id; this.selectedFinding = undefined;
-    this.fit(/^[ER]:/.test(id) ? selectionNeighborhood(diagram, id).box : targetBox(diagram, id));
-    if (/^[ER]:/.test(id)) this.openActions(); else { this.actionsOpen = false; this.actions(); }
+    this.fit(/^[ERS]:/.test(id) ? selectionNeighborhood(diagram, id).box : targetBox(diagram, id));
+    if (/^[ERS]:/.test(id)) this.openActions(); else { this.actionsOpen = false; this.actions(); }
     this.drawOverlay();
     return true;
   }
@@ -209,6 +213,7 @@ export class NotebookCanvas {
     const box = targetBox(diagram ?? null, id);
     if (!diagram || !box) return undefined;
     const node = diagram.nodes.find((n) => n.id === id);
+    if (node?.kind === "specialization") return svg("circle", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, r: box.w / 2 + 6, ...attrs });
     if (node?.kind === "attribute") return svg("ellipse", { cx: box.x + box.w / 2, cy: box.y + box.h / 2, rx: box.w / 2 + 6, ry: box.h / 2 + 6, ...attrs });
     if (node?.kind === "relationship") return svg("polygon", { points: `${box.x + box.w / 2},${box.y - 6} ${box.x + box.w + 6},${box.y + box.h / 2} ${box.x + box.w / 2},${box.y + box.h + 6} ${box.x - 6},${box.y + box.h / 2}`, ...attrs });
     return svg("rect", { x: box.x - 6, y: box.y - 6, width: box.w + 12, height: box.h + 12, ...attrs });
@@ -218,7 +223,7 @@ export class NotebookCanvas {
   }
   private actionPosition() {
     const box = targetBox(this.good?.diagram ?? null, this.selected);
-    if (!box || !this.selected || !/^[ER]:/.test(this.selected)) { this.actions(); return; }
+    if (!box || !this.selected || !/^[ERS]:/.test(this.selected)) { this.actions(); return; }
     const diagram = this.good!.diagram!;
     // Diagram boxes already include the origin; offset locates diagram zero on screen.
     const screen = (box: Box): Box => ({ x: box.x * this.scale + this.offset.x,
@@ -255,10 +260,10 @@ export class NotebookCanvas {
     if (this.selected !== this.notifiedSelection) { this.notifiedSelection = this.selected; this.onSelection(this.selected); }
     const diagram = this.good?.diagram;
     if (!diagram) return;
-    const neighborhood = this.selected && /^[ER]:/.test(this.selected) ? selectionNeighborhood(diagram, this.selected) : undefined;
+    const neighborhood = this.selected && /^[ERS]:/.test(this.selected) ? selectionNeighborhood(diagram, this.selected) : undefined;
     const activeIds = new Set([...(neighborhood?.nodeIds ?? []), ...(neighborhood?.edgeIds ?? []), ...(neighborhood?.labelIds ?? [])]);
     for (const group of this.figure.querySelectorAll<SVGGElement>("svg:last-child g[data-id]")) {
-      const isElement = group.classList.contains("er-entity") || group.classList.contains("er-relationship") || group.classList.contains("er-attribute") || group.classList.contains("er-edge") || diagram.labels.some((l) => l.id === group.dataset.id);
+      const isElement = group.classList.contains("er-entity") || group.classList.contains("er-relationship") || group.classList.contains("er-attribute") || group.classList.contains("er-specialization") || group.classList.contains("er-edge") || diagram.labels.some((l) => l.id === group.dataset.id);
       group.classList.toggle("unrelated", !!neighborhood && isElement && !activeIds.has(group.dataset.id ?? ""));
       group.classList.toggle("connected", !!neighborhood && group.classList.contains("er-edge") && activeIds.has(group.dataset.id ?? ""));
     }
@@ -318,7 +323,7 @@ export class NotebookCanvas {
       this.pinch = { distance: Math.hypot(b.x - a.x, b.y - a.y), scale: this.scale, diagram: this.diagramPoint({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }) };
       return;
     }
-    const group = e.target instanceof Element ? e.target.closest<SVGGElement>(".er-entity, .er-relationship, .er-attribute") : null;
+    const group = e.target instanceof Element ? e.target.closest<SVGGElement>(".er-entity, .er-relationship, .er-attribute, .er-specialization") : null;
     const id = !this.space ? group?.dataset.id : undefined;
     const node = this.good?.diagram?.nodes.find((n) => n.id === id);
     if (id && e.altKey && this.state?.pins[id]) { void this.pin(id, null); this.touches.delete(e.pointerId); return; }

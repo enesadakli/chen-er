@@ -31,7 +31,7 @@ function harness(d: Diagram) {
     down(e: PointerEvent): void; move(e: PointerEvent): void; up(e: PointerEvent): void;
   };
   const placeholder = { hidden: false, textContent: "" };
-  vi.stubGlobal("document", { activeElement: null, querySelector: (selector: string) => selector === "#placeholder" ? placeholder : { setAttribute: vi.fn() } });
+  vi.stubGlobal("document", { activeElement: null, querySelector: (selector: string) => selector === "#placeholder" ? placeholder : { setAttribute: vi.fn(), focus: vi.fn() } });
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
   vi.stubGlobal("DOMParser", class { parseFromString() { return { documentElement: next }; } });
   Object.assign(document, { importNode: () => next });
@@ -115,5 +115,69 @@ describe("viewer canvas origin", () => {
     await Promise.resolve();
     expect(pin).toHaveBeenCalledWith("E:ITEM", free ? { x: -49, y: -177 } : { x: -48, y: -176 });
     expect(group.removeAttribute).toHaveBeenCalledWith("transform");
+  });
+});
+
+describe("viewer specialization interaction", () => {
+  const specialized = (): Diagram => ({ ...diagram(), nodes: [
+    { id: "S:ITEM.0", kind: "specialization", label: "ITEM.0", double: false, box: { x: 20, y: 30, w: 30, h: 30 } },
+  ] });
+
+  it("makes a symbol-free specialization focusable with an invisible pointer target", () => {
+    const { notebook, state } = harness(specialized());
+    const group = { setAttribute: vi.fn(), addEventListener: vi.fn(), append: vi.fn() };
+    const circle = { setAttribute: vi.fn() };
+    Object.assign(notebook, { group: () => group });
+    Object.assign(document, { createElementNS: vi.fn(() => circle) });
+    vi.stubGlobal("SVGGElement", class {});
+    notebook.show(state, []);
+    expect(group.setAttribute).toHaveBeenCalledWith("tabindex", "0");
+    expect(group.setAttribute).toHaveBeenCalledWith("role", "button");
+    expect(group.append).toHaveBeenCalledWith(circle);
+    expect(circle.setAttribute).toHaveBeenCalledWith("fill", "transparent");
+    expect(circle.setAttribute).toHaveBeenCalledWith("pointer-events", "all");
+    expect(circle.setAttribute).toHaveBeenCalledWith("r", "15");
+    vi.stubGlobal("Element", class {});
+    const focus = group.addEventListener.mock.calls.find(([event]) => event === "focus")![1];
+    expect(() => focus()).not.toThrow();
+    notebook.key({ key: "ArrowRight", altKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent);
+  });
+
+  it("draws a circular halo and safely focuses specialization and edge selections", () => {
+    const d = specialized();
+    d.edges.push({ id: "edge:S:ITEM.0#super", kind: "end", from: "S:ITEM.0", to: "E:ITEM", points: [{ x: 35, y: 30 }, { x: 35, y: 0 }], double: true });
+    const { notebook } = harness(d);
+    const shape = { setAttribute: vi.fn() }, create = vi.fn(() => shape);
+    Object.assign(document, { createElementNS: create });
+    const access = notebook as unknown as { haloShape(id: string, attrs: {}): unknown; selectElement(id: string): boolean; focusSelection(): void };
+    expect(access.haloShape("S:ITEM.0", {})).toBe(shape);
+    expect(create).toHaveBeenCalledWith("http://www.w3.org/2000/svg", "circle");
+    expect(shape.setAttribute).toHaveBeenCalledWith("r", "21");
+    expect(access.selectElement("S:ITEM.0")).toBe(true);
+    expect(() => access.focusSelection()).not.toThrow();
+    Object.assign(notebook, { selected: "edge:S:ITEM.0#super" });
+    expect(() => access.focusSelection()).not.toThrow();
+    expect(() => access.haloShape("edge:S:ITEM.0#super", {})).not.toThrow();
+  });
+
+  it("drags and keyboard-pins a specialization using its absolute center", async () => {
+    const { notebook, pin } = harness(specialized());
+    class Group {
+      dataset = { id: "S:ITEM.0" };
+      closest(selector: string) { return selector.includes(".er-specialization") ? this : null; }
+      focus() {}
+      setAttribute = vi.fn(); removeAttribute = vi.fn();
+    }
+    vi.stubGlobal("Element", Group);
+    const group = new Group();
+    const event = (clientX: number, clientY: number) => ({ button: 0, pointerId: 1, target: group, clientX, clientY, altKey: true }) as unknown as PointerEvent;
+    notebook.down(event(470, 540)); notebook.move(event(502, 556)); notebook.up(event(502, 556));
+    await Promise.resolve(); await Promise.resolve();
+    expect(pin).toHaveBeenCalledWith("S:ITEM.0", { x: 51, y: 53 });
+    notebook.key({ key: "ArrowRight", altKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent);
+    expect(pin).toHaveBeenLastCalledWith("S:ITEM.0", { x: 43, y: 45 });
+    notebook.key({ key: "Enter", preventDefault: vi.fn() } as unknown as KeyboardEvent);
+    notebook.key({ key: "Delete", preventDefault: vi.fn() } as unknown as KeyboardEvent);
+    expect(pin).toHaveBeenLastCalledWith("S:ITEM.0", null);
   });
 });
